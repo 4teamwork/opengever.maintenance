@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Dropped Plone 4.1 compatibility. Only 4.2 and up are supported.
+  [lgraf]
+
 - Added script to check for dossiers that are nested too deeply.
   [lgraf]
 
