@@ -6,6 +6,7 @@ from opengever.pdfconverter.behaviors.preview import IPreview
 from opengever.pdfconverter.interfaces import IPDFConverterSettings
 from plone.registry.interfaces import IRegistry
 from zope.component import getUtility
+import random
 import sys
 import transaction
 
@@ -75,6 +76,9 @@ class PDFConversionManager(object):
 
         brains = self.portal.portal_catalog(
                                 portal_type="opengever.document.document")
+        # Randomize order of documents so in case of failures the conversion
+        # doesn't get stuck with the same set of documents every time.
+        random.shuffle(brains)
 
         if self.options.verbose:
             print "Checking %s documents for preview PDFs..." % len(brains)
