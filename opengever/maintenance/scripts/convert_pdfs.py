@@ -15,81 +15,103 @@ try:
 except ImportError:
     from opengever.maintenance.utils import Counter
 
-SEPARATOR = '-' * 78
+
 # Print a warning message if more than batch_size * WARNING_FACTOR PDFs need
 # to be converted
 WARNING_FACTOR = 5
+SEPARATOR = '-' * 78
 
-def convert_pdfs(portal, options):
-    """Queue PDF conversion jobs for as many documents that don't have a preview
-    PDF yet as specified by the --batch-size option. 
-    """
+MSG_TOTAL = 'Total Documents: %i'
+MSG_OK = 'Docs OK: %i'
+MSG_PENDING = 'Docs with conversion pending: %i'
+MSG_NO_FILE = 'Docs without a file: %i'
+MSG_NO_CONVERSION_NEEDED = 'Docs with no conversion needed: %i'
+MSG_PDF_MISSING = 'Docs with missing PDF: %i'
 
-    brains = portal.portal_catalog(portal_type="opengever.document.document")
 
-    if options.verbose:
-        msg = "Checking %s documents for preview PDFs..." % len(brains)
-        print msg
-        print '-' * len(msg)
+class PDFConversionManager(object):
 
-    counter = Counter()
+    def __init__(self, portal, options):
+        self.portal = portal
+        self.options = options
+        self.counter = Counter()
 
-    registry = getUtility(IRegistry)
-    settings = registry.forInterface(IPDFConverterSettings)
+    def queue_conversion_job(self, brain):
+        """Queue a conversion job for a particular document.
+        """
+        if self.options.verbose:
+            print "Queueing conversion job..."
+        conversion_view = self.portal.restrictedTraverse(
+            '%s/pdfconversion' % '/'.join(brain.getPath().split('/')[2:]))
+        self.portal.REQUEST.form.update({'convert': '1'})
+        conversion_view()
+        transaction.commit()
+        self.counter['conversion_queued'] += 1
+        if self.options.verbose:
+            print "Conversion job queued."
 
-    for brain in brains:
-        doc = brain.getObject()
-        if doc.file:
-            if IPreview(doc).preview_file:
-                counter['ok'] += 1
-            elif IPreview(doc).conversion_state == CONVERSION_STATE_CONVERTING:
-                counter['pending'] += 1
-            else:
-                filename = doc.file.filename
-                file_ext = filename[filename.rfind('.') + 1:]
-                if file_ext not in settings.types_to_convert:
-                    counter['no_conversion_needed'] += 1
+    def print_stats(self, brains):
+        if self.options.verbose:
+            print MSG_TOTAL % len(brains)
+            print MSG_OK % self.counter['ok']
+            print MSG_PENDING % self.counter['pending']
+            print MSG_NO_FILE % self.counter['no_file']
+            print MSG_NO_CONVERSION_NEEDED % self.counter['no_conversion_needed']
+            print MSG_PDF_MISSING % self.counter['pdf_missing']
+            print SEPARATOR
+
+        print "%s docs need to be converted to PDF." % self.counter['pdf_missing']
+        print "%s conversion jobs queued." % self.counter['conversion_queued']
+
+        if self.counter['pdf_missing'] > WARNING_FACTOR * self.options.batch_size:
+            sys.stderr.write('WARNING: %s docs need to be converted to PDF.\n' %
+                             self.counter['pdf_missing'])
+
+    def convert_pdfs(self):
+        """Queue PDF conversion jobs for as many documents (that don't have a
+        preview PDF yet) as specified by the --batch-size option.
+        """
+
+        brains = self.portal.portal_catalog(
+                                portal_type="opengever.document.document")
+
+        if self.options.verbose:
+            print "Checking %s documents for preview PDFs..." % len(brains)
+            print SEPARATOR
+
+        registry = getUtility(IRegistry)
+        settings = registry.forInterface(IPDFConverterSettings)
+
+        for brain in brains:
+            doc = brain.getObject()
+            if doc.file:
+                if IPreview(doc).preview_file:
+                    self.counter['ok'] += 1
+                elif IPreview(doc).conversion_state == CONVERSION_STATE_CONVERTING:
+                    self.counter['pending'] += 1
                 else:
-                    counter['pdf_missing'] += 1
-                    if options.verbose:
-                        filename = doc.file.filename.encode('utf-8').ljust(45)
-                        conversion_state = str(IPreview(doc).conversion_state).ljust(5)
-                        url = doc.absolute_url().ljust(50)
-                        print 'PDF missing: %s | PDF STATUS: %s | %s' % (
-                            filename,
-                            conversion_state,
-                            url)
+                    filename = doc.file.filename
+                    file_ext = filename[filename.rfind('.') + 1:]
+                    if file_ext not in settings.types_to_convert:
+                        self.counter['no_conversion_needed'] += 1
+                    else:
+                        self.counter['pdf_missing'] += 1
+                        if self.options.verbose:
+                            filename = doc.file.filename.encode('utf-8').ljust(45)
+                            conversion_state = str(IPreview(doc).conversion_state).ljust(5)
+                            url = doc.absolute_url().ljust(50)
+                            print 'PDF missing: %s | PDF STATUS: %s | %s' % (
+                                filename,
+                                conversion_state,
+                                url)
 
-                    if options.convert and counter['conversion_queued'] < options.batch_size:
-                        # Queue a conversion job
-                        if options.verbose:
-                            print "start manually converting ..."
-                        conversion_view = portal.restrictedTraverse(
-                            '%s/pdfconversion' % '/'.join(brain.getPath().split('/')[2:]))
-                        portal.REQUEST.form.update({'convert': '1'})
-                        conversion_view()
-                        transaction.commit()
-                        counter['conversion_queued'] += 1
-                        if options.verbose:
-                            print "Manually converting started."
+                        if self.options.convert and self.counter['conversion_queued'] < self.options.batch_size:
+                            self.queue_conversion_job(brain)
 
-        else:
-            counter['no_file'] += 1
+            else:
+                self.counter['no_file'] += 1
 
-    if options.verbose:
-        print SEPARATOR
-        print 'Total Documents: %i' %(len(brains))
-        print 'Total Docs OK: %i' %(counter['ok'])
-        print 'Total Docs with conversion pending: %i' %(counter['pending'])
-        print 'Total Docs without a file: %i' %(counter['no_file'])
-        print 'Total Docs with no conversion needed: %i' %(counter['no_conversion_needed'])
-        print 'Total Docs with missing PDF: %i' %(counter['pdf_missing'])
-    else:
-        print counter['pdf_missing']
-
-    if counter['pdf_missing'] > WARNING_FACTOR * options.batch_size:
-        sys.stderr.write('WARNING: %s PDFs total need to be converted.\n' %
-                         counter['pdf_missing'])
+        self.print_stats(brains)
 
 
 def main():
@@ -102,7 +124,8 @@ def main():
 
     print SEPARATOR
     plone = setup_plone(app, options)
-    convert_pdfs(plone, options)
+    manager = PDFConversionManager(plone, options)
+    manager.convert_pdfs()
 
 if __name__ == '__main__':
     main()
