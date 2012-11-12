@@ -64,8 +64,9 @@ class PDFConversionManager(object):
         print "%s conversion jobs queued." % self.counter['conversion_queued']
 
         if self.counter['pdf_missing'] > WARNING_FACTOR * self.options.batch_size:
-            sys.stderr.write('WARNING: %s docs need to be converted to PDF.\n' %
-                             self.counter['pdf_missing'])
+            sys.stderr.write('WARNING: %s: %s docs need to be converted to PDF.\n' %
+                    (self.portal.id.upper(), self.counter['pdf_missing']))
+        print SEPARATOR
 
     def convert_pdfs(self):
         """Queue PDF conversion jobs for as many documents (that don't have a
