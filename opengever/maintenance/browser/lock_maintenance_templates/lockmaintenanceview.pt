@@ -1,0 +1,64 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      lang="en"
+      metal:use-macro="context/main_template/macros/master"
+      i18n:domain="opengever.maintenance">
+<head>
+  <metal:head metal:fill-slot="head_slot">
+  <style>
+  table {
+      border-collapse: separate !important;
+      border-spacing: 1em 0px !important;
+  }
+  </style>
+  </metal:head>
+</head>
+
+<body>
+
+<metal:main fill-slot="main">
+
+    <tal:main-macro metal:define-macro="main">
+
+    <div tal:replace="structure provider:plone.abovecontenttitle" />
+
+    <h1 class="documentFirstHeading">List of WebDAV Locks</h1> 
+
+    <div tal:replace="structure provider:plone.belowcontenttitle" />
+
+    <p class="documentDescription" tal:content="context/Description" />
+
+    <div tal:replace="structure provider:plone.abovecontentbody" />
+
+    <h2>Current WebDAV Locks being held</h2>
+    <table class="listing">
+        <tr>
+            <th>Document</th>
+            <th>Creator</th>
+            <th>Time</th>
+            <th>Duration</th>
+            <th>Type</th>
+            <th>Checked Out</th>
+            <th>Token</th>
+        </tr>
+        <tr tal:repeat="lock_info view/get_lock_infos">
+            <td><a tal:content="lock_info/title" tal:attributes="href lock_info/url"/></td>
+            <td tal:content="lock_info/creator"/>
+            <td tal:content="lock_info/time"/>
+            <td tal:content="lock_info/duration"/>
+            <td tal:content="lock_info/type"/>
+            <td tal:content="lock_info/checked_out"/>
+            <td tal:content="lock_info/token"/>
+        </tr>
+    </table>
+
+    <div class="visualClear"><!----></div>
+    <div tal:replace="structure provider:plone.belowcontentbody" />
+    <div class="visualClear"><!----></div>
+    </tal:main-macro>
+</metal:main>
+
+</body>
+</html>
