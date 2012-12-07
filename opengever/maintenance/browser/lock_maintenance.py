@@ -21,6 +21,11 @@ class LockMaintenanceView(grok.View):
     grok.context(IPloneSiteRoot)
     grok.require('cmf.ManagePortal')
 
+    def update(self):
+        # disable Plone's editable border
+        self.request.set('disable_border', True)
+        super(LockMaintenanceView, self).update()
+
     def get_lock_infos(self):
         results = []
         catalog = self.context.portal_catalog
