@@ -78,6 +78,7 @@ class PDFConversionManager(object):
                                 portal_type="opengever.document.document")
         # Randomize order of documents so in case of failures the conversion
         # doesn't get stuck with the same set of documents every time.
+        brains = list(brains)
         random.shuffle(brains)
 
         if self.options.verbose:
