@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Added script which check and update local roles on all tasks.
+  [phgross]
+
 - Added script to count brains of all available portal_types.
   [lgraf]
 
