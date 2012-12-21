@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Added script wich check and fix none-responsibles on task.
+  [phgross]
+
 - Added script which check and update local roles on all tasks.
   [phgross]
 
