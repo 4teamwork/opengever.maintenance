@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Added view to trigger a pdb breakpoint.
+  [lgraf]
+
 - Added script wich check and fix none-responsibles on task.
   [phgross]
 
