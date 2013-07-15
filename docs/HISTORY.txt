@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Added script for mass-checkin of documents checked out by a particular user.
+  [lgraf]
+
 - Added view to display request headers for file uploads, particularly
   the Content-Type sent by the browser.
   [lgraf]
