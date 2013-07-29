@@ -2,10 +2,12 @@ from Products.CMFCore.utils import getToolByName
 from StringIO import StringIO
 from five import grok
 from opengever.base.behaviors.utils import set_attachment_content_disposition
+from opengever.dossier.behaviors.dossier import IDossier
 from opengever.maintenance.filing.checker import FilingNumberChecker
 from xlwt import Workbook, XFStyle
 from zope.annotation import IAnnotations
 from zope.interface import Interface
+from zope.schema.vocabulary import getVocabularyRegistry
 import transaction
 
 
@@ -91,6 +93,7 @@ class FilingNumberFixer(FilingNumberChecker):
     def __init__(self, options, plone):
         self._fixed_dossiers = {}
         self._fixed_counters = {}
+        self._fixed_filing_prefixes = {}
 
         FilingNumberChecker.__init__(self, options, plone)
 
@@ -105,6 +108,9 @@ class FilingNumberFixer(FilingNumberChecker):
             self._fixed_counters[key].append((old, new))
         else:
             self._fixed_counters[key] = [(old, new), ]
+
+    def log_filing_prefixes_changes(self, path, new):
+        self._fixed_filing_prefixes[path] = new
 
     def fix_legacy_filing_prefixes(self):
         fn_and_paths = self.check_for_legacy_filing_prefixes()
@@ -121,6 +127,8 @@ class FilingNumberFixer(FilingNumberChecker):
 
             # logging
             self.log_fn_changes(path, fn, new_fn)
+            self.log_filing_prefixes_changes(
+                path, self.legacy_prefixes.get(fn_parts[0]))
 
         # check if the fix worked well
         # reset filing_numbers
@@ -154,11 +162,14 @@ class FilingNumberFixer(FilingNumberChecker):
                 new_fn = '%s-%s' % (
                     self.current_client_prefix, fn.lstrip('-'))
 
+                self.log_filing_prefixes_changes(path, new_fn.split('-')[1])
+
             obj = self.plone.unrestrictedTraverse(path.strip('/'))
             self._set_filing_number_without_reindex(obj, new_fn)
 
             # logging
             self.log_fn_changes(path, fn, new_fn)
+
 
         # check if the fix worked well
         # reset filing_numbers
@@ -196,6 +207,7 @@ class FilingNumberFixer(FilingNumberChecker):
 
             # logging
             self.log_fn_changes(path, fn, new_fn)
+            self.log_filing_prefixes_changes(path, new_fn.split('-')[1])
 
         # check if the fix worked well
         # reset filing_numbers
@@ -370,7 +382,8 @@ class FixFilingNumbers(grok.View):
         # duplicates
         fixer.fix_duplicates()
 
-        # store old filing number in the annotation of the obj
+        self.update_filing_prefixes(fixer._fixed_filing_prefixes)
+
         self.store_old_numbers(fixer._fixed_dossiers)
 
         # all fixers done
@@ -382,7 +395,9 @@ class FixFilingNumbers(grok.View):
                 'some problems %s' % (str(checker.results)))
 
         data = self.generate_excel(
-            fixer._fixed_dossiers, fixer.get_filing_number_counters())
+            fixer._fixed_dossiers,
+            fixer.get_filing_number_counters(),
+            fixer._fixed_filing_prefixes)
         response = self.request.RESPONSE
 
         response.setHeader('Content-Type', 'application/vnd.ms-excel')
@@ -392,17 +407,35 @@ class FixFilingNumbers(grok.View):
         return data
 
     def store_old_numbers(self, fixed_dossiers):
+        """store old filing number in the annotation of the obj
+        """
+
         for path, numbers in fixed_dossiers.items():
             obj = self.context.unrestrictedTraverse(path)
             ann = IAnnotations(obj)
             ann[OLD_FILING_NUMBER_KEY] = numbers[0][0]
 
-    def generate_excel(self, fixed_dossiers, counters):
+    def update_filing_prefixes(self, fixed_dossiers):
+        for path, prefix in fixed_dossiers.items():
+            obj = self.context.unrestrictedTraverse(path)
+            IDossier(obj).filing_prefix = self.get_prefix_value(obj, prefix)
+            obj.reindexObject()
+
+    def get_prefix_value(self, obj, prefix):
+        if not hasattr(self, 'prefix_vocabulary'):
+            voca = getVocabularyRegistry().get(obj, 'opengever.dossier.type_prefixes')
+            self.prefix_vocabulary = {}
+            for value, term in voca.by_value.items():
+                self.prefix_vocabulary[term.title] = value
+
+        return self.prefix_vocabulary.get(prefix)
+
+    def generate_excel(self, fixed_dossiers, counters, fixed_prefixes):
         w = Workbook()
 
         self._add_dossier_sheet(w, fixed_dossiers)
         self._add_counters_sheet(w, counters)
-
+        self._add_prefix_sheet(w, fixed_prefixes)
         data = StringIO()
         w.save(data)
         data.seek(0)
@@ -435,3 +468,15 @@ class FixFilingNumbers(grok.View):
         # set_size
         sheet.col(0).width = 5000
         sheet.col(1).width = 5000
+
+    def _add_prefix_sheet(self, w, prefixes):
+        sheet = w.add_sheet('changed prefixes')
+
+        for r, path in enumerate(prefixes.keys()):
+            sheet.write(r, 0, path, TITLE_STYLE)
+            sheet.write(r, 1, prefixes.get(path), NEW_STYLE)
+
+        # set_size
+        sheet.col(0).width = 17500
+        for i in range(1, 16):
+            sheet.col(i).width = 5000
