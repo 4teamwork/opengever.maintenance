@@ -66,10 +66,10 @@ FILING_PREFIX_MAPPING = {
     'gd-gds': {
         u'Gesundheitsdirektion': u'Direktion',
     },
-    'vd-vds':{
+    'vd-vds': {
         u'Volkswirtschaftsdirektion': u'Direktion',
     },
-    'dbk-dbks':{
+    'dbk-dbks': {
         u'Direktion f\xfcr Bildung und Kultur': u'Direktion',
         u'Sicherheitsdirektion': u'Direktion',
         u'Gesundheitsdirektion': u'Direktion',
@@ -169,7 +169,6 @@ class FilingNumberFixer(FilingNumberChecker):
 
             # logging
             self.log_fn_changes(path, fn, new_fn)
-
 
         # check if the fix worked well
         # reset filing_numbers
@@ -423,7 +422,9 @@ class FixFilingNumbers(grok.View):
 
     def get_prefix_value(self, obj, prefix):
         if not hasattr(self, 'prefix_vocabulary'):
-            voca = getVocabularyRegistry().get(obj, 'opengever.dossier.type_prefixes')
+            voca = getVocabularyRegistry().get(
+                obj, 'opengever.dossier.type_prefixes')
+
             self.prefix_vocabulary = {}
             for value, term in voca.by_value.items():
                 self.prefix_vocabulary[term.title] = value
