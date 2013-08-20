@@ -84,7 +84,7 @@ FILING_PREFIX_MAPPING = {
 
 CLIENT_PREFIX_MAPPING = {
     'di-zibu': {'DI.ZBD': 'DI ZIBU'},
-
+    'kom-nlk': {'BD.NLK': 'KOM NLK'},
 }
 
 
