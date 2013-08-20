@@ -33,7 +33,7 @@ class FakeOptions(object):
 
 FILING_PREFIX_MAPPING = {
     'ska-kr': {'Amt': u'Kantonsrat', },
-    'kok-koko': {
+    'kom-koko': {
         'Finanzdirektion': u'KOM',
         'Kantonsrat': u'KOM'},
     'dbk-ams': {
