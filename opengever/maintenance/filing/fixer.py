@@ -352,8 +352,6 @@ class FixFilingNumbers(grok.View):
 
     def render(self):
 
-        transaction.doom()
-
         fixer = FilingNumberFixer(FakeOptions(), self.context)
         fixer.run()
 
@@ -399,6 +397,7 @@ class FixFilingNumbers(grok.View):
             fixer._fixed_filing_prefixes)
         response = self.request.RESPONSE
 
+        transaction.commit()
         response.setHeader('Content-Type', 'application/vnd.ms-excel')
         set_attachment_content_disposition(
             self.request, "dossier_report.xls")
