@@ -18,24 +18,6 @@ NEW_BUILDOUT_NAMING_SCHEME = re.compile(r'[0-9]*plone-(.*)$')
 OG_CLIENT_SCHEMA = re.compile(r'(.*)-(.*)')
 
 
-cwd = os.getcwd()
-bin_script_path = os.path.join(cwd, sys.argv[0])
-buildout_dir = os.path.dirname(os.path.dirname(bin_script_path))
-logdir = os.path.join(buildout_dir, 'var', 'log')
-
-buildout_name = os.path.basename(buildout_dir)
-
-match = OLD_BUILDOUT_NAMING_SCHEME.match(buildout_name)
-if match is None:
-    # Try new buildout naming scheme (01-plone-foo-bar)
-    match = NEW_BUILDOUT_NAMING_SCHEME.match(buildout_name)
-    if match is None:
-        raise Exception("Could not determine directorate from buildout name '%s'" %
-                        buildout_name)
-
-site_id = match.group(1)
-directorate = OG_CLIENT_SCHEMA.match(site_id).group(1)
-
 
 stats = dict()
 
@@ -60,7 +42,7 @@ class LogParser(apachelog.parser):
         return aliases.get(name, name)
 
 
-def merge_logs(start_date):
+def merge_logs(start_date, logdir):
     start_date_str = start_date.strftime("%b/%Y")
     pkg_dir = os.path.dirname(__file__)
     script_path = os.path.join(pkg_dir, 'scripts', 'logresolvemerge.pl')
@@ -89,7 +71,7 @@ def merge_logs(start_date):
         os.rename("%s/merged_truncated.log" % logdir, "%s/merged.log" % logdir)
 
 
-def analyze_log(start_date, end_date):
+def analyze_log(start_date, end_date, logdir, site_id, directorate):
     """Parse Z2 log (common log format).
     Example line:
     10.11.111.43 - Anonymous [31/Dec/2012:17:11:28 +0200] "GET /di-kes/portal_css/some.css HTTP/1.1" 200 2204 "http://0000oglx10:14301/di-kes/referer" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:17.0) Gecko/20100101 Firefox/17.0"
@@ -157,7 +139,7 @@ def analyze_log(start_date, end_date):
 
     # Write out stats to CSV
     csv_filename = 'log_stats.csv'
-    csv_data = generate_csv(stats)
+    csv_data = generate_csv(stats, site_id, directorate)
     csv_file = open(csv_filename, 'w')
     csv_file.write(csv_data)
     csv_file.close()
@@ -165,7 +147,7 @@ def analyze_log(start_date, end_date):
 
 
 @join_lines
-def generate_csv(stats):
+def generate_csv(stats, site_id, directorate):
     yield "SITE;DIRECTORATE;MONTH;VIEWS;USERS;TOP_USER_1_NAME;TOP_USER_1_VIEWS;TOP_USER_2_NAME;TOP_USER_2_VIEWS;TOP_USER_3_NAME;TOP_USER_3_VIEWS;EE"
     for month_key in sorted(stats.keys()):
         top_users = stats[month_key]['users'].most_common(3)
@@ -198,6 +180,31 @@ def generate_csv(stats):
         yield ';'.join(values)
 
 
+
+def get_names():
+    """
+    XXX: Refactor me!
+    """
+    cwd = os.getcwd()
+    bin_script_path = os.path.join(cwd, sys.argv[0])
+    buildout_dir = os.path.dirname(os.path.dirname(bin_script_path))
+    logdir = os.path.join(buildout_dir, 'var', 'log')
+
+    buildout_name = os.path.basename(buildout_dir)
+
+    match = OLD_BUILDOUT_NAMING_SCHEME.match(buildout_name)
+    if match is None:
+        # Try new buildout naming scheme (01-plone-foo-bar)
+        match = NEW_BUILDOUT_NAMING_SCHEME.match(buildout_name)
+        if match is None:
+            raise Exception("Could not determine directorate from buildout name '%s'" %
+                            buildout_name)
+
+    site_id = match.group(1)
+    directorate = OG_CLIENT_SCHEMA.match(site_id).group(1)
+    return (logdir, site_id, directorate)
+
+
 def main():
     if not len(sys.argv) == 3:
         print "Usage: bin/analyze-logs <start date> <end date>"
@@ -210,6 +217,8 @@ def main():
     start = datetime.strptime(start, INPUT_DATEFMT)
     end = datetime.strptime(end, INPUT_DATEFMT) + timedelta(days=1)
 
-    merge_logs(start)
-    analyze_log(start, end)
+    logdir, site_id, directorate = get_names()
+
+    merge_logs(start, logdir)
+    analyze_log(start, end, logdir, site_id, directorate)
 
