@@ -11,8 +11,11 @@ import sys
 
 
 VERBOSE = False
-NEW_CLIENT_NAME_RE = re.compile(r'[0-9]*-plone-([a-z]*)-([a-z]*)')
-OLD_CLIENT_NAME_RE = re.compile(r'plone[0-9]*-([a-z]*)-([a-z]*)')
+
+OLD_BUILDOUT_NAMING_SCHEME = re.compile(r'plone[0-9]*-(.*)$')
+NEW_BUILDOUT_NAMING_SCHEME = re.compile(r'[0-9]*plone-(.*)$')
+
+OG_CLIENT_SCHEMA = re.compile(r'(.*)-(.*)')
 
 
 cwd = os.getcwd()
@@ -20,17 +23,19 @@ bin_script_path = os.path.join(cwd, sys.argv[0])
 buildout_dir = os.path.dirname(os.path.dirname(bin_script_path))
 logdir = os.path.join(buildout_dir, 'var', 'log')
 
-site_name = os.path.basename(buildout_dir)
-#site_name = 'plone01-ska-arch'
-match = OLD_CLIENT_NAME_RE.match(site_name)
+buildout_name = os.path.basename(buildout_dir)
+
+match = OLD_BUILDOUT_NAMING_SCHEME.match(buildout_name)
 if match is None:
     # Try new buildout naming scheme (01-plone-foo-bar)
-    match = NEW_CLIENT_NAME_RE.match(site_name)
+    match = NEW_BUILDOUT_NAMING_SCHEME.match(buildout_name)
     if match is None:
-        raise Exception("Could not determine directorate from site name '%s'" %
-                        site_name)
+        raise Exception("Could not determine directorate from buildout name '%s'" %
+                        buildout_name)
 
-directorate = match.group(1)
+site_id = match.group(1)
+directorate = OG_CLIENT_SCHEMA.match(site_id).group(1)
+
 
 stats = dict()
 
@@ -175,7 +180,7 @@ def generate_csv(stats):
         #print month_key
         num_users = len(stats[month_key]['users'].keys())
         values = [
-            site_name,
+            site_id,
             directorate,
             month_key,
             stats[month_key]['views'],
