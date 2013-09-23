@@ -25,10 +25,14 @@ setup(name='opengever.maintenance',
       install_requires=[
           'setuptools',
           'Plone',
+          'apachelog',
       ],
       entry_points="""
       # -*- Entry points: -*-
       [z3c.autoinclude.plugin]
       target = plone
+
+      [console_scripts]
+      analyze-logs = opengever.maintenance.analyze_logs:main
       """,
       )
