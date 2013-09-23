@@ -21,7 +21,7 @@ buildout_dir = os.path.dirname(os.path.dirname(bin_script_path))
 logdir = os.path.join(buildout_dir, 'var', 'log')
 
 site_name = os.path.basename(buildout_dir)
-site_name = 'plone01-ska-arch'
+#site_name = 'plone01-ska-arch'
 match = OLD_CLIENT_NAME_RE.match(site_name)
 if match is None:
     # Try new buildout naming scheme (01-plone-foo-bar)
