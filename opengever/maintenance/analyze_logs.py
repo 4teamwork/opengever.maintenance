@@ -11,7 +11,8 @@ import sys
 
 
 VERBOSE = False
-CLIENT_NAME_RE = re.compile(r'[0-9]*-plone-([a-z]*)-([a-z]*)')
+NEW_CLIENT_NAME_RE = re.compile(r'[0-9]*-plone-([a-z]*)-([a-z]*)')
+OLD_CLIENT_NAME_RE = re.compile(r'plone[0-9]*-([a-z]*)-([a-z]*)')
 
 
 cwd = os.getcwd()
@@ -20,11 +21,14 @@ buildout_dir = os.path.dirname(os.path.dirname(bin_script_path))
 logdir = os.path.join(buildout_dir, 'var', 'log')
 
 site_name = os.path.basename(buildout_dir)
-#site_name = '01-plone-ska-arch'
-match = CLIENT_NAME_RE.match(site_name)
+site_name = 'plone01-ska-arch'
+match = OLD_CLIENT_NAME_RE.match(site_name)
 if match is None:
-    raise Exception("Could not determine directorate from site name '%s'" %
-                    site_name)
+    # Try new buildout naming scheme (01-plone-foo-bar)
+    match = NEW_CLIENT_NAME_RE.match(site_name)
+    if match is None:
+        raise Exception("Could not determine directorate from site name '%s'" %
+                        site_name)
 
 directorate = match.group(1)
 
