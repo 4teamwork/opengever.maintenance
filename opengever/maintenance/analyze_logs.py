@@ -139,40 +139,10 @@ def analyze_log(start_date, end_date):
 
         month_key = log_time.strftime('%Y-%m')
         if not month_key in stats:
-            stats[month_key] = dict(users=Counter(), views=0, top_user_name='', top_user_views=0, dossiers=0, docs=0, tasks=0, mails=0, ee=0)
+            stats[month_key] = dict(users=Counter(), views=0, top_user_name='', top_user_views=0, ee=0)
 
         stats[month_key]['users'][data['userid']] += 1
         stats[month_key]['views'] += 1
-
-        if method == 'POST':
-            dossier_added_match = re.match('.*/\+\+add\+\+.*dossier.*$', path)
-            if dossier_added_match:
-                stats[month_key]['dossiers'] += 1
-
-            doc_added_match = re.match('.*/\+\+add\+\+opengever.document.document$', path)
-            if doc_added_match:
-                stats[month_key]['docs'] += 1
-
-            task_added_match = re.match('.*/\+\+add\+\+.*task.*$', path)
-            if task_added_match:
-                stats[month_key]['tasks'] += 1
-
-            mail_added_match = re.match('.*/\+\+add\+\+.*mail.*$', path)
-            mail_inbound_match = re.match('.*/mail-inbound$', path)
-            if mail_added_match or mail_inbound_match:
-                stats[month_key]['mails'] += 1
-
-            quickupload_match = re.match('.*/quick_upload$', path)
-            if quickupload_match:
-                if 'quick_upload_file' in path:
-                    if ('.msg' in path or '.eml' in path):
-                        # It's a mail
-                        stats[month_key]['mails'] += 1
-                    else:
-                        stats[month_key]['docs'] += 1
-                else:
-                    # Quickupload - unknown type, count as doc
-                    stats[month_key]['docs'] += 1
 
         ee_match = re.match('.*externalEdit.*$', path)
         if ee_match and not data['status'] == 302:
@@ -181,15 +151,17 @@ def analyze_log(start_date, end_date):
     logfile.close()
 
     # Write out stats to CSV
+    csv_filename = 'log_stats.csv'
     csv_data = generate_csv(stats)
-    csv_file = open('stats.csv', 'w')
+    csv_file = open(csv_filename, 'w')
     csv_file.write(csv_data)
     csv_file.close()
+    print "Wrote logfile stats to '%s'." % csv_filename
 
 
 @join_lines
 def generate_csv(stats):
-    yield "SITE;DIRECTORATE;MONTH;VIEWS;USERS;TOP_USER_1_NAME;TOP_USER_1_VIEWS;TOP_USER_2_NAME;TOP_USER_2_VIEWS;TOP_USER_3_NAME;TOP_USER_3_VIEWS;EE;DOSSIERS;DOCS;TASKS;MAILS"
+    yield "SITE;DIRECTORATE;MONTH;VIEWS;USERS;TOP_USER_1_NAME;TOP_USER_1_VIEWS;TOP_USER_2_NAME;TOP_USER_2_VIEWS;TOP_USER_3_NAME;TOP_USER_3_VIEWS;EE"
     for month_key in sorted(stats.keys()):
         top_users = stats[month_key]['users'].most_common(3)
         while not len(top_users) == 3:
@@ -215,10 +187,6 @@ def generate_csv(stats):
             stats[month_key]['top_user_3_name'],
             stats[month_key]['top_user_3_views'],
             stats[month_key]['ee'],
-            stats[month_key]['dossiers'],
-            stats[month_key]['docs'],
-            stats[month_key]['tasks'],
-            stats[month_key]['mails'],
             ]
         for i, value in enumerate(values):
             values[i] = str(value)
