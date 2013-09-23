@@ -35,6 +35,7 @@ class BrainStatsBuilder(object):
                                    day=1)
         self.plone = globals()['plone']
         self.catalog = self.plone.portal_catalog
+        self.site_id = self.plone.id
 
     def generate_stats(self):
         current_month = self.start_date.month
@@ -108,14 +109,19 @@ class BrainStatsBuilder(object):
 
     @join_lines
     def generate_csv(self):
-        yield "MONTH;DOSSIERS;DOCS;TASKS;MAILS;TOTAL"
+        site_id = self.site_id
+        directorate = site_id.split('-')[0]
+        yield "SITE;DIRECTORATE;MONTH;DOSSIERS;DOCS;TASKS;MAILS;TOTAL"
         for month_key in sorted(self.stats.keys()):
-            line = "%s;%s;%s;%s;%s;%s" % (month_key,
-                                          self.stats[month_key]['dossiers'],
-                                          self.stats[month_key]['docs'],
-                                          self.stats[month_key]['tasks'],
-                                          self.stats[month_key]['mails'],
-                                          self.stats[month_key]['total'],
+            line = "%s;%s;%s;%s;%s;%s;%s;%s" % (
+                site_id,
+                directorate,
+                month_key,
+                self.stats[month_key]['dossiers'],
+                self.stats[month_key]['docs'],
+                self.stats[month_key]['tasks'],
+                self.stats[month_key]['mails'],
+                self.stats[month_key]['total'],
             )
             yield line
 
