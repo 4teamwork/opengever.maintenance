@@ -119,15 +119,6 @@ class BrainStatsBuilder(object):
             )
             yield line
 
-        line = "%s;%s;%s;%s;%s;%s" % ('TOTAL',
-                                      self.stats['TOTAL']['dossiers'],
-                                      self.stats['TOTAL']['docs'],
-                                      self.stats['TOTAL']['tasks'],
-                                      self.stats['TOTAL']['mails'],
-                                      self.stats['TOTAL']['total'],
-        )
-        yield line
-
 
 def main():
     setup_debug_mode()
