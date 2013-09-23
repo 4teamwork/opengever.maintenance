@@ -1,0 +1,238 @@
+from collections import Counter
+from datetime import datetime
+from datetime import timedelta
+from opengever.maintenance.utils import join_lines
+from subprocess import CalledProcessError
+import apachelog
+import os
+import re
+import subprocess
+import sys
+
+
+VERBOSE = False
+CLIENT_NAME_RE = re.compile(r'[0-9]*-plone-([a-z]*)-([a-z]*)')
+
+
+cwd = os.getcwd()
+bin_script_path = os.path.join(cwd, sys.argv[0])
+buildout_dir = os.path.dirname(os.path.dirname(bin_script_path))
+logdir = os.path.join(buildout_dir, 'var', 'log')
+
+site_name = os.path.basename(buildout_dir)
+#site_name = '01-plone-ska-arch'
+match = CLIENT_NAME_RE.match(site_name)
+if match is None:
+    raise Exception("Could not determine directorate from site name '%s'" %
+                    site_name)
+
+directorate = match.group(1)
+
+stats = dict()
+
+INPUT_DATEFMT = "%d-%m-%Y"
+LOG_DATEFMT = "%d/%b/%Y:%H:%M:%S"
+FILTER_TYPES = ['.css', '.js', '.png', '.gif', '.kss']
+FILTER_TERMS = ['livesearch_reply', '@@search?SearchableText', 'transition-resolve', 'transition-archive', 'listing?ajax_load']
+FILTER_USERS = ['TE1COC', 'Anonymous', 'zopemaster', 'lukas.graf@4teamwork.ch', 'philippe.gross@4teamwork.ch']
+
+
+class LogParser(apachelog.parser):
+    def alias(self, name):
+        aliases = {'%h': 'host',
+                   '%l': 'ident',
+                   '%u': 'userid',
+                   '%t': 'time',
+                   '%r': 'request',
+                   '%>s': 'status',
+                   '%b': 'bytes',
+                   '%{User-agent}i': 'user_agent',
+                   '%{Referer}i': 'referer'}
+        return aliases.get(name, name)
+
+
+def merge_logs(start_date):
+    start_date_str = start_date.strftime("%b/%Y")
+    pkg_dir = os.path.dirname(__file__)
+    script_path = os.path.join(pkg_dir, 'scripts', 'logresolvemerge.pl')
+    print "Merging logs in %s..." % logdir
+    cmd = "perl %s %s/instance?-Z2.log > %s/merged.log" % (script_path, logdir, logdir)
+    out = subprocess.check_output(cmd, shell=True)
+    print out
+
+    # Truncate logs
+    print "Truncating logs..."
+
+    partial_logfile = False
+    cmd = "grep '%s' %s/merged.log" % (start_date_str, logdir)
+    try:
+        out = subprocess.check_output(cmd, shell=True)
+    except CalledProcessError:
+        # No match -> logfile probably starts after start_date
+        partial_logfile = True
+
+    if not partial_logfile:
+        cmd = "grep -A 99999999 '%s' %s/merged.log > %s/merged_truncated.log" % (start_date_str, logdir, logdir)
+        out = subprocess.check_output(cmd, shell=True)
+        print out
+
+        # Move truncated file back, overwriting original
+        os.rename("%s/merged_truncated.log" % logdir, "%s/merged.log" % logdir)
+
+
+def analyze_log(start_date, end_date):
+    """Parse Z2 log (common log format).
+    Example line:
+    10.11.111.43 - Anonymous [31/Dec/2012:17:11:28 +0200] "GET /di-kes/portal_css/some.css HTTP/1.1" 200 2204 "http://0000oglx10:14301/di-kes/referer" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:17.0) Gecko/20100101 Firefox/17.0"
+    """
+    format = apachelog.formats['extended']
+    parser = LogParser(format)
+
+    lineno = 0
+    logfile = open("%s/merged.log" % logdir, 'r')
+    for line in logfile:
+        lineno += 1
+        if lineno % 10000 == 0:
+            sys.stderr.write("Parsing line %s...\n" % lineno)
+        filter_line = False
+        try:
+            data = parser.parse(line.strip())
+        except apachelog.ApacheLogParserError:
+            if VERBOSE:
+                print "WARNING: Couldn't parse line: \n%s" % line
+            continue
+
+        request_pattern = re.compile(r'([A-Z]*) (.*) (HTTP/.*)')
+        method, path, http = request_pattern.match(data['request']).groups()
+
+        # Strip UTC offset because using %z with strptime doesn't work
+        time = re.match('\[(.*?) \+0200\]', data['time']).group(1)
+        log_time = datetime.strptime(time, LOG_DATEFMT)
+
+        # Filter users we don't care about
+        if any([u in data['userid'] for u in FILTER_USERS]):
+            continue
+
+        # Stop parsing at end of date range
+        if log_time > end_date:
+            break
+
+        # Filter by date range
+        if not(log_time > start_date and log_time < end_date):
+            continue
+
+        # Filter types we're not interested in
+        for filter_type in FILTER_TYPES:
+            if path.endswith(filter_type) or "%s?" % filter_type in path:
+                filter_line = True
+        for filter_term in FILTER_TERMS:
+            if filter_term in path:
+                filter_line = True
+
+        if filter_line:
+            continue
+
+
+        month_key = log_time.strftime('%Y-%m')
+        if not month_key in stats:
+            stats[month_key] = dict(users=Counter(), views=0, top_user_name='', top_user_views=0, dossiers=0, docs=0, tasks=0, mails=0, ee=0)
+
+        stats[month_key]['users'][data['userid']] += 1
+        stats[month_key]['views'] += 1
+
+        if method == 'POST':
+            dossier_added_match = re.match('.*/\+\+add\+\+.*dossier.*$', path)
+            if dossier_added_match:
+                stats[month_key]['dossiers'] += 1
+
+            doc_added_match = re.match('.*/\+\+add\+\+opengever.document.document$', path)
+            if doc_added_match:
+                stats[month_key]['docs'] += 1
+
+            task_added_match = re.match('.*/\+\+add\+\+.*task.*$', path)
+            if task_added_match:
+                stats[month_key]['tasks'] += 1
+
+            mail_added_match = re.match('.*/\+\+add\+\+.*mail.*$', path)
+            mail_inbound_match = re.match('.*/mail-inbound$', path)
+            if mail_added_match or mail_inbound_match:
+                stats[month_key]['mails'] += 1
+
+            quickupload_match = re.match('.*/quick_upload$', path)
+            if quickupload_match:
+                if 'quick_upload_file' in path:
+                    if ('.msg' in path or '.eml' in path):
+                        # It's a mail
+                        stats[month_key]['mails'] += 1
+                    else:
+                        stats[month_key]['docs'] += 1
+                else:
+                    # Quickupload - unknown type, count as doc
+                    stats[month_key]['docs'] += 1
+
+        ee_match = re.match('.*externalEdit.*$', path)
+        if ee_match and not data['status'] == 302:
+            stats[month_key]['ee'] += 1
+
+    logfile.close()
+
+    # Write out stats to CSV
+    csv_data = generate_csv(stats)
+    csv_file = open('stats.csv', 'w')
+    csv_file.write(csv_data)
+    csv_file.close()
+
+
+@join_lines
+def generate_csv(stats):
+    yield "SITE;DIRECTORATE;MONTH;VIEWS;USERS;TOP_USER_1_NAME;TOP_USER_1_VIEWS;TOP_USER_2_NAME;TOP_USER_2_VIEWS;TOP_USER_3_NAME;TOP_USER_3_VIEWS;EE;DOSSIERS;DOCS;TASKS;MAILS"
+    for month_key in sorted(stats.keys()):
+        top_users = stats[month_key]['users'].most_common(3)
+        while not len(top_users) == 3:
+            top_users.append(('',''))
+        stats[month_key]['top_user_1_name'] = top_users[0][0]
+        stats[month_key]['top_user_1_views'] = top_users[0][1]
+        stats[month_key]['top_user_2_name'] = top_users[1][0]
+        stats[month_key]['top_user_2_views'] = top_users[1][1]
+        stats[month_key]['top_user_3_name'] = top_users[2][0]
+        stats[month_key]['top_user_3_views'] = top_users[2][1]
+        #print month_key
+        num_users = len(stats[month_key]['users'].keys())
+        values = [
+            site_name,
+            directorate,
+            month_key,
+            stats[month_key]['views'],
+            num_users,
+            stats[month_key]['top_user_1_name'],
+            stats[month_key]['top_user_1_views'],
+            stats[month_key]['top_user_2_name'],
+            stats[month_key]['top_user_2_views'],
+            stats[month_key]['top_user_3_name'],
+            stats[month_key]['top_user_3_views'],
+            stats[month_key]['ee'],
+            stats[month_key]['dossiers'],
+            stats[month_key]['docs'],
+            stats[month_key]['tasks'],
+            stats[month_key]['mails'],
+            ]
+        for i, value in enumerate(values):
+            values[i] = str(value)
+        yield ';'.join(values)
+
+
+def main():
+    if not len(sys.argv) == 3:
+        print "Usage: bin/analyze-logs <start date> <end date>"
+        print "Example: bin/analze-logs 01-03-2013 01-07-2013"
+        sys.exit(1)
+
+    start = sys.argv[1]
+    end = sys.argv[2]
+
+    start = datetime.strptime(start, INPUT_DATEFMT)
+    end = datetime.strptime(end, INPUT_DATEFMT) + timedelta(days=1)
+
+    merge_logs(start)
+    analyze_log(start, end)
+
