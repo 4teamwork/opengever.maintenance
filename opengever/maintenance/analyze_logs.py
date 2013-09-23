@@ -170,7 +170,7 @@ def generate_csv(stats):
     for month_key in sorted(stats.keys()):
         top_users = stats[month_key]['users'].most_common(3)
         while not len(top_users) == 3:
-            top_users.append(('',''))
+            top_users.append(('',0))
         stats[month_key]['top_user_1_name'] = top_users[0][0]
         stats[month_key]['top_user_1_views'] = top_users[0][1]
         stats[month_key]['top_user_2_name'] = top_users[1][0]
