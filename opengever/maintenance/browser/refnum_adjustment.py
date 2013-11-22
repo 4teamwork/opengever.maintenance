@@ -120,7 +120,8 @@ class ReferenceNumberPrefixForm(form.Form):
         child_mapping[new_prefix] = intid
 
         # Drop entry for old prefix from child_mapping
-        child_mapping.pop(old_prefix)
+        if old_prefix in child_mapping:
+            child_mapping.pop(old_prefix)
 
         if IRepositoryFolder.providedBy(obj):
             # Also change the prefix on the repo folder behavior
