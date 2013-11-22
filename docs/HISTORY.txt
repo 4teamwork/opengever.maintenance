@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Added convenience import opengever.maintenance.dm that points to setup_debug_mode function.
+  [lgraf]
+
 - Added script for mass-checkin of documents checked out by a particular user.
   [lgraf]
 
