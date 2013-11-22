@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Added view to adjust reference number prefix for a specific object.
+  [lgraf]
+
 - Added convenience import opengever.maintenance.dm that points to setup_debug_mode function.
   [lgraf]
 
