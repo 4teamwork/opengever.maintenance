@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to check for broken / damaged relations.
+  [lgraf]
+
 - Added view to adjust reference number prefix for a specific object.
   [lgraf]
 
