@@ -1,6 +1,13 @@
 """Helpers for dealing with documents in the context of PDF conversion.
 """
 
+from Acquisition import aq_inner
+from opengever.ogds.base.utils import get_current_client
+from Products.CMFCore.utils import getToolByName
+from ZODB.POSException import ConflictError
+import hashlib
+import time
+
 
 def has_file(doc):
     return doc.file is not None
@@ -146,3 +153,55 @@ def reset_conversion_status(docs):
     from opengever.pdfconverter.behaviors.preview import IPreview
     for doc in docs:
         IPreview(doc).conversion_state = None
+
+
+class PDFConverter(object):
+
+    def generate_token(self, doc):
+        """Generate an access token for a document.
+        """
+        ts = time.time()
+        token_base = '%s%f' % (doc.Title(), ts)
+        token = hashlib.md5(token_base).hexdigest()
+        return token
+
+    def get_internal_url(self, context):
+        """Build the internal URL of an object.
+        """
+        client_url = get_current_client().site_url
+        portal_url = getToolByName(context, "portal_url")
+        internal_url = context.absolute_url().replace(portal_url(), client_url)
+        return internal_url
+
+    def queue_conversion_job(self, doc):
+        """Queue an asynchronous conversion job to create a preview PDF for the
+        document.
+        """
+        from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_CONVERTING
+        from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_FAILED
+        from opengever.pdfconverter.behaviors.preview import IPreview
+        from opengever.async import pdf as pdf_tasks
+
+        doc = aq_inner(doc)
+
+        # Create and set the access token
+        token = self.generate_token(doc)
+        doc._pdfconversion_token = token
+
+        # Create internal URL
+        internal_url = self.get_internal_url(doc)
+        url = '%s/pdfconversion?token=%s' % (internal_url, token)
+
+        # Set conversion status and queue conversion job
+        IPreview(doc).conversion_state = CONVERSION_STATE_CONVERTING
+        try:
+            pdf_tasks.convert.delay(url,
+                                    doc.file.filename,
+                                    doc.file.contentType)
+            return 'SUCCESS'
+        except (ConflictError, KeyboardInterrupt):
+            raise
+        except Exception, e:
+            print "Queueing conversion job failed for '%s': %s" % (doc, e)
+            IPreview(doc).conversion_state = CONVERSION_STATE_FAILED
+            return e

@@ -64,7 +64,14 @@
 
     <h2>Actions</h2>
     <ul>
-        <li><a tal:attributes="href string:${request/URL}?reset_conversion_status=True">Reset conversion status</a> (Reset all documents in status <em>converting</em> to status <em>not_converted</em>)</li>
+        <li>
+            <a tal:attributes="href string:${request/URL}?reset_conversion_status=True">
+            Reset conversion status</a> (Reset all documents in status <em>converting</em> to status <em>not_converted</em>)
+        </li>
+        <li>
+            <a tal:attributes="href string:${request/URL}?queue_conversion_jobs=True&amp;n=50">
+            Queue conversion jobs</a> (Queue a conversion job for 50 random (unconverted) documents)
+        </li>
     </ul>
 
 

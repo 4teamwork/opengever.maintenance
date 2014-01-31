@@ -4,6 +4,7 @@ from opengever.maintenance.pdf_conversion.helpers import DocumentCollector
 from opengever.maintenance.pdf_conversion.helpers import get_status
 from Products.CMFPlone.interfaces import IPloneSiteRoot
 from opengever.maintenance.pdf_conversion.helpers import reset_conversion_status
+from opengever.maintenance.pdf_conversion.helpers import PDFConverter
 
 
 class PDFConversionStatusView(grok.View):
@@ -23,6 +24,9 @@ class PDFConversionStatusView(grok.View):
         form = self.request.form
         if form.get('reset_conversion_status'):
             return self.reset_conversion_status()
+        elif form.get('queue_conversion_jobs'):
+            n = int(form.get('n', 50))
+            return self.queue_conversion_jobs(n)
         else:
             # Render template
             return super(PDFConversionStatusView, self).__call__()
@@ -70,3 +74,18 @@ class PDFConversionStatusView(grok.View):
         reset_conversion_status(docs)
         self.request.response.write("Done.")
 
+    def queue_conversion_jobs(self, n=50):
+        converter = PDFConverter()
+        docs = self.collector.docs_missing_pdf()[:n]
+        self.request.response.write(
+            "Queueing conversion jobs for %s docs...\n" % len(docs))
+
+        for doc in docs:
+            result = converter.queue_conversion_job(doc)
+            if result == 'SUCCESS':
+                msg = "Queued job for %s.\n" % doc
+            else:
+                msg = "Queueing job for %s failed: %s\n" % (doc, result)
+            self.request.response.write(msg)
+
+        self.request.response.write("Done.\n")
