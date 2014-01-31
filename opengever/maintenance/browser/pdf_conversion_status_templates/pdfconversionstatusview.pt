@@ -36,10 +36,11 @@
     <div tal:define="overview view/get_overview_stats">
         <h2>Overview</h2>
         Missing: <span tal:content="overview/missing">7</span><br />
+        Failed: <span tal:content="overview/failed">1</span><br />
         Converting: <span tal:content="overview/converting">1</span><br />
         Ready:<span tal:content="overview/ready">23</span><br />
         <hr />
-        Total documents with files: <span tal:content="overview/total">31</span><br />
+        Total documents with files: <span tal:content="overview/total">32</span><br />
     </div>
 
 

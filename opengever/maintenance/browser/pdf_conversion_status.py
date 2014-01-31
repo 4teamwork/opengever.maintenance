@@ -18,6 +18,7 @@ class PDFConversionStatusView(grok.View):
     def get_overview_stats(self):
         missing = 0
         ready = 0
+        failed = 0
         converting = 0
 
         doc_infos = self.get_doc_infos()
@@ -26,12 +27,15 @@ class PDFConversionStatusView(grok.View):
                 ready += 1
             elif info['state'] == "converting":
                 converting += 1
+            elif info['state'] == "failed":
+                failed += 1
             else:
                 missing += 1
         total = missing + converting + ready
         stats = dict(missing=missing,
                      ready=ready,
                      converting=converting,
+                     failed=failed,
                      total=total)
         return stats
 
@@ -48,6 +52,7 @@ class PDFConversionStatusView(grok.View):
         # setups without opengever.pdfconverter installed
         from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_CONVERTING
         from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_READY
+        from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_FAILED
         from opengever.pdfconverter.behaviors.preview import IPreview
 
         doc_infos = []
@@ -60,6 +65,8 @@ class PDFConversionStatusView(grok.View):
                 state = "ready"
             elif state == CONVERSION_STATE_CONVERTING:
                 state = "converting"
+            elif state == CONVERSION_STATE_FAILED:
+                state = "failed"
             else:
                 state = "missing"
 
@@ -70,4 +77,4 @@ class PDFConversionStatusView(grok.View):
 
     def get_pending_docs(self):
         docs = self.get_doc_infos()
-        return [d for d in docs if d['state'] in ('converting', 'missing')]
+        return [d for d in docs if d['state'] in ('converting', 'missing', 'failed')]
