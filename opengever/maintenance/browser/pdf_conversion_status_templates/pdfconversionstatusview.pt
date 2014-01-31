@@ -12,9 +12,9 @@
       border-collapse: separate !important;
       border-spacing: 1em 0px !important;
   }
-  strong {
-      font-weight: bold
-  }
+  strong {font-weight: bold}
+  em {font-style: italic}
+
   </style>
   </metal:head>
 </head>
@@ -60,6 +60,12 @@
         Documents missing PDF: <span tal:content="overview/docs_missing_pdf">50</span><br />
         <hr />
     </div>
+
+
+    <h2>Actions</h2>
+    <ul>
+        <li><a tal:attributes="href string:${request/URL}?reset_conversion_status=True">Reset conversion status</a> (Reset all documents in status <em>converting</em> to status <em>not_converted</em>)</li>
+    </ul>
 
 
     <h2>Documents with outstanding PDF previews</h2>

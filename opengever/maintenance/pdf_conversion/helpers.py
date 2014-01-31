@@ -137,3 +137,12 @@ class DocumentCollector(object):
                 in_status(['converting', 'failed', 'not_converted']),
                 self.non_pdf_docs())
         return self._docs_missing_pdf
+
+
+def reset_conversion_status(docs):
+    """Helper function to reset conversion status to None ('not_converted') for
+    a list of documents.
+    """
+    from opengever.pdfconverter.behaviors.preview import IPreview
+    for doc in docs:
+        IPreview(doc).conversion_state = None

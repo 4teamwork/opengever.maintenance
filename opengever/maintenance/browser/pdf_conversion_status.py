@@ -3,6 +3,7 @@ from five import grok
 from opengever.maintenance.pdf_conversion.helpers import DocumentCollector
 from opengever.maintenance.pdf_conversion.helpers import get_status
 from Products.CMFPlone.interfaces import IPloneSiteRoot
+from opengever.maintenance.pdf_conversion.helpers import reset_conversion_status
 
 
 class PDFConversionStatusView(grok.View):
@@ -17,6 +18,14 @@ class PDFConversionStatusView(grok.View):
         # disable Plone's editable border
         self.request.set('disable_border', True)
         super(PDFConversionStatusView, self).update()
+
+    def __call__(self):
+        form = self.request.form
+        if form.get('reset_conversion_status'):
+            return self.reset_conversion_status()
+        else:
+            # Render template
+            return super(PDFConversionStatusView, self).__call__()
 
     @property
     def collector(self):
@@ -53,3 +62,11 @@ class PDFConversionStatusView(grok.View):
             info = dict(url=url, title=title, status=status)
             doc_infos.append(info)
         return doc_infos
+
+    def reset_conversion_status(self):
+        docs = self.collector.converting_docs()
+        self.request.response.write(
+            "Resetting conversion status for %s docs...\n" % len(docs))
+        reset_conversion_status(docs)
+        self.request.response.write("Done.")
+
