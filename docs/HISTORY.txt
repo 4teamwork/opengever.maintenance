@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add command to convert missing PDFs.
+  [lgraf]
+
 - Add view to display PDF preview conversion status
   [lgraf]
 

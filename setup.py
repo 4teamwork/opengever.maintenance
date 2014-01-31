@@ -34,5 +34,8 @@ setup(name='opengever.maintenance',
 
       [console_scripts]
       analyze-logs = opengever.maintenance.analyze_logs:main
+
+      [zopectl.command]
+      convert_missing_pdfs = opengever.maintenance.commands:convert_missing_pdfs
       """,
       )
