@@ -1,4 +1,7 @@
+from collections import Counter
 from five import grok
+from opengever.maintenance.pdf_conversion.helpers import DocumentCollector
+from opengever.maintenance.pdf_conversion.helpers import get_status
 from Products.CMFPlone.interfaces import IPloneSiteRoot
 
 
@@ -15,66 +18,38 @@ class PDFConversionStatusView(grok.View):
         self.request.set('disable_border', True)
         super(PDFConversionStatusView, self).update()
 
-    def get_overview_stats(self):
-        missing = 0
-        ready = 0
-        failed = 0
-        converting = 0
+    @property
+    def collector(self):
+        if not hasattr(self, '_document_collector'):
+            self._document_collector = DocumentCollector(self.context)
+        return self._document_collector
 
-        doc_infos = self.get_doc_infos()
-        for info in doc_infos:
-            if info['state'] == "ready":
-                ready += 1
-            elif info['state'] == "converting":
-                converting += 1
-            elif info['state'] == "failed":
-                failed += 1
-            else:
-                missing += 1
-        total = missing + converting + ready
-        stats = dict(missing=missing,
-                     ready=ready,
-                     converting=converting,
-                     failed=failed,
-                     total=total)
-        return stats
+    def overview_stats(self):
+        c = self.collector
+        counter = Counter()
 
-    def get_doc_infos(self):
-        """Returns a list of dicts with information about conversion
-        states of documents.
-        """
-        catalog = self.context.portal_catalog
-        docs = catalog(portal_type='opengever.document.document')
-        objs = [brain.getObject() for brain in docs]
-        docs_with_file = [o for o in objs if o.file is not None]
+        counter['total_docs'] = len(c.all_docs())
 
-        # Local imports to avoid startup failure when grokking package on
-        # setups without opengever.pdfconverter installed
-        from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_CONVERTING
-        from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_READY
-        from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_FAILED
-        from opengever.pdfconverter.behaviors.preview import IPreview
+        counter['docs_with_file'] = len(c.docs_with_file())
+        counter['docs_without_file'] = len(c.docs_without_file())
+        counter['conversion_required'] = len(c.non_pdf_docs())
+        counter['conversion_not_required'] = len(c.pdf_docs())
 
+        counter['converted'] = len(c.converted_docs())
+        counter['converting'] = len(c.converting_docs())
+        counter['failed'] = len(c.failed_docs())
+        counter['not_converted'] = len(c.not_converted_docs())
+
+        counter['docs_missing_pdf'] = len(c.docs_missing_pdf())
+        return counter
+
+    def outstanding_docs(self):
         doc_infos = []
-        for doc in docs_with_file:
+        for doc in self.collector.docs_missing_pdf():
             url = doc.absolute_url()
-            title = doc.Title()
+            title = doc.Title()[:70]
+            status = get_status(doc)
 
-            state = IPreview(doc).conversion_state
-            if state == CONVERSION_STATE_READY:
-                state = "ready"
-            elif state == CONVERSION_STATE_CONVERTING:
-                state = "converting"
-            elif state == CONVERSION_STATE_FAILED:
-                state = "failed"
-            else:
-                state = "missing"
-
-            info = dict(url=url, title=title, state=state)
+            info = dict(url=url, title=title, status=status)
             doc_infos.append(info)
-
         return doc_infos
-
-    def get_pending_docs(self):
-        docs = self.get_doc_infos()
-        return [d for d in docs if d['state'] in ('converting', 'missing', 'failed')]

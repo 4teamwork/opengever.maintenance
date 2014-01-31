@@ -12,6 +12,9 @@
       border-collapse: separate !important;
       border-spacing: 1em 0px !important;
   }
+  strong {
+      font-weight: bold
+  }
   </style>
   </metal:head>
 </head>
@@ -33,27 +36,42 @@
     <div tal:replace="structure provider:plone.abovecontentbody" />
 
 
-    <div tal:define="overview view/get_overview_stats">
+    <div tal:define="overview view/overview_stats">
         <h2>Overview</h2>
-        Missing: <span tal:content="overview/missing">7</span><br />
-        Failed: <span tal:content="overview/failed">1</span><br />
-        Converting: <span tal:content="overview/converting">1</span><br />
-        Ready:<span tal:content="overview/ready">23</span><br />
         <hr />
-        Total documents with files: <span tal:content="overview/total">32</span><br />
+        <ul>
+            <li>Total documents with file: <span tal:content="overview/docs_with_file">400</span>
+                <ul>
+                    <li>Conversion required: <span tal:content="overview/conversion_required">350</span>
+                        <ul>
+                            <li>Converted: <span tal:content="overview/converted">300</span></li>
+                            <li>Converting: <strong tal:content="overview/converting">25</strong></li>
+                            <li>Failed: <strong tal:content="overview/failed">5</strong></li>
+                            <li>Not converted: <strong tal:content="overview/not_converted">20</strong></li>
+                        </ul>
+                    </li>
+                    <li>Conversion not required (already PDF): <span tal:content="overview/conversion_not_required">50</span></li>
+                </ul>
+            </li>
+            <li>Total documents without file: <span tal:content="overview/docs_without_file">100</span></li>
+        </ul>
+        <hr />
+        Total documents: <span tal:content="overview/total_docs">500</span><br />
+        Documents missing PDF: <span tal:content="overview/docs_missing_pdf">50</span><br />
+        <hr />
     </div>
 
 
-    <h2>Missing PDFs</h2>
+    <h2>Documents with outstanding PDF previews</h2>
     <table class="listing">
         <tr>
             <th>Document</th>
             <th>Conversion State</th>
             <th>Convert Now</th>
         </tr>
-        <tr tal:repeat="doc view/get_pending_docs">
+        <tr tal:repeat="doc view/outstanding_docs">
             <td><a tal:content="doc/title" tal:attributes="href doc/url"/></td>
-            <td tal:content="doc/state"/>
+            <td tal:content="doc/status"/>
             <td><a tal:attributes="href string:${doc/url}/pdfconversion?convert=True">Convert Now</a></td>
         </tr>
     </table>
