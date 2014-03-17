@@ -7,10 +7,11 @@ import transaction
 
 def list_objects_with_specific_mime_types(portal, specific_type):
     """ Lists all plone objects containing a file with the given mimetype.
-        Also mentiones the mimetype according to the plone registry.
+
+    Also mentiones the mimetype according to the plone registry.
     """
     print "List of objects with wrong mimetype '%s':" % specific_type
-    for obj in get_objects_by_mimetype_its_mimetype(portal, specific_type):
+    for obj in get_objects_by_mimetype(portal, specific_type):
         lookuped_mimetype = lookup_mimetype(portal, obj.file.filename)
         print "Looked up mimetype '%s' for %s (correct: %s)" % \
             (obj.file.contentType,
@@ -18,10 +19,11 @@ def list_objects_with_specific_mime_types(portal, specific_type):
              lookuped_mimetype)
 
 
-def get_objects_by_mimetype_its_mimetype(portal, specific_type):
+def get_objects_by_mimetype(portal, specific_type):
     """ Returns a list with plone objects containing files.
-        The list is filtered by the mimetype of the containing file
-        specified by 'specific_type'.
+
+    The list is filtered by the mimetype of the containing file
+    specified by 'specific_type'.
     """
     result = []
     catalog = portal.portal_catalog
@@ -38,11 +40,12 @@ def get_objects_by_mimetype_its_mimetype(portal, specific_type):
 
 def fix_wrong_mime_types(portal, wrong_type, expected_type=None):
     """ Fixes mimetypes of files in plone objects.
-        'wrong_type' is the mimetype the file currenty has. It will be
-        replaced by 'expected_type'. If 'expected_type' is not specified,
-        the correct value according to the plone registry will be used.
+
+    'wrong_type' is the mimetype the file currenty has. It will be
+    replaced by 'expected_type'. If 'expected_type' is not specified,
+    the correct value according to the plone registry will be used.
     """
-    for obj in get_objects_by_mimetype_its_mimetype(portal, wrong_type):
+    for obj in get_objects_by_mimetype(portal, wrong_type):
         if not expected_type:
             expected_type = lookup_mimetype(portal, obj.file.filename).mimetypes[0]
         old_type = obj.file.contentType
@@ -57,16 +60,17 @@ def fix_wrong_mime_types(portal, wrong_type, expected_type=None):
 
 def lookup_mimetype(portal, filename):
     """ Looks up mimetype to a given filename.
-        It will check the plone mimetype registry and
-        fall back to the python mimetype module if needed.
+
+    It will check the plone mimetype registry and
+    fall back to the python mimetype module if needed.
     """
     registry = getToolByName(portal, 'mimetypes_registry')
-    lookupMimeType = registry.lookupExtension(filename)
-    if not lookupMimeType:
-        lookupMimeType = registry.globFilename(filename)
-    if not lookupMimeType:
+    type_from_registry = registry.lookupExtension(filename)
+    if not type_from_registry:
+        type_from_registry = registry.globFilename(filename)
+    if not type_from_registry:
         raise Exception("Cannot parse mimetype for %s." % filename)
-    return lookupMimeType
+    return type_from_registry
 
 
 def main():
