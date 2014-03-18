@@ -2,7 +2,7 @@ from Acquisition import aq_inner
 from Acquisition import aq_parent
 from five import grok
 from opengever.base.interfaces import IReferenceNumber
-from opengever.base.interfaces import IReferenceNumberFormatter
+
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.repository.interfaces import IRepositoryFolder
@@ -31,6 +31,14 @@ except ImportError:
     PREFIX_REF_KEY = ReferenceNumberPrefixAdpater.REF_KEY
     DOSSIER_KEY = None
     REPOSITORY_FOLDER_KEY = None
+
+
+
+try:
+    from opengever.base.interfaces import IReferenceNumberFormatter
+    REFNUM_FORMATTER_AVAILABLE = True
+except ImportError:
+    REFNUM_FORMATTER_AVAILABLE = False
 
 
 class RefnumSelfcheckView(grok.View):
@@ -83,13 +91,16 @@ class ReferenceNumberHelper(object):
         if OLD_CODE_BASE:
             return '/'
         else:
-            registry = getUtility(IRegistry)
-            proxy = registry.forInterface(IReferenceNumberSettings)
+            if REFNUM_FORMATTER_AVAILABLE:
+                registry = getUtility(IRegistry)
+                proxy = registry.forInterface(IReferenceNumberSettings)
 
-            formatter = queryAdapter(obj,
-                                     IReferenceNumberFormatter,
-                                     name=proxy.formatter)
-            return formatter.repository_dossier_seperator
+                formatter = queryAdapter(obj,
+                                         IReferenceNumberFormatter,
+                                         name=proxy.formatter)
+                return formatter.repository_dossier_seperator
+            else:
+                return '/'
 
     def get_new_mapping(self, key, obj):
         ann = IAnnotations(obj)
