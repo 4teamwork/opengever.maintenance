@@ -243,16 +243,19 @@ class ReferenceNumberChecker(object):
         parent = aq_parent(aq_inner(obj))
         local_number = IReferenceNumberPrefix(parent).get_number(obj)
         intid = self.intids.getId(obj)
+        try:
+            child_mapping = self.helper.get_new_mapping(CHILD_REF_KEY, obj)
+            if not child_mapping[local_number] == intid:
+                check_result = 'FAILED'
+                self.log("WARNING: obj %s not in child mapping of parent!" % obj)
 
-        child_mapping = self.helper.get_new_mapping(CHILD_REF_KEY, obj)
-        if not child_mapping[local_number] == intid:
+            prefix_mapping = self.helper.get_new_mapping(PREFIX_REF_KEY, obj)
+            if not prefix_mapping[intid] == local_number:
+                check_result = 'FAILED'
+                self.log("WARNING: obj %s not in prefix mapping of parent!" % obj)
+        except Exception, e:
             check_result = 'FAILED'
-            self.log("WARNING: obj %s not in child mapping of parent!" % obj)
-
-        prefix_mapping = self.helper.get_new_mapping(PREFIX_REF_KEY, obj)
-        if not prefix_mapping[intid] == local_number:
-            check_result = 'FAILED'
-            self.log("WARNING: obj %s not in prefix mapping of parent!" % obj)
+            self.log("WARNING: '%s' for %s" % (e, obj))
 
         return check_result
 
@@ -265,15 +268,19 @@ class ReferenceNumberChecker(object):
         intid = self.intids.getId(obj)
         ann = IAnnotations(parent)
 
-        child_mapping = ann.get(CHILD_REF_KEY)
-        if not child_mapping[local_number] == intid:
-            check_result = 'FAILED'
-            self.log("WARNING: obj %s not in child mapping of parent!" % obj)
+        try:
+            child_mapping = ann.get(CHILD_REF_KEY)
+            if not child_mapping[local_number] == intid:
+                check_result = 'FAILED'
+                self.log("WARNING: obj %s not in child mapping of parent!" % obj)
 
-        prefix_mapping = ann.get(PREFIX_REF_KEY)
-        if not prefix_mapping[intid] == local_number:
+            prefix_mapping = ann.get(PREFIX_REF_KEY)
+            if not prefix_mapping[intid] == local_number:
+                check_result = 'FAILED'
+                self.log("WARNING: obj %s not in prefix mapping of parent!" % obj)
+        except Exception, e:
             check_result = 'FAILED'
-            self.log("WARNING: obj %s not in prefix mapping of parent!" % obj)
+            self.log("WARNING: '%s' for %s" % (e, obj))
 
         return check_result
 
