@@ -2,16 +2,20 @@ from Acquisition import aq_inner
 from Acquisition import aq_parent
 from five import grok
 from opengever.base.interfaces import IReferenceNumber
+from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.repository.interfaces import IRepositoryFolder
 from persistent.dict import PersistentDict
 from persistent.list import PersistentList
+from plone.registry.interfaces import IRegistry
 from Products.CMFPlone.interfaces import IPloneSiteRoot
 from zope.annotation.interfaces import IAnnotations
 from zope.app.intid.interfaces import IIntIds
 from zope.component import getAdapter
 from zope.component import getUtility
+from zope.component import queryAdapter
+from opengever.base.interfaces import IReferenceNumberSettings
 
 
 try:
@@ -75,11 +79,17 @@ class ReferenceNumberHelper(object):
         self.log = log_func
         self.site = site
 
-    def get_repo_dossier_separator(self):
+    def get_repo_dossier_separator(self, obj=None):
         if OLD_CODE_BASE:
             return '/'
         else:
-            raise NotImplemented()
+            registry = getUtility(IRegistry)
+            proxy = registry.forInterface(IReferenceNumberSettings)
+
+            formatter = queryAdapter(obj,
+                                     IReferenceNumberFormatter,
+                                     name=proxy.formatter)
+            return formatter.repository_dossier_seperator
 
     def get_new_mapping(self, key, obj):
         ann = IAnnotations(obj)
@@ -114,10 +124,10 @@ class ReferenceNumberChecker(object):
         check_result = 'PASSED'
         catalog = self.site.portal_catalog
         dossier_brains = catalog(object_provides=IDossierMarker.__identifier__)
-        sep = self.helper.get_repo_dossier_separator()
 
         for brain in dossier_brains:
             dossier = brain.getObject()
+            sep = self.helper.get_repo_dossier_separator(obj=dossier)
             url = dossier.absolute_url()
 
             if dossier.id in self.ignored_ids:
