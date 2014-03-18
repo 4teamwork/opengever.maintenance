@@ -2,7 +2,6 @@ from Acquisition import aq_inner
 from Acquisition import aq_parent
 from five import grok
 from opengever.base.interfaces import IReferenceNumber
-
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.repository.interfaces import IRepositoryFolder
@@ -15,7 +14,6 @@ from zope.app.intid.interfaces import IIntIds
 from zope.component import getAdapter
 from zope.component import getUtility
 from zope.component import queryAdapter
-from opengever.base.interfaces import IReferenceNumberSettings
 
 
 try:
@@ -33,9 +31,9 @@ except ImportError:
     REPOSITORY_FOLDER_KEY = None
 
 
-
 try:
     from opengever.base.interfaces import IReferenceNumberFormatter
+    from opengever.base.interfaces import IReferenceNumberSettings
     REFNUM_FORMATTER_AVAILABLE = True
 except ImportError:
     REFNUM_FORMATTER_AVAILABLE = False
