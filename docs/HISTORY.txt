@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Added script to check and fix mimetypes.
+  [lknoepfel]
+
 - Add command to convert missing PDFs.
   [lgraf]
 
