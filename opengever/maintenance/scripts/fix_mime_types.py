@@ -12,9 +12,13 @@ def fix_wrong_mime_types(portal, wrong_mimetype, fix):
     replaced by the value looked up in the plone/python mimetype registry.
     """
     for obj in get_objects_by_mimetype(portal, wrong_mimetype):
-        registry_type = lookup_mimetype(portal, obj.file.filename).mimetypes[0]
+        try:
+            registry_type = lookup_mimetype(portal,
+                                            obj.file.filename).mimetypes[0]
+        except Exception:
+            continue
 
-        if registry_type and registry_type != obj.file.contentType:
+        if registry_type != obj.file.contentType:
             if not fix:
                 print "%s: %s" % (
                     registry_type.ljust(30),
@@ -56,7 +60,7 @@ def lookup_mimetype(portal, filename):
     if not type_from_registry:
         type_from_registry = registry.globFilename(filename)
     if not type_from_registry:
-        return None
+        raise Exception("No mimetype found for '%s'." % filename)
     return type_from_registry
 
 
