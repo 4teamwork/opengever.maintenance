@@ -20,9 +20,10 @@ def fix_wrong_mime_types(portal, wrong_mimetype, fix):
 
         if registry_type != obj.file.contentType:
             if not fix:
-                print "%s: %s" % (
+                print "%s: %s at %s" % (
                     registry_type.ljust(30),
-                    obj.file.filename)
+                    obj.file.filename.rjust(50),
+                    obj.absolute_url())
             else:
                 obj.file.contentType = registry_type
 
@@ -55,6 +56,10 @@ def lookup_mimetype(portal, filename):
     fall back to the python mimetype module if needed.
     Returns None if lookup fails.
     """
+
+    if not '.' in filename:
+        raise Exception("Filename without extension '%s'" % filename)
+
     registry = getToolByName(portal, 'mimetypes_registry')
     type_from_registry = registry.lookupExtension(filename)
     if not type_from_registry:
