@@ -1,14 +1,15 @@
 from Acquisition import aq_inner
 from Acquisition import aq_parent
+from Products.CMFPlone.interfaces import IPloneSiteRoot
 from five import grok
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.repository.interfaces import IRepositoryFolder
+from opengever.repository.repositoryroot import IRepositoryRoot
 from persistent.dict import PersistentDict
 from persistent.list import PersistentList
 from plone.registry.interfaces import IRegistry
-from Products.CMFPlone.interfaces import IPloneSiteRoot
 from zope.annotation.interfaces import IAnnotations
 from zope.app.intid.interfaces import IIntIds
 from zope.component import getAdapter
@@ -101,14 +102,18 @@ class ReferenceNumberHelper(object):
                 return '/'
 
     def get_new_mapping(self, key, obj):
-        ann = IAnnotations(obj)
+        parent = aq_parent(aq_inner(obj))
+        ann = IAnnotations(parent)
 
         if IDossierMarker.providedBy(obj):
-            mapping_base = ann[DOSSIER_KEY]
-        elif IRepositoryFolder.providedBy(obj):
-            mapping_base = ann[REPOSITORY_FOLDER_KEY]
+            mapping_base = ann.get(DOSSIER_KEY)
+        elif IRepositoryFolder.providedBy(obj) or IRepositoryRoot.providedBy(obj):
+            mapping_base = ann.get(REPOSITORY_FOLDER_KEY)
         else:
             raise Exception("Unknown object type!")
+
+        if not mapping_base:
+            return None
 
         mapping = mapping_base.get(key)
         return mapping
@@ -355,7 +360,7 @@ def instance_of(obj, types):
 
 
 def is_persistent(thing):
-    """Recursive function that checks if a structure containing nested lists 
+    """Recursive function that checks if a structure containing nested lists
     and dicts uses the Persistent types all the way down.
     """
     if not instance_of(thing, [list, dict]):
