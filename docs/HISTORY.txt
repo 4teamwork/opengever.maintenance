@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add a 'transmogrify' view to run a transmogrifier config TTW.
+  [lgraf]
+
 - Add command to convert missing PDFs.
   [lgraf]
 
