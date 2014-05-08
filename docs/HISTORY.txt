@@ -5,6 +5,10 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add helper scripts for running OGDS sync as a cron job.
+  (Previously in og-maintenance).
+  [lgraf]
+
 - Add a 'transmogrify' view to run a transmogrifier config TTW.
   [lgraf]
 
