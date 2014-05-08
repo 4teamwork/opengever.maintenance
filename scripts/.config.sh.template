@@ -1,0 +1,15 @@
+# This file is required for update-ogds.sh and must be placed
+# at /home/zope/.opengever/.config.sh
+#
+# It must define at least FIRST_CLIENT_PATH and FIRST_CLIENT_ID
+#
+# FIRST_CLIENT_PATH will be used to locate the path to the first
+# client's buildout directory, find bin/instance0 and the path
+# to src/opengever.maintenance
+#
+# FIRST_CLIENT_ID is the ID of the Plone site for the first client.
+#
+# Example:
+
+export FIRST_CLIENT_PATH="/home/zope/host.4teamwork.ch/01-plone-gever-test/"
+export FIRST_CLIENT_ID="mandant1"
