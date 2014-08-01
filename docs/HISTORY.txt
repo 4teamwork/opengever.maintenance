@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add helper functions to get and set GS profile versions.
+  [lgraf]
+
 - Add helper scripts for running OGDS sync as a cron job.
   (Previously in og-maintenance).
   [lgraf]
