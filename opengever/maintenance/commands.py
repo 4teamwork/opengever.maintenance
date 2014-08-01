@@ -3,9 +3,12 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.pdf_conversion.helpers import DocumentCollector
 from opengever.maintenance.pdf_conversion.helpers import get_status
 from opengever.maintenance.pdf_conversion.helpers import PDFConverter
+from opengever.maintenance.profile_version import get_profile_version
+from opengever.maintenance.profile_version import set_profile_version
 import argparse
 import random
 import sys
+import transaction
 
 
 class Command(object):
@@ -125,4 +128,68 @@ class ConvertMissingPDFsCmd(Command):
 
 def convert_missing_pdfs_cmd(app, args):
     cmd = ConvertMissingPDFsCmd(app, args)
+    cmd.run()
+
+
+class GetProfileVersionCmd(Command):
+    """
+    Displays the DB version of a particular GS profile.
+
+    Usage example:
+    # bin/instance get_profile_version foo.bar:default
+    """
+
+    def _build_arg_parser(self):
+        parser = super(GetProfileVersionCmd, self)._build_arg_parser()
+
+        parser.add_argument(
+            'profile_id',
+            help="Profile ID (example: foo.bar:default)")
+
+        return parser
+
+    def run(self):
+        site = setup_plone(self.app)
+
+        version = get_profile_version(site, self.options.profile_id)
+        print "Version for profile '{}': {}".format(self.options.profile_id,
+                                                    repr(version))
+
+
+def get_profile_version_cmd(app, args):
+    cmd = GetProfileVersionCmd(app, args)
+    cmd.run()
+
+
+class SetProfileVersionCmd(Command):
+    """
+    Sets the DB version of a particular GS profile.
+
+    Usage example:
+    # bin/instance set_profile_version foo.bar:default 1
+    """
+
+    def _build_arg_parser(self):
+        parser = super(SetProfileVersionCmd, self)._build_arg_parser()
+
+        parser.add_argument(
+            'profile_id',
+            help="Profile ID (example: foo.bar:default)")
+
+        parser.add_argument(
+            'version',
+            help="DB version to set the profile to.")
+
+        return parser
+
+    def run(self):
+        site = setup_plone(self.app)
+        set_profile_version(site,
+                            self.options.profile_id,
+                            self.options.version)
+        transaction.commit()
+
+
+def set_profile_version_cmd(app, args):
+    cmd = SetProfileVersionCmd(app, args)
     cmd.run()

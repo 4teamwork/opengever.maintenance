@@ -37,5 +37,7 @@ setup(name='opengever.maintenance',
 
       [zopectl.command]
       convert_missing_pdfs = opengever.maintenance.commands:convert_missing_pdfs_cmd
+      get_profile_version = opengever.maintenance.commands:get_profile_version_cmd
+      set_profile_version = opengever.maintenance.commands:set_profile_version_cmd
       """,
       )

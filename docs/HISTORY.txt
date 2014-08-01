@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add zopectl commands to get and set GS profile versions.
+  [lgraf]
+
 - Add helper functions to get and set GS profile versions.
   [lgraf]
 
