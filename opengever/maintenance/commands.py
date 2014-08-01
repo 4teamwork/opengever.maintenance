@@ -8,20 +8,49 @@ import random
 import sys
 
 
-class ConvertMissingPDFs(object):
+class Command(object):
+    """
+    Base class for commands to be executed by a zopectl.command
+    entry point handler.
+    """
+
     def __init__(self, app, args):
+        """
+        app
+            The Zope Application Root object.
+        args
+            Any additional arguments that were passed on the command line.
+        """
         self.app = app
         self.args = args
 
-    def _parse_args(self):
+        arg_parser = self._build_arg_parser()
+        self.options = arg_parser.parse_args(self.args)
+
+    def _build_arg_parser(self):
+        """
+        Builds a default argument parser taking no arguments.
+        Subclasses may extend this method to accept custom arguments.
+        """
         prog = "%s" % sys.argv[0]
 
         # Top level parser
         formatter = lambda prog: HelpFormatter(prog, max_help_position=30)
         parser = argparse.ArgumentParser(prog=prog,
                                          formatter_class=formatter)
+        return parser
 
-        # Global arguments
+    def run(self):
+        raise NotImplementedError
+
+
+class ConvertMissingPDFsCmd(Command):
+    """Render PDF previews for documents that don't have one yet
+    """
+
+    def _build_arg_parser(self):
+        parser = super(ConvertMissingPDFsCmd, self)._build_arg_parser()
+
         parser.add_argument(
             '-q',
             '--quiet',
@@ -41,10 +70,9 @@ class ConvertMissingPDFs(object):
             default=50,
             help="Number of documents to be converted to PDF.")
 
-        return parser.parse_args(self.args)
+        return parser
 
     def run(self):
-        self.options = self._parse_args()
         site = setup_plone(self.app)
         self.collector = DocumentCollector(site)
 
@@ -95,15 +123,6 @@ class ConvertMissingPDFs(object):
         print "Done.\n"
 
 
-def convert_missing_pdfs(app, args):
-    """
-    zopectl.command entry point handler.
-
-    app
-        The Zope Application Root object.
-    args
-        Any additional arguments that were passed on the command line.
-    """
-
-    cmd = ConvertMissingPDFs(app, args)
+def convert_missing_pdfs_cmd(app, args):
+    cmd = ConvertMissingPDFsCmd(app, args)
     cmd.run()
