@@ -21,4 +21,9 @@
       name="collective.transmogrifier.sections.tests.pprinter"
       />
 
+  <utility
+      component="opengever.maintenance.sections.ClearLocalRolesSection"
+      name="opengever.maintenance.change_local_roles"
+      />
+
 </configure>
