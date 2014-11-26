@@ -22,7 +22,7 @@
       />
 
   <utility
-      component="opengever.maintenance.sections.ClearLocalRolesSection"
+      component="opengever.maintenance.sections.ChangeLocalRolesSection"
       name="opengever.maintenance.change_local_roles"
       />
 
