@@ -1,11 +1,19 @@
 <configure xmlns="http://namespaces.zope.org/zope"
            xmlns:grok="http://namespaces.zope.org/grok"
            xmlns:i18n="http://namespaces.zope.org/i18n"
+           xmlns:transmogrifier="http://namespaces.plone.org/transmogrifier"
            i18n_domain="opengever.maintenance">
 
     <include package="z3c.autoinclude" file="meta.zcml" />
     <includeDependencies package="." />
 
     <grok:grok package="." />
+
+    <transmogrifier:registerConfig
+        name="opengever.maintenance.update_repository"
+        title="Opengever Repositorysystem import"
+        description="Pipeline configuration for Opengever Setup"
+        configuration="cfgs/repository.cfg"
+        />
 
 </configure>
