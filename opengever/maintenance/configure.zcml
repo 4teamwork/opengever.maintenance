@@ -16,4 +16,9 @@
         configuration="cfgs/repository.cfg"
         />
 
+  <utility
+      component="collective.transmogrifier.sections.tests.PrettyPrinter"
+      name="collective.transmogrifier.sections.tests.pprinter"
+      />
+
 </configure>
