@@ -43,10 +43,21 @@ class ChangeLocalRolesSection(object):
             if obj is None:             # path doesn't exist
                 yield item; continue
 
+            usernames = []
+
             if IRoleManager.providedBy(obj):
                 for principal, roles in item[roleskey].items():
+                    usernames.append(principal)
                     if roles:
                         obj.manage_setLocalRoles(principal, roles)
                         obj.reindexObjectSecurity()
+
+            # Make sure that users which do not appear in extraLocalCoordinators
+            # will have their roles cleared
+            for username, roles in obj.get_local_roles():
+                if not username in usernames:
+                    obj.manage_delLocalRoles([username])
+
+            obj.reindexObjectSecurity()
 
             yield item
