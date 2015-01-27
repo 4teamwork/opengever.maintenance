@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add option to doom transaction to @@transmogrify view.
+  [lgraf]
+
 - Add view to check for reference number prefix collisions.
   [lgraf]
 
