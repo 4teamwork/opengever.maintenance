@@ -50,7 +50,7 @@ class ChangeLocalRolesSection(object):
                     usernames.append(principal)
                     if roles:
                         obj.manage_setLocalRoles(principal, roles)
-                        obj.reindexObjectSecurity()
+                        #obj.reindexObjectSecurity()
 
             # Make sure that users which do not appear in extraLocalCoordinators
             # will have their roles cleared
@@ -58,6 +58,6 @@ class ChangeLocalRolesSection(object):
                 if not username in usernames:
                     obj.manage_delLocalRoles([username])
 
-            obj.reindexObjectSecurity()
+            #obj.reindexObjectSecurity()
 
             yield item
