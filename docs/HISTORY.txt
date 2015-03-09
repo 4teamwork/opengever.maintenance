@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add view to list principals used in role assignments.
+  [lgraf]
+
 - Add option to doom transaction to @@transmogrify view.
   [lgraf]
 
