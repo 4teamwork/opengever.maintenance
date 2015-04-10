@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add a @@health-check view to be used with httpok and/or HAProxy.
+  [lgraf]
+
 - Add view to list principals used in role assignments.
   [lgraf]
 
