@@ -20,3 +20,19 @@ Setting up debug mode
 
 (``opengever.maintenance.dm`` is a convenience import that actually points to
 ``opengever.maintenance.debughelpers.setup_debug_mode``.)
+
+
+Commands
+========
+
+The ``opengever.maintenance`` package provides some useful zopectl commands:
+
+Get or set a profile version:
+-----------------------------
+
+.. code::
+
+    bin/instance get_profile_version foo.bar:default
+    
+    bin/instance set_profile_version foo.bar:default 1
+
