@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Use zope2.Public for the @@health-check view.
+  [lgraf]
+
 - Add a @@health-check view to be used with httpok and/or HAProxy.
   [lgraf]
 

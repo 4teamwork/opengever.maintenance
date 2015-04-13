@@ -15,7 +15,7 @@ class HealthCheckView(grok.View):
 
     grok.name('health-check')
     grok.context(IPloneSiteRoot)
-    grok.require('zope.Public')
+    grok.require('zope2.Public')
 
     def render(self):
         # Access the session in order to trigger a possible
