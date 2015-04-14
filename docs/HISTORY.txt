@@ -5,6 +5,10 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Use conditional import in @@health-check view to
+  make it work for og.core < 4.2.
+  [lgraf]
+
 - Use zope2.Public for the @@health-check view.
   [lgraf]
 

@@ -1,7 +1,12 @@
 from five import grok
-from opengever.base.model import create_session
 from Products.CMFPlone.interfaces import IPloneSiteRoot
 import json
+
+try:
+    from opengever.base.model import create_session
+except ImportError:
+    # opengever.core < 4.2
+    from opengever.ogds.base.utils import create_session
 
 
 class HealthCheckView(grok.View):
