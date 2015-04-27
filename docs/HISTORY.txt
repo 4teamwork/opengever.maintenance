@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to list (possibly) truncated rows in SQL.
+  [lgraf]
+
 - Use conditional import in @@health-check view to
   make it work for og.core < 4.2.
   [lgraf]
