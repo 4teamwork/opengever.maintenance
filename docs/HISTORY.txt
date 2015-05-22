@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Adjust imports for Plone 4.3 support.
+  [phgross]
+
 - Add script to list (possibly) truncated rows in SQL.
   [lgraf]
 
