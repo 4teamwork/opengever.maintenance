@@ -2,8 +2,9 @@ from AccessControl.SecurityManagement import newSecurityManager
 from optparse import OptionParser
 from Products.CMFPlone.Portal import PloneSite
 from Testing.makerequest import makerequest
-from zope.app.component.hooks import setSite
+from zope.component.hooks import setSite
 import sys
+
 
 MAX_FRAMES = 5
 

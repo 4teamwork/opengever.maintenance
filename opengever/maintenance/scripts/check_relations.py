@@ -2,8 +2,8 @@ from AccessControl.SecurityManagement import newSecurityManager
 from optparse import OptionParser
 from Testing.makerequest import makerequest
 from zc.relation.interfaces import ICatalog
-from zope.app.component.hooks import setSite
 from zope.component import getUtility
+from zope.component.hooks import setSite
 import transaction
 
 
@@ -63,4 +63,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
