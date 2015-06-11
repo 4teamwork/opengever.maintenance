@@ -1,3 +1,4 @@
+from collections import Counter
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
@@ -9,12 +10,6 @@ from zope.component import getUtility
 import random
 import sys
 import transaction
-
-
-try:
-    from collections import Counter
-except ImportError:
-    from opengever.maintenance.utils import Counter
 
 
 # Print a warning message if more than batch_size * WARNING_FACTOR PDFs need
