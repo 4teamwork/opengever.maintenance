@@ -3,6 +3,13 @@ import os
 
 version = '1.0dev'
 
+tests_require = [
+    'ftw.testing',
+    'plone.app.testing',
+    'plone.testing',
+    'zope.testing',
+]
+
 setup(name='opengever.maintenance',
       version=version,
       description="Commonly used utilities and scripts for OG maintenance.",
@@ -29,6 +36,8 @@ setup(name='opengever.maintenance',
           'plone.api',
           'apachelog',
       ],
+      tests_require=tests_require,
+      extras_require=dict(tests=tests_require),
       entry_points="""
       # -*- Entry points: -*-
       [z3c.autoinclude.plugin]
