@@ -8,6 +8,9 @@ Changelog
 - Declare dependency on five.grok so that z3c.autoinclude loads its ZCML.
   [lgraf]
 
+- Declare dependency on plone.api.
+  [lgraf]
+
 - Adjust imports for Plone 4.3 support.
   [phgross]
 

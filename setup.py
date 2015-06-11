@@ -26,6 +26,7 @@ setup(name='opengever.maintenance',
           'setuptools',
           'Plone',
           'five.grok',
+          'plone.api',
           'apachelog',
       ],
       entry_points="""
