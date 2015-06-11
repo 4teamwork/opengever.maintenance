@@ -29,6 +29,7 @@ def in_status(status_list):
 
 
 def get_status(doc):
+    # Inline imports to avoid import errors that prevent instance startup
     from opengever.pdfconverter.behaviors.preview import IPreview
     from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_READY
     from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_FAILED

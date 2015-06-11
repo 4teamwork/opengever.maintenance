@@ -2,8 +2,6 @@ from collections import Counter
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
-from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_CONVERTING
-from opengever.pdfconverter.behaviors.preview import IPreview
 from opengever.pdfconverter.interfaces import IPDFConverterSettings
 from plone.registry.interfaces import IRegistry
 from zope.component import getUtility
@@ -68,6 +66,10 @@ class PDFConversionManager(object):
         """Queue PDF conversion jobs for as many documents (that don't have a
         preview PDF yet) as specified by the --batch-size option.
         """
+
+        # Inline imports to avoid import errors that prevent instance startup
+        from opengever.pdfconverter.behaviors.preview import CONVERSION_STATE_CONVERTING
+        from opengever.pdfconverter.behaviors.preview import IPreview
 
         brains = self.portal.portal_catalog(
                                 portal_type="opengever.document.document")
