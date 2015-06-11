@@ -2,11 +2,12 @@
 """
 
 from Acquisition import aq_inner
-from opengever.ogds.base.utils import get_current_admin_unit
 from Products.CMFCore.utils import getToolByName
 from ZODB.POSException import ConflictError
 import hashlib
 import time
+
+from opengever.maintenance.compat import get_site_url
 
 
 def has_file(doc):
@@ -168,9 +169,9 @@ class PDFConverter(object):
     def get_internal_url(self, context):
         """Build the internal URL of an object.
         """
-        admin_unit_url = get_current_admin_unit().site_url
+        site_url = get_site_url()
         portal_url = getToolByName(context, "portal_url")
-        internal_url = context.absolute_url().replace(portal_url(), admin_unit_url)
+        internal_url = context.absolute_url().replace(portal_url(), site_url)
         return internal_url
 
     def queue_conversion_job(self, doc):
