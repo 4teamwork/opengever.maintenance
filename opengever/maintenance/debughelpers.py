@@ -106,6 +106,11 @@ def setup_option_parser():
     parser.
     """
     parser = OptionParser()
+    # Add a fake '-c' option to work around an issue with recent versions of
+    # plone.recipe.zope2instance's bin/interpreter script.
+    # See https://dev.plone.org/ticket/13414
+    parser.add_option("-c", "--fake-option", dest="fake_option", default=None)
+
     parser.add_option("-s", "--site-root", dest="site_root", default=None)
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose",
                       default=False)

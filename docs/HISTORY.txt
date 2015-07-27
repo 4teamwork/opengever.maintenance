@@ -5,6 +5,11 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add a fake '-c' option to work around an issue with recent versions of
+  plone.recipe.zope2instance's bin/interpreter script.
+  See https://dev.plone.org/ticket/13414
+  [lgraf]
+
 - Declare dependency on five.grok so that z3c.autoinclude loads its ZCML.
   [lgraf]
 
