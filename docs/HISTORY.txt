@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to find all Dossiers missing a reference_number.
+  [lgraf]
+
 - Add a fake '-c' option to work around an issue with recent versions of
   plone.recipe.zope2instance's bin/interpreter script.
   See https://dev.plone.org/ticket/13414
