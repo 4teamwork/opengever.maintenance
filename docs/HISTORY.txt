@@ -5,6 +5,10 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add a get_object_count() function that returns the number of ZODB objects
+  and can also handle RelStorage + Oracle.
+  [lgraf]
+
 - Add script to update the PW for a user in the ZODBUserManager.
   [lgraf]
 
