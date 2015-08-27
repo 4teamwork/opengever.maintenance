@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to update the PW for a user in the ZODBUserManager.
+  [lgraf]
+
 - Add script to find all Dossiers missing a reference_number.
   [lgraf]
 
