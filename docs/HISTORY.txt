@@ -5,6 +5,18 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add a script that collects object stats from catalog and ZODB and
+  returns them as JSON.
+  [lgraf]
+
+- Add get_contenttype_stats() function that returns counts for
+  common GEVER content types from ZCatalog.
+  [lgraf]
+
+- Add a get_object_count() function that returns the number of ZODB objects
+  and can also handle RelStorage + Oracle.
+  [lgraf]
+
 - Add script to update the PW for a user in the ZODBUserManager.
   [lgraf]
 
