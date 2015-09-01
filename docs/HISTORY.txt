@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add a script that set a shared secret in the acl_users session management.
+  [phgross]
+
 - Add a script that collects object stats from catalog and ZODB and
   returns them as JSON.
   [lgraf]
