@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to remove broken portal transforms.
+  [lgraf]
+
 - Add script to set ftw.zm session_auth plugin's _secret_ts, so we can
   sync rotation of the signing secrets.
   [lgraf]
