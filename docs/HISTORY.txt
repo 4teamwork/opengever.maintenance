@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add very basic view to warm up instance caches.
+  [lgraf]
+
 - Add script to remove broken portal transforms.
   [lgraf]
 
