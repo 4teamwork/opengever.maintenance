@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to find tasks with title > 255 chars.
+  [lgraf]
+
 - Add very basic view to warm up instance caches.
   [lgraf]
 
