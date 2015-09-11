@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to find and fix mails with no_subject.
+  [lgraf]
+
 - Add script to find uncatalogued mails.
   [deiferni]
 
