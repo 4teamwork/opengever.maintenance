@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to crop long dossier and task titles.
+  [lgraf]
+
 - Add script to find tasks with title > 255 chars.
   [lgraf]
 
