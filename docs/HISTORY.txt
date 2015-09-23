@@ -5,6 +5,10 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to discover inconsistencies between the Plone Lexicon
+  and ZCTextIndexes.
+  [lgraf]
+
 - Add script to crop long dossier and task titles.
   [lgraf]
 
