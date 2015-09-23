@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to find uncatalogued mails.
+  [deiferni]
+
 - Add scripts to fix mail-class migrations based on catalog entries
   and references from the intid utility.
   [deiferni]
