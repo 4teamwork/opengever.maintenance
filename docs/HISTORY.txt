@@ -5,6 +5,10 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add scripts to fix mail-class migrations based on catalog entries
+  and references from the intid utility.
+  [deiferni]
+
 - Add script to fix affected indices with inconsistencies between lexicon and index.
   [deiferni]
 
