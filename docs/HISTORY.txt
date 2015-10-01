@@ -5,6 +5,10 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add browser view to register logging filters for the SQLAlchemy logger to
+  control its verbosity.
+  [lgraf]
+
 - Add script to find uncatalogued mails.
   [deiferni]
 
