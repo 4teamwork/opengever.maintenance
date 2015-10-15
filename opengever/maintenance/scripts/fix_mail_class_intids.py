@@ -88,7 +88,8 @@ def fix_mail_class(plone):
 
         # Refresh provided interfaces cache
         directlyProvides(base, directlyProvidedBy(base))
-        mail.reindexObject()
+        catalog.reindexObject(mail, idxs=['object_provides'],
+                              update_metadata=False)
 
         print 'Mail {}:{} fixed new class: {}'.format(mail, intid, mail.__class__)
         print '/'.join(mail.getPhysicalPath())
