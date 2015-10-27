@@ -33,6 +33,8 @@ def fix_mails_with_no_subject(options):
         catalog.unrestrictedSearchResults(sortable_title='no_subject'))
     affected_mail_brains.extend(
         catalog.unrestrictedSearchResults(Title='no_subject'))
+    affected_mail_brains.extend(
+        catalog.unrestrictedSearchResults(SearchableText='no_subject'))
 
     affected_urls = set([b.getURL() for b in set(affected_mail_brains)])
 
@@ -48,13 +50,15 @@ def fix_mails_with_no_subject(options):
     if len(affected_mails) > 0:
         commit_needed = True
         print ("Reindexing indexes 'sortable_title', 'Title', "
-               "'breadcrumb_titles' for mails with 'no_subject':")
+               "'breadcrumb_titles', 'SearchableText' for mails with "
+               "'no_subject':")
 
     for obj in affected_mails:
         print "Reindexing mail {}".format(obj.absolute_url())
         catalog.reindexObject(
             obj,
-            idxs=['sortable_title', 'Title', 'breadcrumb_titles'],
+            idxs=['sortable_title', 'Title', 'breadcrumb_titles',
+                  'SearchableText'],
             update_metadata=1)
 
     if commit_needed:
