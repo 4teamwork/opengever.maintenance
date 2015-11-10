@@ -34,6 +34,18 @@ def get_id_for_obj(obj):
     return util.normalize(name, locale='de')
 
 
+def is_equal(current, new):
+    current = normalize(current)
+    new = normalize(new)
+    return current == new or new in current
+
+def normalize(value):
+    value.replace('ue', 'u')
+    value.replace('ae', 'a')
+    value.replace('oe', 'o')
+    return value
+
+
 def check_ids():
     to_fix = []
     catalog = api.portal.get_tool('portal_catalog')
