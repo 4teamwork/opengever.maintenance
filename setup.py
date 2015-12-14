@@ -8,6 +8,7 @@ tests_require = [
     'plone.app.testing',
     'plone.testing',
     'zope.testing',
+    'opengever.core[tests]',
 ]
 
 setup(name='opengever.maintenance',
