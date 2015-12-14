@@ -33,6 +33,7 @@ setup(name='opengever.maintenance',
       install_requires=[
           'apachelog',
           'five.grok',
+          'opengever.core',
           'Plone',
           'plone.api',
           'setuptools',
