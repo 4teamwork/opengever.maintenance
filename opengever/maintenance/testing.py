@@ -9,6 +9,13 @@ class OGMaintenanceLayer(PloneSandboxLayer):
     defaultBases = (COMPONENT_REGISTRY_ISOLATION,)
 
     def setUpZope(self, app, configurationContext):
+        # this include is done to solve load-order issues during testing.
+        # including ftw.profilehook here can be removed once we only use
+        # opengever.core 4.6.1 and higher.
+        import ftw.profilehook
+        xmlconfig.file('configure.zcml', ftw.profilehook,
+                       context=configurationContext)
+
         import opengever.maintenance
         xmlconfig.file('configure.zcml', opengever.maintenance,
                        context=configurationContext)
