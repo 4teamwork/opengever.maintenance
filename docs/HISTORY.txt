@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Cleanup dependencies, add opengever.core as dependecy.
+  [deiferni]
+
 - Add script to find and fix mails with no_subject.
   [lgraf]
 
