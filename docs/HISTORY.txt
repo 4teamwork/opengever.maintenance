@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add view with reference number self-checks.
+  [lgraf]
+
 - Cleanup dependencies, add opengever.core as dependecy.
   [deiferni]
 
