@@ -1,6 +1,5 @@
 from Acquisition import aq_inner
 from Acquisition import aq_parent
-from Products.CMFPlone.interfaces import IPloneSiteRoot
 from five import grok
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberPrefix
@@ -10,11 +9,13 @@ from opengever.repository.repositoryroot import IRepositoryRoot
 from persistent.dict import PersistentDict
 from persistent.list import PersistentList
 from plone.registry.interfaces import IRegistry
+from Products.CMFPlone.interfaces import IPloneSiteRoot
 from zope.annotation.interfaces import IAnnotations
 from zope.app.intid.interfaces import IIntIds
 from zope.component import getAdapter
 from zope.component import getUtility
 from zope.component import queryAdapter
+import transaction
 
 
 try:
@@ -53,6 +54,8 @@ class RefnumSelfcheckView(grok.View):
         self.request.response.write(msg + "\n")
 
     def render(self):
+        transaction.doom()
+
         site = self.context
         checker = ReferenceNumberChecker(self.log, site)
         self.log("Running reference number self-checks...")
