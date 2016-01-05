@@ -4,6 +4,7 @@ from five import grok
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.dossier.behaviors.dossier import IDossierMarker
+from opengever.dossier.templatedossier import ITemplateDossier
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.repositoryroot import IRepositoryRoot
 from persistent.dict import PersistentDict
@@ -148,6 +149,8 @@ class ReferenceNumberChecker(object):
             url = dossier.absolute_url()
 
             if dossier.id in self.ignored_ids:
+                continue
+            if ITemplateDossier.providedBy(dossier):
                 continue
 
             refNumb = getAdapter(dossier, IReferenceNumber)
