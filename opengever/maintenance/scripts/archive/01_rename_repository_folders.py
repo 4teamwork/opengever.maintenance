@@ -91,6 +91,11 @@ def rename_repositories(options):
 
 
 def main():
+    raise Exception(
+        "this script will assign new reference numbers while moving, "
+        "most certainly you don't want that to happen..."
+    )
+
     app = setup_app()
 
     parser = setup_option_parser()
