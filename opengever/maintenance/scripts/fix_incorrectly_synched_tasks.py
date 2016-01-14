@@ -6,15 +6,19 @@ from opengever.maintenance.debughelpers import setup_plone
 from plone import api
 from pprint import pprint as pp
 import transaction
-
+from datetime import datetime
 
 SEPARATOR = '-' * 78
 TASK_ATTRIBUTES = ['title', 'text', 'breadcrumb_title', 'physical_path',
-                   'review_state', 'icon', 'responsible', 'issuer', 'deadline',
-                   'completed', 'modified', 'task_type', 'is_subtask',
+                   'review_state', 'responsible', 'issuer', 'deadline',
+                   'completed', 'task_type', 'is_subtask',
                    'sequence_number', 'reference_number', 'containing_dossier',
                    'dossier_sequence_number', 'assigned_org_unit',
                    'principals', 'predecessor', 'containing_subdossier']
+
+INFO_ONLY = ['principals']
+
+SKIPPED = ['modified', 'icon']
 
 
 def check_is_update_to_date(task, sql_task):
@@ -23,8 +27,28 @@ def check_is_update_to_date(task, sql_task):
     copy.sync_with(task)
 
     for attr in TASK_ATTRIBUTES:
-        if getattr(copy, attr) != getattr(sql_task, attr):
-            incorrect_attributes.append(attr)
+        expected = getattr(copy, attr)
+        stored = getattr(sql_task, attr)
+
+        if attr == 'principals':
+            expected = [principal for principal in expected]
+            stored = [principal for principal in stored]
+            expected.sort()
+            stored.sort()
+
+        if isinstance(expected, str):
+            expected = expected.decode('utf-8')
+
+        elif isinstance(expected, datetime) and isinstance(expected, datetime):
+            expected = expected.date()
+
+        if expected != stored and not (expected == '' and stored == None):
+
+            if attr in INFO_ONLY:
+                print 'Difference detected but ignored {} {} ... {}'.format(attr, expected, stored)
+	    else:
+                print 'Difference detected {} {} ... {}'.format(attr, expected, stored)
+                incorrect_attributes.append(attr)
 
     return incorrect_attributes
 
@@ -93,3 +117,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
