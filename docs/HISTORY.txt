@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add a view to re-generate excerpts for a meeting.
+  [deiferni]
+
 - Add view with reference number self-checks.
   [lgraf]
 
