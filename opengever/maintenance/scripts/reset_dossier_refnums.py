@@ -43,7 +43,7 @@ logging.root.addHandler(handler)
 logging.root.setLevel(logging.INFO)
 
 
-STATS_CSV_APTH = os.path.abspath(
+STATS_CSV_PATH = os.path.abspath(
     os.path.join(__file__,
                  '..', '..', '..', '..',
                  'reset_dossier_refnums_statistics.csv'))
@@ -163,8 +163,8 @@ class RefnumsStatistics(object):
 
     @contextmanager
     def __call__(self):
-        if os.path.exists(STATS_CSV_APTH):
-            print 'Error: file exists:', STATS_CSV_APTH
+        if os.path.exists(STATS_CSV_PATH):
+            print 'Error: file exists:', STATS_CSV_PATH
             print 'Not going to overwrite.'
             sys.exit(1)
 
@@ -236,9 +236,9 @@ class RefnumsStatistics(object):
 
         print ''
         print ''
-        print 'INFO: Writing statistics to', STATS_CSV_APTH
+        print 'INFO: Writing statistics to', STATS_CSV_PATH
 
-        with open(STATS_CSV_APTH, 'w+') as csvfile:
+        with open(STATS_CSV_PATH, 'w+') as csvfile:
             writer = DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for item in items.values():
