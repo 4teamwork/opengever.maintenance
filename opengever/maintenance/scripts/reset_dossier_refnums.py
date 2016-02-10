@@ -3,13 +3,17 @@ from Acquisition import aq_parent
 from contextlib import contextmanager
 from csv import DictWriter
 from ftw.upgrade.progresslogger import ProgressLogger
+from opengever.base.adapters import CHILD_REF_KEY
 from opengever.base.adapters import DOSSIER_KEY
+from opengever.base.adapters import PREFIX_REF_KEY
+from opengever.base.adapters import REPOSITORY_FOLDER_KEY
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.browser.refnum_selfcheck import ReferenceNumberChecker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.repositoryroot import IRepositoryRoot
 from persistent.dict import PersistentDict
 from persistent.list import PersistentList
@@ -64,6 +68,7 @@ class DossierRefnumsResetter(object):
         transaction.get().note('reset_dossier_refnums')
         try:
             with RefnumsStatistics(self.catalog)():
+                self.make_repository_storages_persistent()
                 self.reset_dossier_refnums()
                 print ''
                 print ''
@@ -76,6 +81,37 @@ class DossierRefnumsResetter(object):
             print ''
             print 'ABORTING TRANSACTION'
             print 'Reason:', str(exc)
+
+    def make_repository_storages_persistent(self):
+        brains = self.catalog(object_provides=IRepositoryFolder.__identifier__)
+        brains = ProgressLogger('Making repository storages persistent.', brains)
+        objects = (brain.getObject() for brain in brains)
+        changes = map(self._make_repo_storages_persistent, objects)
+        print 'Changed refnum storages for {} repository folders.'.format(
+            len(filter(None, changes)))
+        print ''
+
+    def _make_repo_storages_persistent(self, repo_folder):
+        changed = False
+
+        annotations = IAnnotations(repo_folder)
+        if REPOSITORY_FOLDER_KEY not in annotations:
+            return changed
+
+        if type(annotations[REPOSITORY_FOLDER_KEY]) == dict:
+            annotations[REPOSITORY_FOLDER_KEY] = PersistentDict(
+                annotations[REPOSITORY_FOLDER_KEY])
+            changed = True
+
+        container = annotations[REPOSITORY_FOLDER_KEY]
+        for key in (CHILD_REF_KEY, PREFIX_REF_KEY):
+            if type(container[key]) != dict:
+                continue
+
+            container[key] = PersistentDict(container[key])
+            changed = True
+
+        return changed
 
     def reset_dossier_refnums(self):
         msg = 'Resetting dossier reference numbers now.'
