@@ -105,7 +105,7 @@ class DossierRefnumsResetter(object):
 
         container = annotations[REPOSITORY_FOLDER_KEY]
         for key in (CHILD_REF_KEY, PREFIX_REF_KEY):
-            if type(container[key]) != dict:
+            if type(container.get(key)) != dict:
                 continue
 
             container[key] = PersistentDict(container[key])
