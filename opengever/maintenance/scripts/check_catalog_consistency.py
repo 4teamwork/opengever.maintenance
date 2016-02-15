@@ -23,6 +23,9 @@ class CatalogConsistencyChecker(object):
             # Trigger RID key errors
             self._get_index_data_for_brain(brain)
 
+            # Trigger key errors in _wordinfo mapping
+            self._check_wordinfo_consistency(brain)
+
         print "All checks done."
 
     def _get_index_data_for_brain(self, brain):
@@ -58,6 +61,42 @@ class CatalogConsistencyChecker(object):
                 msg = "Index {}: Fetching RID {} failed with {!r}. Path: {}"
                 print msg.format(name, rid, e, brain.getPath())
         return result
+
+    def _check_wordinfo_consistency(self, brain):
+        """During a massive rename operation, we saw KeyErrors during
+        unIndexing of objects from the attempt to delete doc2score[rid].
+
+        This check tries to force that kind of KeyError, by accessing
+        idx.index._wordinfo[wid][rid] for each indexed word in each index
+        with a lexicon (usually ZCTextIndexes).
+
+        The error seemed to be of a transient nature, so it's unclear
+        whether this is actually a persistent problem - but if it is, this
+        check should uncover it.
+        """
+        rid = brain.getRID()
+        _catalog = self.catalog._catalog
+        entry = self.catalog.getIndexDataForRID(rid)
+
+        for idx_name, words in entry.items():
+            idx = _catalog.getIndex(idx_name)
+
+            try:
+                lexicon = idx.getLexicon()
+            except AttributeError:
+                # No getLexicon() method - probably not a ZCTextIndex
+                continue
+
+            for word in words:
+                wid = lexicon._wids[word]
+                doc2score = idx.index._wordinfo[wid]
+                try:
+                    # Access score to potentially trigger a KeyError
+                    doc2score[rid]
+                except Exception, e:
+                    msg = "Index {}: Fetching score for word {!r}, " \
+                          "RID {} failed with {!r}. Path: {}"
+                    print msg.format(idx_name, word, rid, e, brain.getPath())
 
 
 def main():
