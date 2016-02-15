@@ -47,7 +47,29 @@ def check_for_rid_key_errors(portal, options):
 
     for brain in brains:
         rid = brain.getRID()
-        getIndexDataForRID(portal_catalog, rid, brain)
+        entry = getIndexDataForRID(portal_catalog, rid, brain)
+        check_for_wordinfo_inconsistencies(portal_catalog, rid, brain, entry)
+
+
+def check_for_wordinfo_inconsistencies(portal_catalog, rid, brain, entry):
+    _catalog = portal_catalog._catalog
+    for idx_name, words in entry.items():
+        idx = _catalog.getIndex(idx_name)
+
+        try:
+            lexicon = idx.getLexicon()
+        except AttributeError:
+            # No getLexicon() method - probably not a ZCTextIndex
+            continue
+
+        for word in words:
+            wid = lexicon._wids[word]
+            doc2score = idx.index._wordinfo[wid]
+            try:
+                score = doc2score[rid]
+            except Exception, e:
+                msg = "Index {}: Fetching score for word {!r}, RID {} failed with {!r}. Path: {}"
+                print msg.format(idx_name, word, rid, e, brain.getPath())
 
 
 def main():
