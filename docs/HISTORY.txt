@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add scripts to dump catalog stats grouped by month.
+  [lgraf]
+
 - Add check to verify catalog _wordinfo consistency.
   [lgraf]
 

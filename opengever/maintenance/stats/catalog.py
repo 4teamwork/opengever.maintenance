@@ -25,11 +25,15 @@ TYPES = {
 }
 
 
-def get_contenttype_stats(plone):
+def get_contenttype_stats(plone, daterange=None):
     catalog_stats = {}
     catalog = api.portal.get_tool('portal_catalog')
+
     for type_key, iface in TYPES.items():
-        brains = catalog.unrestrictedSearchResults(
-            object_provides=iface.__identifier__)
+        query = {'object_provides': iface.__identifier__}
+        if daterange is not None:
+            query['created'] = {'query': (daterange), 'range': 'min:max'}
+
+        brains = catalog.unrestrictedSearchResults(query)
         catalog_stats[type_key] = len(brains)
     return catalog_stats
