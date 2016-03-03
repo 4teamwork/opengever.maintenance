@@ -49,9 +49,8 @@ class LockMaintenanceView(grok.View):
                 infos['type'] = lock_info[0]['type']
 
                 manager = getMultiAdapter((obj, obj.REQUEST),
-                                              ICheckinCheckoutManager)
-                checked_out = manager.checked_out()
-                infos['checked_out'] = checked_out
+                                          ICheckinCheckoutManager)
+                infos['checked_out'] = manager.get_checked_out_by()
 
                 results.append(infos)
 
