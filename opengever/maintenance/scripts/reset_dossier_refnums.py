@@ -19,6 +19,8 @@ from persistent.dict import PersistentDict
 from persistent.list import PersistentList
 from Products.CMFCore.utils import getToolByName
 from zope.annotation.interfaces import IAnnotations
+from zope.app.intid.interfaces import IIntIds
+from zope.component import getUtility
 import logging
 import os.path
 import sys
@@ -63,12 +65,13 @@ class DossierRefnumsResetter(object):
     def __init__(self, portal):
         self.portal = portal
         self.catalog = getToolByName(self.portal, 'portal_catalog')
+        self.intids = getUtility(IIntIds)
 
     def __call__(self):
         transaction.get().note('reset_dossier_refnums')
         try:
             with RefnumsStatistics(self.catalog)():
-                self.make_repository_storages_persistent()
+                self.fix_repository_storages()
                 self.reset_dossier_refnums()
                 print ''
                 print ''
@@ -82,12 +85,18 @@ class DossierRefnumsResetter(object):
             print 'ABORTING TRANSACTION'
             print 'Reason:', str(exc)
 
-    def make_repository_storages_persistent(self):
+    def fix_repository_storages(self):
         brains = self.catalog(object_provides=IRepositoryFolder.__identifier__)
         brains = ProgressLogger('Making repository storages persistent.', brains)
-        objects = (brain.getObject() for brain in brains)
+        objects = tuple(brain.getObject() for brain in brains)
+
         changes = map(self._make_repo_storages_persistent, objects)
         print 'Changed refnum storages for {} repository folders.'.format(
+            len(filter(None, changes)))
+        print ''
+
+        changes = map(self._put_in_parent_mappings, objects)
+        print 'Put folder in parent mappings for {} repository folders.'.format(
             len(filter(None, changes)))
         print ''
 
@@ -109,6 +118,21 @@ class DossierRefnumsResetter(object):
                 continue
 
             container[key] = PersistentDict(container[key])
+            changed = True
+
+        return changed
+
+    def _put_in_parent_mappings(self, repo_folder):
+        changed = False
+        parent = aq_parent(aq_inner(repo_folder))
+        child = repo_folder
+        child_number = IReferenceNumber(child).get_local_number()
+        child_intid = self.intids.getId(child)
+        ref = IReferenceNumberPrefix(parent)
+
+        is_in_intid_mapping = child_intid in ref.get_prefix_mapping(child)
+        if not is_in_intid_mapping:
+            ref.set_number(child, number=child_number)
             changed = True
 
         return changed
