@@ -2,6 +2,7 @@ from Acquisition import aq_inner
 from Acquisition import aq_parent
 from csv import DictWriter
 from datetime import datetime
+from ftw.upgrade.progresslogger import ProgressLogger
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
@@ -44,8 +45,6 @@ def use_canonical_document_id(options):
     for brain in brains:
         name = brain.id
         if name.startswith('template-') or name.startswith('document-'):
-            if options.verbose:
-                logger.info("skipped: {}".format(brain.getPath()))
             continue
 
         to_rename.append(brain.getObject())
@@ -64,6 +63,14 @@ def use_canonical_document_id(options):
         base = "https://{}/".format(options.domain)
         return urljoin(base, visible_fragment)
 
+    def commit():
+        if options.dry_run:
+            return
+
+        if options.verbose:
+            logger.info("committing...")
+        transaction.commit()
+
     with open(REPORT_PATH, 'w+') as csvfile:
         writer = DictWriter(csvfile, fieldnames=["old_url", "new_url"])
         writer.writeheader()
@@ -71,13 +78,10 @@ def use_canonical_document_id(options):
         # elevated privileges are necessary to be able to modify stuff in
         # closed dossiers.
         with elevated_privileges():
-            for obj in to_rename:
+            for index, obj in enumerate(ProgressLogger("renaming", to_rename)):
                 parent = aq_parent(aq_inner(obj))
-                old_name = obj.getId()
                 old_url = '/'.join(obj.getPhysicalPath())
                 new_name = INameChooser(parent).chooseName(None, obj)
-                logger.info("renaming '{}' to '{}' ({})".format(
-                    old_name, new_name, '/'.join(obj.getPhysicalPath())))
                 api.content.rename(obj=obj, new_id=new_name)
                 new_url = '/'.join(obj.getPhysicalPath())
                 writer.writerow({
@@ -85,9 +89,10 @@ def use_canonical_document_id(options):
                     "new_url": build_url(new_url)
                 })
 
-    if not options.dry_run:
-        transaction.commit()
+                if index and index % 100 == 0:
+                    commit()
 
+    commit()
     logger.info("done.")
 
 
