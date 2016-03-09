@@ -59,27 +59,7 @@ class RefnumSelfcheckView(grok.View):
 
         site = self.context
         checker = ReferenceNumberChecker(self.log, site)
-        self.log("Running reference number self-checks...")
-
-        self.log("Running 'check_if_dossier_refnums_are_complete'...")
-        result = checker.check_if_dossier_refnums_are_complete()
-        self.log("Done: %s" % result)
-
-        self.log("Running 'check_for_duplicate_refnums'...")
-        result = checker.check_for_duplicate_refnums()
-        self.log("Done: %s" % result)
-
-        self.log("Running 'check_if_index_equals_objdata'...")
-        result = checker.check_if_index_equals_objdata()
-        self.log("Done: %s" % result)
-
-        self.log("Running 'check_if_in_proper_mappings'...")
-        result = checker.check_if_in_proper_mappings()
-        self.log("Done: %s" % result)
-
-        self.log("Running 'check_if_mappings_are_persistent'...")
-        result = checker.check_if_mappings_are_persistent()
-        self.log("Done: %s" % result)
+        checker.selfcheck()
 
 
 class ReferenceNumberHelper(object):
@@ -137,6 +117,24 @@ class ReferenceNumberChecker(object):
     def log(self, msg):
         msg = "    " + msg
         return self.parent_logger(msg)
+
+    def selfcheck(self):
+        self.log("Running reference number self-checks...")
+
+        checks = ('check_if_dossier_refnums_are_complete',
+                  'check_for_duplicate_refnums',
+                  'check_if_index_equals_objdata',
+                  'check_if_in_proper_mappings',
+                  'check_if_mappings_are_persistent')
+
+        results = {}
+        for checkname in checks:
+            self.log("Running '{}'...".format(checkname))
+            result = getattr(self, checkname)()
+            self.log("Done {}: {}".format(checkname, result))
+            results[checkname] = result
+
+        return results
 
     def check_if_dossier_refnums_are_complete(self):
         check_result = 'PASSED'
