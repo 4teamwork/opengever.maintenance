@@ -1,11 +1,22 @@
+from opengever.base.interfaces import IReferenceNumberSettings
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.setup.sections.reference import PathFromReferenceNumberSection
+from opengever.setup.sections.xlssource import XlsSource
 from plone import api
+from plone.i18n.normalizer.interfaces import IIDNormalizer
+from plone.i18n.normalizer.interfaces import IURLNormalizer
+from plone.registry.interfaces import IRegistry
+from zope.component import getUtility
+from zope.component import queryUtility
+import logging
 import os
 import os.path
 import transaction
 
+
+logger = logging.getLogger('opengever.maintenance')
 
 REPOSITORIES_FOLDER_NAME = 'opengever_repositories'
 
@@ -14,7 +25,44 @@ class Abort(Exception):
     pass
 
 
-class RetentionPeriodFixer(object):
+class FixerXlsSource(XlsSource):
+    """Abuse xlsx-source transmogrifier section from opengever.core.
+
+    No longer do transmogrifier related stuff but just load the excel file
+    from the specified path.
+    """
+    def __init__(self, repository_file_path):
+        self.repository_file_path = repository_file_path
+        self.filename = os.path.split(repository_file_path)[1]
+        self.repository_id, extension = os.path.splitext(self.filename)
+
+    def __iter__(self):
+        keys, sheet_data = self.read_excel_file(self.repository_file_path)
+        # skip repository root
+        for rownum, row in enumerate(sheet_data[1:], start=1):
+            yield self.process_row(row, rownum, keys, self.repository_id)
+
+
+class FixerPathFromReferenceNumber(PathFromReferenceNumberSection):
+    """Abuse reference number inserter from opengever.core
+
+    No longer do transmogrifier related stuff but just generate the reference
+    numbers.
+    """
+    def __init__(self, previous):
+        self.logger = logger
+        self.previous = previous
+
+        self.refnum_mapping = {}
+        self.normalizer = queryUtility(IURLNormalizer, name="de")
+        self.id_normalizer = queryUtility(IIDNormalizer)
+
+        registry = getUtility(IRegistry)
+        proxy = registry.forInterface(IReferenceNumberSettings)
+        self.reference_formatter = proxy.formatter
+
+
+class RetentionPeriodFixer(XlsSource):
 
     def __init__(self, plone, profile):
         self.plone = plone
@@ -22,7 +70,8 @@ class RetentionPeriodFixer(object):
         self.portal_setup = api.portal.get_tool('portal_setup')
 
     def run(self):
-        repository_file_path = self.get_repository_file_path()
+        source = FixerPathFromReferenceNumber(
+            FixerXlsSource(self.get_repository_file_path()))
 
     def get_repository_file_path(self):
         profile_info = self.portal_setup.getProfileInfo(self.profile)
