@@ -1,3 +1,5 @@
+from Acquisition import aq_inner
+from Acquisition import aq_parent
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberSettings
@@ -67,6 +69,89 @@ class FixerPathFromReferenceNumber(PathFromReferenceNumberSection):
         self.reference_formatter = reference_formatter
 
 
+class RepoRootDiff(object):
+
+    def __init__(self, registry, context):
+        self.context = context
+        self.child_folders = []
+
+        self.register_in(registry)
+
+    def register_in(self, registry):
+        path = '/'.join(self.context.getPhysicalPath())
+        if path in registry:
+            raise Abort('object is already registered: {}'.format(path))
+        registry[path] = self
+
+    def append_child_folder(self, child_folder):
+        self.child_folders.append(child_folder)
+
+    def apply_recursively(self):
+        for child_folder in self.child_folders:
+            child_folder.apply_recursively()
+
+
+class RepoFolderDiff(RepoRootDiff):
+
+    def __init__(self, registry, context, item,
+                 reference_formatter, catalog, options):
+        super(RepoFolderDiff, self).__init__(registry, context)
+        self.item = item
+        self.reference_formatter = reference_formatter
+        self.catalog = catalog
+        self.options = options
+        self.child_documents = []
+
+    def register_in(self, registry):
+        super(RepoFolderDiff, self).register_in(registry)
+
+        parent_context = aq_parent(aq_inner(self.context))
+        parent_diff = registry['/'.join(parent_context.getPhysicalPath())]
+        parent_diff.append_child_folder(self)
+
+    def apply_recursively(self):
+        self.fix_reference_number()
+        super(RepoFolderDiff, self).apply_recursively()
+
+    def get_repository_reference_number(self):
+        reference = IReferenceNumber(self.context)
+        formatter = getAdapter(self.context, IReferenceNumberFormatter,
+                               name=self.reference_formatter)
+        return formatter.repository_number(reference.get_parent_numbers())
+
+    def fix_reference_number(self):
+        reference_number = self.get_repository_reference_number()
+        if reference_number != self.item['reference_number']:
+            logger.warn('reference numbers differ for {}: '
+                        '"{}" (site), "{}" (excel)'
+                        .format(self.path,
+                                reference_number,
+                                self.item["reference_number"]))
+            return
+
+        if self.is_leaf_folder():
+            self.fix_leaf_folder()
+        else:
+            self.fix_non_leaf_folder()
+
+    def is_leaf_folder(self):
+        child_folders = self.catalog.unrestrictedSearchResults(
+            path={'query': '/'.join(self.context.getPhysicalPath()),
+                  'depth': 1},
+            object_provides=IRepositoryFolder.__identifier__)
+        return len(child_folders) == 0
+
+    def fix_non_leaf_folder(self):
+        if self.options.verbose:
+            logger.info('fixing non-leaf folder {}'
+                        .format(self.item['_query_path']))
+
+    def fix_leaf_folder(self):
+        if self.options.verbose:
+            logger.info('fixing leaf folder {}'
+                        .format(self.item['_query_path']))
+
+
 class RetentionPeriodFixer(XlsSource):
 
     def __init__(self, plone, options):
@@ -75,26 +160,24 @@ class RetentionPeriodFixer(XlsSource):
         self.profile = options.profile
         self.portal_setup = api.portal.get_tool('portal_setup')
         self.catalog = api.portal.get_tool('portal_catalog')
+        self.diffs = {}
 
         registry = getUtility(IRegistry)
         proxy = registry.forInterface(IReferenceNumberSettings)
         self.reference_formatter = proxy.formatter
-
-    def get_repository_reference_number(self, context):
-        reference = IReferenceNumber(context)
-        formatter = getAdapter(context, IReferenceNumberFormatter,
-                               name=self.reference_formatter)
-        return formatter.repository_number(reference.get_parent_numbers())
 
     def run(self):
         xlssource = FixerXlsSource(self.get_repository_file_path())
         source = FixerPathFromReferenceNumber(xlssource,
                                               self.reference_formatter)
 
+        diff_root = RepoRootDiff(self.diffs, self.get_repo_root())
         for item in source:
-            self.fix_retention_period(item)
+            self.init_diff(item)
 
-    def fix_retention_period(self, item):
+        diff_root.apply_recursively()
+
+    def init_diff(self, item):
         path = item['_path'].lstrip('/').encode('utf-8')
         item['_query_path'] = path
 
@@ -103,36 +186,8 @@ class RetentionPeriodFixer(XlsSource):
             logger.warn('could not find repository folder: {}'.format(path))
             return
 
-        reference_number = self.get_repository_reference_number(context)
-        if reference_number != item['reference_number']:
-            logger.warn('reference numbers differ for {}: '
-                        '"{}" (site), "{}" (excel)'
-                        .format(path,
-                                reference_number,
-                                item["reference_number"]))
-            return
-
-        if self.is_leaf_folder(context):
-            self.fix_leaf_folder(context, item)
-        else:
-            self.fix_non_leaf_folder(context, item)
-
-    def is_leaf_folder(self, context):
-        child_folders = self.catalog.unrestrictedSearchResults(
-            path={'query': '/'.join(context.getPhysicalPath()),
-                  'depth': 1},
-            object_provides=IRepositoryFolder.__identifier__)
-        return len(child_folders) == 0
-
-    def fix_non_leaf_folder(self, context, item):
-        if self.options.verbose:
-            logger.info('fixing non-leaf folder {}'
-                        .format(item['_query_path']))
-
-    def fix_leaf_folder(self, context, item):
-        if self.options.verbose:
-            logger.info('fixing leaf folder {}'
-                        .format(item['_query_path']))
+        RepoFolderDiff(self.diffs, context, item,
+                       self.reference_formatter, self.catalog, self.options)
 
     def get_repository_file_path(self):
         profile_info = self.portal_setup.getProfileInfo(self.profile)
@@ -149,6 +204,16 @@ class RetentionPeriodFixer(XlsSource):
                         len(repository_filenames), repository_filenames))
 
         return os.path.join(repositories_folder, repository_filenames[0])
+
+    def get_repo_root(self):
+        repo_roots = self.catalog.unrestrictedSearchResults(
+            portal_type={'query': 'opengever.repository.repositoryroot',
+                         'depth': 1})
+        if len(repo_roots) != 1:
+            raise Abort('Expected exactly one repository root, found {}'
+                        .format(len(repo_roots)))
+
+        return repo_roots[0].getObject()
 
 
 def main():
