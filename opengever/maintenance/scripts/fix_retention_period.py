@@ -1,8 +1,10 @@
 from Acquisition import aq_inner
 from Acquisition import aq_parent
+from opengever.base.behaviors.lifecycle import ILifeCycle
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberSettings
+from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
@@ -29,6 +31,7 @@ logging.root.addHandler(handler)
 logging.root.setLevel(logging.INFO)
 
 REPOSITORIES_FOLDER_NAME = 'opengever_repositories'
+DEFAULT_PERIOD = 5
 
 
 class Abort(Exception):
@@ -72,12 +75,13 @@ class FixerPathFromReferenceNumber(PathFromReferenceNumberSection):
 class RepoRootDiff(object):
 
     def __init__(self, registry, context):
+        self.new_period = DEFAULT_PERIOD
         self.context = context
         self.child_folders = []
 
-        self.register_in(registry)
+        self._register_in(registry)
 
-    def register_in(self, registry):
+    def _register_in(self, registry):
         path = '/'.join(self.context.getPhysicalPath())
         if path in registry:
             raise Abort('object is already registered: {}'.format(path))
@@ -95,65 +99,141 @@ class RepoFolderDiff(RepoRootDiff):
 
     def __init__(self, registry, context, item,
                  reference_formatter, catalog, options):
-        super(RepoFolderDiff, self).__init__(registry, context)
+        self._is_leaf_folder = None
+        self.can_apply = True
+        self.parent = None
+        self.child_dossiers = []
+
         self.item = item
         self.reference_formatter = reference_formatter
         self.catalog = catalog
         self.options = options
-        self.child_documents = []
 
-    def register_in(self, registry):
-        super(RepoFolderDiff, self).register_in(registry)
+        super(RepoFolderDiff, self).__init__(registry, context)
+        self._diff()
+
+    def _register_in(self, registry):
+        super(RepoFolderDiff, self)._register_in(registry)
 
         parent_context = aq_parent(aq_inner(self.context))
-        parent_diff = registry['/'.join(parent_context.getPhysicalPath())]
-        parent_diff.append_child_folder(self)
+        self.parent = registry['/'.join(parent_context.getPhysicalPath())]
+        self.parent.append_child_folder(self)
 
-    def apply_recursively(self):
-        self.fix_reference_number()
-        super(RepoFolderDiff, self).apply_recursively()
+    @property
+    def is_leaf_folder(self):
+        if self._is_leaf_folder is None:
+            child_folders = self.catalog.unrestrictedSearchResults(
+                path={'query': '/'.join(self.context.getPhysicalPath()),
+                      'depth': 1},
+                object_provides=IRepositoryFolder.__identifier__)
+            self._is_leaf_folder = len(child_folders) == 0
+        return self._is_leaf_folder
 
-    def get_repository_reference_number(self):
-        reference = IReferenceNumber(self.context)
-        formatter = getAdapter(self.context, IReferenceNumberFormatter,
-                               name=self.reference_formatter)
-        return formatter.repository_number(reference.get_parent_numbers())
-
-    def fix_reference_number(self):
-        reference_number = self.get_repository_reference_number()
+    def _diff(self):
+        reference_number = self._get_repository_reference_number()
         if reference_number != self.item['reference_number']:
             logger.warn('reference numbers differ for {}: '
                         '"{}" (site), "{}" (excel)'
                         .format(self.path,
                                 reference_number,
                                 self.item["reference_number"]))
+            self.can_apply = False
             return
 
-        if self.is_leaf_folder():
-            self.fix_leaf_folder()
-        else:
-            self.fix_non_leaf_folder()
+        self.current_period = ILifeCycle(self.context).retention_period
+        xls_period = self.item.get('retention_period')
+        self.new_period = xls_period or self.parent.new_period
 
-    def is_leaf_folder(self):
-        child_folders = self.catalog.unrestrictedSearchResults(
-            path={'query': '/'.join(self.context.getPhysicalPath()),
-                  'depth': 1},
-            object_provides=IRepositoryFolder.__identifier__)
-        return len(child_folders) == 0
+    def _get_repository_reference_number(self):
+        reference = IReferenceNumber(self.context)
+        formatter = getAdapter(self.context, IReferenceNumberFormatter,
+                               name=self.reference_formatter)
+        return formatter.repository_number(reference.get_parent_numbers())
 
-    def fix_non_leaf_folder(self):
+    def apply_recursively(self):
+        if not self.can_apply:
+            return
+
+        self.apply_to_repo_folder()
+        if self.is_leaf_folder:
+            self.apply_to_dossiers()
+
+        super(RepoFolderDiff, self).apply_recursively()
+
+    def apply_to_dossiers(self):
+        child_dossiers = self.catalog.unrestrictedSearchResults(
+            path='/'.join(self.context.getPhysicalPath()),
+            object_provides=IDossierMarker.__identifier__)
+
+        for brain in child_dossiers:
+            self.apply_to_dossier(brain.getObject())
+
+    def apply_to_repo_folder(self):
+        kind = 'leaf ' if self.is_leaf_folder else ''
+        if self.current_period != DEFAULT_PERIOD:
+            if self.options.verbose:
+                logger.info('skipping {}repo-folder {}, modified'
+                            .format(kind, self.item['_query_path']))
+            return
+
+        if self.current_period == self.new_period:
+            if self.options.verbose:
+                logger.info('skipping {}repo-folder {}, not changed'
+                            .format(kind, self.item['_query_path']))
+            return
+
+            if self.options.verbose:
+                logger.info('skipping {}repo-folder {}, modified'
+                            .format(kind, self.item['_query_path']))
+
         if self.options.verbose:
-            logger.info('fixing non-leaf folder {}'
-                        .format(self.item['_query_path']))
+            logger.info('fixing {}repo-folder {}, {}->{}'
+                        .format(kind, self.item['_query_path'],
+                                self.current_period, self.new_period))
+        ILifeCycle(self.context).retention_period = self.new_period
 
-    def fix_leaf_folder(self):
+    def apply_to_dossier(self, dossier):
+        if ILifeCycle(dossier).retention_period == self.new_period:
+            return
+
         if self.options.verbose:
-            logger.info('fixing leaf folder {}'
-                        .format(self.item['_query_path']))
+            logger.info('fixing {} dossier {}'
+                        .format('/'.join(dossier.getPhysicalPath())))
+
+        ILifeCycle(dossier).retention_period = self.new_period
 
 
 class RetentionPeriodFixer(XlsSource):
+    """Fix retention periods that were not set from the xls file by mistake.
 
+    The problem was caused by a missing row-header in the init excel file.
+    Thus all retention_period values specified by the customer were not set,
+    instead the default value was used.
+
+    We attempt to fix this by comparing the current repository to the initial
+    excel file and setting the retention_period on the repository as follows:
+
+                    plone: no change, plone: (re-)moved, plone: changed
+    xls: no value   parent/default,   skip,              skip
+    xls: value      from xls,         skip,              skip
+
+    Values specified in the excel file are inherited by children. If an excel
+    file contanis a value for a parent folder but none for a child folder the
+    child folder inherits the parent's retention period setting.
+
+    When a leaf folder's retention_period is updated, all dossiers in that
+    folder that have the same retention_period as the folder are updated
+    as well, under the assumption that the value was inherited.
+
+    Note: this will set a wrong retention_period when:
+      - the repo_folders retention_period changes to non-default
+      - the child (dossier/repo-folder) should have a rentention_period equal
+        to the default retention_period.
+
+    Unfortunately this cannot be avoided since we cannot tell the difference
+    between inherited and configured value.
+
+    """
     def __init__(self, plone, options):
         self.plone = plone
         self.options = options
@@ -202,7 +282,6 @@ class RetentionPeriodFixer(XlsSource):
         if len(repository_filenames) != 1:
             raise Abort("Expected one repository file but found {}, {}".format(
                         len(repository_filenames), repository_filenames))
-
         return os.path.join(repositories_folder, repository_filenames[0])
 
     def get_repo_root(self):
@@ -232,13 +311,12 @@ def main():
                      .format(options.profile))
         return
 
-    plone = setup_plone(app, options)
-    RetentionPeriodFixer(plone, options).run()
-
     if options.dry_run:
         logger.warn('transaction doomed because we are in dry-mode.')
         transaction.doom()
 
+    plone = setup_plone(app, options)
+    RetentionPeriodFixer(plone, options).run()
     transaction.commit()
 
 
