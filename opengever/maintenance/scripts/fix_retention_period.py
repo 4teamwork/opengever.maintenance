@@ -187,6 +187,17 @@ class RepoFolderDiff(RepoRootDiff):
                             .format(kind, self.item['_query_path']))
             return
 
+        current_title = self.context.Title(prefix_with_reference_number=False)
+        current_title = current_title.decode('utf-8')  # Title returns utf-8
+        xls_title = self.item['effective_title']
+        if current_title != xls_title:
+            if self.options.verbose:
+                logger.info(u'skipping {}repo-folder {}, title changed '
+                            u'from "{}" to "{}"'
+                            .format(kind, self.item['_query_path'],
+                                    xls_title, current_title))
+            return
+
         if self.options.verbose:
             logger.info('fixing {}repo-folder {}, {}->{}'
                         .format(kind, self.item['_query_path'],
