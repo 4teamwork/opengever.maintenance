@@ -136,12 +136,12 @@ class RepoFolderDiff(RepoRootDiff):
         return self._is_leaf_folder
 
     def _diff(self):
-        reference_number = self._get_repository_reference_number()
-        if reference_number != self.item['reference_number']:
+        self.reference_number = self._get_repository_reference_number()
+        if self.reference_number != self.item['reference_number']:
             logger.warn('reference numbers differ for {}: '
                         '"{}" (site), "{}" (excel)'
                         .format(self.path,
-                                reference_number,
+                                self.reference_number,
                                 self.item["reference_number"]))
             self.can_apply = False
             return
@@ -177,14 +177,18 @@ class RepoFolderDiff(RepoRootDiff):
         kind = 'leaf ' if self.is_leaf_folder else ''
         if self.current_period != DEFAULT_PERIOD:
             if self.options.verbose:
-                logger.info('skipping {}repo-folder {}, modified'
-                            .format(kind, self.item['_query_path']))
+                logger.info('skipping {}repo-folder ({}) {}, modified'
+                            .format(kind,
+                                    self.reference_number,
+                                    self.item['_query_path']))
             return False
 
         if self.current_period == self.new_period:
             if self.options.verbose:
-                logger.info('skipping {}repo-folder {}, not changed'
-                            .format(kind, self.item['_query_path']))
+                logger.info('skipping {}repo-folder ({}) {}, not changed'
+                            .format(kind,
+                                    self.reference_number,
+                                    self.item['_query_path']))
             return False
 
         current_title = self.context.Title(prefix_with_reference_number=False)
@@ -192,17 +196,24 @@ class RepoFolderDiff(RepoRootDiff):
         xls_title = self.item['effective_title']
         if current_title != xls_title:
             if self.options.verbose:
-                logger.info(u'skipping {}repo-folder {}, title changed '
+                logger.info(u'skipping {}repo-folder ({}) {}, title changed '
                             u'from "{}" to "{}"'
-                            .format(kind, self.item['_query_path'],
-                                    xls_title, current_title))
+                            .format(kind,
+                                    self.reference_number,
+                                    self.item['_query_path'],
+                                    xls_title,
+                                    current_title))
             return False
 
         if self.options.verbose:
-            logger.info('fixing {}repo-folder {}, {}->{}'
-                        .format(kind, self.item['_query_path'],
-                                self.current_period, self.new_period))
+            logger.info('fixing {}repo-folder ({}) {}, {}->{}'
+                        .format(kind,
+                                self.reference_number,
+                                self.item['_query_path'],
+                                self.current_period,
+                                self.new_period))
         ILifeCycle(self.context).retention_period = self.new_period
+        return True
 
     def apply_to_dossier(self, dossier):
         dossier_path = '/'.join(dossier.getPhysicalPath())
