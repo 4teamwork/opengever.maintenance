@@ -4,6 +4,7 @@ from opengever.base.behaviors.lifecycle import ILifeCycle
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberSettings
+from opengever.base.interfaces import IRetentionPeriodRegister
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
@@ -31,6 +32,10 @@ logging.root.addHandler(handler)
 logging.root.setLevel(logging.INFO)
 
 REPOSITORIES_FOLDER_NAME = 'opengever_repositories'
+
+# all affected customers use the default rentetion periods of
+# ['5', '10', '15', '20', '25']. furthermore the default of 5 is hardcoded as
+# a default value of ILifeCycle.retention_period
 DEFAULT_PERIOD = 5
 
 
@@ -245,6 +250,12 @@ class RetentionPeriodFixer(XlsSource):
         registry = getUtility(IRegistry)
         proxy = registry.forInterface(IReferenceNumberSettings)
         self.reference_formatter = proxy.formatter
+
+        retention_period_register = registry.forInterface(
+            IRetentionPeriodRegister)
+        if retention_period_register.is_restricted:
+            raise Abort("The retention periods are restricted. I'm not sure "
+                        "what that means so i don't handle it.")
 
     def run(self):
         xlssource = FixerXlsSource(self.get_repository_file_path())
