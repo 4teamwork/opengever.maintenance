@@ -205,12 +205,24 @@ class RepoFolderDiff(RepoRootDiff):
         ILifeCycle(self.context).retention_period = self.new_period
 
     def apply_to_dossier(self, dossier):
-        if ILifeCycle(dossier).retention_period == self.new_period:
+        dossier_path = '/'.join(dossier.getPhysicalPath())
+        current_period = ILifeCycle(dossier).retention_period
+
+        if current_period != self.current_period:
+            if self.options.verbose:
+                logger.info('skipping dossier {}, modified'
+                            .format(dossier_path))
+            return
+
+        if current_period == self.new_period:
+            if self.options.verbose:
+                logger.info('skipping dossier {}, not changed'
+                            .format(dossier_path))
             return
 
         if self.options.verbose:
-            logger.info('fixing {} dossier {}'
-                        .format('/'.join(dossier.getPhysicalPath())))
+            logger.info('fixing dossier {}, {}->{}'
+                        .format(dossier_path, current_period, self.new_period))
 
         ILifeCycle(dossier).retention_period = self.new_period
 
