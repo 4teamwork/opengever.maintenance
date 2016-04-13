@@ -293,9 +293,17 @@ class RetentionPeriodFixer(XlsSource):
 
         repositories_folder = os.path.join(profile_path,
                                            REPOSITORIES_FOLDER_NAME)
+
+        def is_parsable(filename):
+            if filename.startswith('.') or filename.startswith('~'):
+                return False
+            if not filename.endswith('.xlsx'):
+                return False
+            return True
+
         repository_filenames = [filename for filename in
                                 os.listdir(repositories_folder)
-                                if filename.endswith('.xlsx')]
+                                if is_parsable(filename)]
 
         if len(repository_filenames) != 1:
             raise Abort("Expected one repository file but found {}, {}".format(
