@@ -6,6 +6,7 @@ from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberSettings
 from opengever.base.interfaces import IRetentionPeriodRegister
 from opengever.dossier.behaviors.dossier import IDossierMarker
+from opengever.journal.handlers import journal_entry_factory
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
@@ -212,6 +213,14 @@ class RepoFolderDiff(RepoRootDiff):
                         .format('/'.join(dossier.getPhysicalPath())))
 
         ILifeCycle(dossier).retention_period = self.new_period
+
+        # the log entry is untranslated on purpose, we don't want to add
+        # translations for this fix to opengever.core.
+        comment = u'Alter Wert: "{} Jahre", neuer Wert: "{} Jahre"'.format(
+            current_period, self.new_period)
+        journal_entry_factory(dossier, 'Aufbewahrungsdauer korrigiert',
+                              title=u'Aufbewahrungsdauer korrigiert.',
+                              comment=comment)
 
 
 class RetentionPeriodFixer(XlsSource):
