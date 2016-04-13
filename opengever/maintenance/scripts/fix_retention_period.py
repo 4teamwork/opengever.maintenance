@@ -159,8 +159,7 @@ class RepoFolderDiff(RepoRootDiff):
         if not self.can_apply:
             return
 
-        self.apply_to_repo_folder()
-        if self.is_leaf_folder:
+        if self.apply_to_repo_folder() and self.is_leaf_folder:
             self.apply_to_dossiers()
 
         super(RepoFolderDiff, self).apply_recursively()
@@ -179,13 +178,13 @@ class RepoFolderDiff(RepoRootDiff):
             if self.options.verbose:
                 logger.info('skipping {}repo-folder {}, modified'
                             .format(kind, self.item['_query_path']))
-            return
+            return False
 
         if self.current_period == self.new_period:
             if self.options.verbose:
                 logger.info('skipping {}repo-folder {}, not changed'
                             .format(kind, self.item['_query_path']))
-            return
+            return False
 
         current_title = self.context.Title(prefix_with_reference_number=False)
         current_title = current_title.decode('utf-8')  # Title returns utf-8
@@ -196,7 +195,7 @@ class RepoFolderDiff(RepoRootDiff):
                             u'from "{}" to "{}"'
                             .format(kind, self.item['_query_path'],
                                     xls_title, current_title))
-            return
+            return False
 
         if self.options.verbose:
             logger.info('fixing {}repo-folder {}, {}->{}'
