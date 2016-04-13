@@ -187,10 +187,6 @@ class RepoFolderDiff(RepoRootDiff):
                             .format(kind, self.item['_query_path']))
             return
 
-            if self.options.verbose:
-                logger.info('skipping {}repo-folder {}, modified'
-                            .format(kind, self.item['_query_path']))
-
         if self.options.verbose:
             logger.info('fixing {}repo-folder {}, {}->{}'
                         .format(kind, self.item['_query_path'],
