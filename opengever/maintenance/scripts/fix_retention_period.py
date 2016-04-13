@@ -141,9 +141,9 @@ class RepoFolderDiff(RepoRootDiff):
     def _diff(self):
         self.reference_number = self._get_repository_reference_number()
         if self.reference_number != self.item['reference_number']:
-            logger.warn('reference numbers differ for {}: '
-                        '"{}" (site), "{}" (excel)'
-                        .format(self.path,
+            logger.warn('reference numbers differ for: {}'
+                        ' "{}" (site), "{}" (excel)'
+                        .format(self.item['_query_path'],
                                 self.reference_number,
                                 self.item["reference_number"]))
             self.can_apply = False
