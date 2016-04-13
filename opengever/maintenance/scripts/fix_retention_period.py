@@ -17,6 +17,7 @@ from plone import api
 from plone.i18n.normalizer.interfaces import IIDNormalizer
 from plone.i18n.normalizer.interfaces import IURLNormalizer
 from plone.registry.interfaces import IRegistry
+from zope.annotation.interfaces import IAnnotations
 from zope.component import getAdapter
 from zope.component import getUtility
 from zope.component import queryUtility
@@ -33,6 +34,8 @@ logging.root.addHandler(handler)
 logging.root.setLevel(logging.INFO)
 
 REPOSITORIES_FOLDER_NAME = 'opengever_repositories'
+
+BACKUP_KEY = 'retention_period_backup'
 
 # all affected customers use the default rentetion periods of
 # ['5', '10', '15', '20', '25']. furthermore the default of 5 is hardcoded as
@@ -156,6 +159,11 @@ class RepoFolderDiff(RepoRootDiff):
                                name=self.reference_formatter)
         return formatter.repository_number(reference.get_parent_numbers())
 
+    def make_retention_period_backup(self, obj, backup_period):
+        annotations = IAnnotations(obj)
+        if BACKUP_KEY not in annotations:
+            annotations[BACKUP_KEY] = backup_period
+
     def apply_recursively(self):
         if not self.can_apply:
             return
@@ -212,6 +220,7 @@ class RepoFolderDiff(RepoRootDiff):
                                 self.item['_query_path'],
                                 self.current_period,
                                 self.new_period))
+        self.make_retention_period_backup(self.context, self.current_period)
         ILifeCycle(self.context).retention_period = self.new_period
         return True
 
@@ -234,7 +243,7 @@ class RepoFolderDiff(RepoRootDiff):
         if self.options.verbose:
             logger.info('fixing dossier {}, {}->{}'
                         .format(dossier_path, current_period, self.new_period))
-
+        self.make_retention_period_backup(dossier, current_period)
         ILifeCycle(dossier).retention_period = self.new_period
 
         # the log entry is untranslated on purpose, we don't want to add
@@ -275,6 +284,9 @@ class RetentionPeriodFixer(XlsSource):
 
     Unfortunately this cannot be avoided since we cannot tell the difference
     between inherited and configured value.
+
+    The old retention period is stored in the object annotations in case
+    we need to recover from a failed fix.
 
     """
     def __init__(self, plone, options):
