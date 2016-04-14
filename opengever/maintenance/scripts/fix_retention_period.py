@@ -80,6 +80,19 @@ class FixerPathFromReferenceNumber(PathFromReferenceNumberSection):
         self.id_normalizer = queryUtility(IIDNormalizer)
         self.reference_formatter = reference_formatter
 
+    def has_grouped_by_three_reference_number_formatter(self):
+        if isinstance(self.reference_formatter, basestring):
+            return self.reference_formatter in [
+                'grouped_by_three', 'no_client_id_grouped_by_three']
+
+        return self.reference_formatter.is_grouped_by_three
+
+    def get_reference_number(self, refnum):
+        if self.has_grouped_by_three_reference_number_formatter():
+            cl_refnum = refnum.replace('.', '')
+            return '.'.join(cl_refnum)
+        return refnum
+
 
 class RepoRootDiff(object):
 
