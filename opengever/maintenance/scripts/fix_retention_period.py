@@ -106,13 +106,14 @@ class RepoRootDiff(object):
 
 class RepoFolderDiff(RepoRootDiff):
 
-    def __init__(self, registry, context, item,
+    def __init__(self, registry, fixed_folders, context, item,
                  reference_formatter, catalog, options):
         self._is_leaf_folder = None
         self.can_apply = True
         self.parent = None
         self.child_dossiers = []
 
+        self.fixed_folders = fixed_folders
         self.item = item
         self.reference_formatter = reference_formatter
         self.catalog = catalog
@@ -191,14 +192,6 @@ class RepoFolderDiff(RepoRootDiff):
                                     self.item['_query_path']))
             return False
 
-        if self.current_period == self.new_period:
-            if self.options.verbose:
-                logger.info('skipping {}repo-folder ({}) {}, not changed'
-                            .format(kind,
-                                    self.reference_number,
-                                    self.item['_query_path']))
-            return False
-
         current_title = self.context.Title(prefix_with_reference_number=False)
         current_title = current_title.decode('utf-8')  # Title returns utf-8
         xls_title = self.item['effective_title']
@@ -211,6 +204,16 @@ class RepoFolderDiff(RepoRootDiff):
                                     self.item['_query_path'],
                                     xls_title,
                                     current_title))
+            return False
+
+        self.fixed_folders.add(self.context)
+
+        if self.current_period == self.new_period:
+            if self.options.verbose:
+                logger.info('skipping {}repo-folder ({}) {}, not changed'
+                            .format(kind,
+                                    self.reference_number,
+                                    self.item['_query_path']))
             return False
 
         if self.options.verbose:
@@ -296,6 +299,7 @@ class RetentionPeriodFixer(XlsSource):
         self.portal_setup = api.portal.get_tool('portal_setup')
         self.catalog = api.portal.get_tool('portal_catalog')
         self.diffs = {}
+        self.fixed_folders = set()
 
         registry = getUtility(IRegistry)
         proxy = registry.forInterface(IReferenceNumberSettings)
@@ -318,6 +322,8 @@ class RetentionPeriodFixer(XlsSource):
 
         diff_root.apply_recursively()
 
+        self.log_stats()
+
     def init_diff(self, item):
         path = item['_path'].lstrip('/').encode('utf-8')
         item['_query_path'] = path
@@ -327,8 +333,29 @@ class RetentionPeriodFixer(XlsSource):
             logger.warn('could not find repository folder: {}'.format(path))
             return
 
-        RepoFolderDiff(self.diffs, context, item,
+        RepoFolderDiff(self.diffs, self.fixed_folders, context, item,
                        self.reference_formatter, self.catalog, self.options)
+
+    def log_stats(self):
+        if not self.options.verbose:
+            return
+
+        repo_folder_brains = self.catalog.unrestrictedSearchResults(
+            object_provides=IRepositoryFolder.__identifier__)
+        repo_folders = set(each.getObject() for each in repo_folder_brains)
+
+        logger.info(20*'-')
+        logger.info("{} of {} repository folders have been checked/fixed"
+                    .format(len(self.fixed_folders), len(repo_folders)))
+
+        omitted_folders = repo_folders.difference(self.fixed_folders)
+        omitted_folders = sorted(omitted_folders,
+                                 key=lambda content: content.absolute_url())
+        logger.info('The following repository folders have not been '
+                    'checked/fixed:')
+        for omitted in omitted_folders:
+            logger.info("{} {}".format(
+                omitted.Title(), '/'.join(omitted.getPhysicalPath())))
 
     def get_repository_file_path(self):
         profile_info = self.portal_setup.getProfileInfo(self.profile)
