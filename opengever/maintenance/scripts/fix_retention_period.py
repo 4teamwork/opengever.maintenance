@@ -119,13 +119,14 @@ class RepoRootDiff(object):
 
 class RepoFolderDiff(RepoRootDiff):
 
-    def __init__(self, registry, fixed_folders, context, item,
+    def __init__(self, repo_root, registry, fixed_folders, context, item,
                  reference_formatter, catalog, options):
         self._is_leaf_folder = None
         self.can_apply = True
         self.parent = None
         self.child_dossiers = []
 
+        self.repo_root = repo_root
         self.fixed_folders = fixed_folders
         self.item = item
         self.reference_formatter = reference_formatter
@@ -238,6 +239,16 @@ class RepoFolderDiff(RepoRootDiff):
                                 self.new_period))
         self.make_retention_period_backup(self.context, self.current_period)
         ILifeCycle(self.context).retention_period = self.new_period
+
+        # the log entry is untranslated on purpose, we don't want to add
+        # translations for this fix to opengever.core.
+        comment = u'Alter Wert: "{} Jahre", neuer Wert: "{} Jahre"'.format(
+            self.current_period, self.new_period)
+        title = u'Aufbewahrungsdauer korrigiert "{}".'.format(
+            self.context.Title().decode('utf-8'))
+        journal_entry_factory(self.repo_root, 'Aufbewahrungsdauer korrigiert',
+                              title=title,
+                              comment=comment)
         return True
 
     def apply_to_dossier(self, dossier):
@@ -329,15 +340,16 @@ class RetentionPeriodFixer(XlsSource):
         source = FixerPathFromReferenceNumber(xlssource,
                                               self.reference_formatter)
 
-        diff_root = RepoRootDiff(self.diffs, self.get_repo_root())
+        repo_root = self.get_repo_root()
+        diff_root = RepoRootDiff(self.diffs, repo_root)
         for item in source:
-            self.init_diff(item)
+            self.init_diff(repo_root, item)
 
         diff_root.apply_recursively()
 
         self.log_stats()
 
-    def init_diff(self, item):
+    def init_diff(self, repo_root, item):
         path = item['_path'].lstrip('/').encode('utf-8')
         item['_query_path'] = path
 
@@ -346,8 +358,9 @@ class RetentionPeriodFixer(XlsSource):
             logger.warn('could not find repository folder: {}'.format(path))
             return
 
-        RepoFolderDiff(self.diffs, self.fixed_folders, context, item,
-                       self.reference_formatter, self.catalog, self.options)
+        RepoFolderDiff(repo_root, self.diffs, self.fixed_folders, context,
+                       item, self.reference_formatter, self.catalog,
+                       self.options)
 
     def log_stats(self):
         if not self.options.verbose:
