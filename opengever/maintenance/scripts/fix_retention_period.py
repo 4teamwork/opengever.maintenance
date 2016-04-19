@@ -6,6 +6,7 @@ from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberSettings
 from opengever.base.interfaces import IRetentionPeriodRegister
 from opengever.dossier.behaviors.dossier import IDossierMarker
+from opengever.journal import _
 from opengever.journal.handlers import journal_entry_factory
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
@@ -41,6 +42,9 @@ BACKUP_KEY = 'retention_period_backup'
 # ['5', '10', '15', '20', '25']. furthermore the default of 5 is hardcoded as
 # a default value of ILifeCycle.retention_period
 DEFAULT_PERIOD = 5
+
+
+ACTION_RETENTION_PERIOD_FIXED = "Retention period fixed"
 
 
 class Abort(Exception):
@@ -239,16 +243,9 @@ class RepoFolderDiff(RepoRootDiff):
                                 self.new_period))
         self.make_retention_period_backup(self.context, self.current_period)
         ILifeCycle(self.context).retention_period = self.new_period
+        self.add_journal_entry(self.repo_root, self.context,
+                               self.current_period, self.new_period)
 
-        # the log entry is untranslated on purpose, we don't want to add
-        # translations for this fix to opengever.core.
-        comment = u'Alter Wert: "{} Jahre", neuer Wert: "{} Jahre"'.format(
-            self.current_period, self.new_period)
-        title = u'Aufbewahrungsdauer korrigiert "{}".'.format(
-            self.context.Title().decode('utf-8'))
-        journal_entry_factory(self.repo_root, 'Aufbewahrungsdauer korrigiert',
-                              title=title,
-                              comment=comment)
         return True
 
     def apply_to_dossier(self, dossier):
@@ -272,13 +269,33 @@ class RepoFolderDiff(RepoRootDiff):
                         .format(dossier_path, current_period, self.new_period))
         self.make_retention_period_backup(dossier, current_period)
         ILifeCycle(dossier).retention_period = self.new_period
+        self.add_journal_entry(dossier, dossier,
+                               current_period, self.new_period)
 
-        # the log entry is untranslated on purpose, we don't want to add
-        # translations for this fix to opengever.core.
-        comment = u'Alter Wert: "{} Jahre", neuer Wert: "{} Jahre"'.format(
-            current_period, self.new_period)
-        journal_entry_factory(dossier, 'Aufbewahrungsdauer korrigiert',
-                              title=u'Aufbewahrungsdauer korrigiert.',
+    def add_journal_entry(self, journal_context, fixed_context,
+                          old_period, new_period):
+        """Add a journal entry to `journal_context` indicating that
+        `fixed_context` has been fixed.
+
+        The journal entry is not translated, we don't want to add translations
+        for this fix to opengever.core.
+
+        We use message objects to make it possible to add translations should
+        it be required, also this helps to avoid an UnicodeDecodeError.
+
+        """
+        title = _(u'label_retention_period_fixed',
+                  default=u'Aufbewahrungsdauer korrigiert "${name}"',
+                  mapping={'name':
+                           fixed_context.Title().decode('utf-8')})
+        # the comment is handled different from the title, it does not get
+        # translated when displaying :-o.
+        comment = 'Alter Wert: "{} Jahre", neuer Wert: "{} Jahre"'\
+                  .format(old_period, new_period)
+
+        journal_entry_factory(journal_context,
+                              ACTION_RETENTION_PERIOD_FIXED,
+                              title=title,
                               comment=comment)
 
 
