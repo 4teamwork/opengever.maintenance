@@ -292,9 +292,9 @@ class RetentionPeriodFixer(XlsSource):
     We attempt to fix this by comparing the current repository to the initial
     excel file and setting the retention_period on the repository as follows:
 
-                    plone: no change, plone: (re-)moved, plone: changed
-    xls: no value   parent/default,   skip,              skip
-    xls: value      from xls,         skip,              skip
+                    plone: default value, plone: (re-)moved, plone: changed
+    xls: no value   parent/default,       skip,              skip
+    xls: value      from xls,             skip,              skip
 
     Values specified in the excel file are inherited by children. If an excel
     file contanis a value for a parent folder but none for a child folder the
@@ -304,10 +304,12 @@ class RetentionPeriodFixer(XlsSource):
     folder that have the same retention_period as the folder are updated
     as well, under the assumption that the value was inherited.
 
-    Note: this will set a wrong retention_period when:
-      - the repo_folders retention_period changes to non-default
-      - the child (dossier/repo-folder) should have a rentention_period equal
-        to the default retention_period.
+    Note: this will set a wrong retention_period when the following two
+    conditions are met:
+      - the parent repo_folders retention_period changes to non-default, and ...
+      - ... the child (dossier/repo-folder) should have a rentention_period
+        equal to the value of what was previously a default, but was a
+        deliberately chosen value for that dossier/repo-folder.
 
     Unfortunately this cannot be avoided since we cannot tell the difference
     between inherited and configured value.
