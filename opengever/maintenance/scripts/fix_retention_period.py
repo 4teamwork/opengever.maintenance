@@ -123,7 +123,7 @@ class RepoRootDiff(object):
 
 class RepoFolderDiff(RepoRootDiff):
 
-    def __init__(self, repo_root, registry, fixed_folders, context, item,
+    def __init__(self, repo_root, registry, handled_folders, context, item,
                  reference_formatter, catalog, options):
         self._is_leaf_folder = None
         self.can_apply = True
@@ -131,7 +131,7 @@ class RepoFolderDiff(RepoRootDiff):
         self.child_dossiers = []
 
         self.repo_root = repo_root
-        self.fixed_folders = fixed_folders
+        self.handled_folders = handled_folders
         self.item = item
         self.reference_formatter = reference_formatter
         self.catalog = catalog
@@ -170,7 +170,7 @@ class RepoFolderDiff(RepoRootDiff):
 
         self.current_period = ILifeCycle(self.context).retention_period
         xls_period = self.item.get('retention_period')
-        self.new_period = xls_period or self.parent.new_period
+        self.new_period = xls_period if xls_period is not None else self.parent.new_period
 
     def _get_repository_reference_number(self):
         reference = IReferenceNumber(self.context)
@@ -204,7 +204,8 @@ class RepoFolderDiff(RepoRootDiff):
         kind = 'leaf ' if self.is_leaf_folder else ''
         if self.current_period != DEFAULT_PERIOD:
             if self.options.verbose:
-                logger.info('skipping {}repo-folder ({}) {}, modified'
+                logger.info('skipping {}repo-folder ({}) {}, '
+                            'non-default retention_period'
                             .format(kind,
                                     self.reference_number,
                                     self.item['_query_path']))
@@ -224,11 +225,12 @@ class RepoFolderDiff(RepoRootDiff):
                                     current_title))
             return False
 
-        self.fixed_folders.add(self.context)
+        self.handled_folders.add(self.context)
 
         if self.current_period == self.new_period:
             if self.options.verbose:
-                logger.info('skipping {}repo-folder ({}) {}, not changed'
+                logger.info('skipping {}repo-folder ({}) {}, no change '
+                            'from default retention_period'
                             .format(kind,
                                     self.reference_number,
                                     self.item['_query_path']))
@@ -250,27 +252,29 @@ class RepoFolderDiff(RepoRootDiff):
 
     def apply_to_dossier(self, dossier):
         dossier_path = '/'.join(dossier.getPhysicalPath())
-        current_period = ILifeCycle(dossier).retention_period
+        dossier_period = ILifeCycle(dossier).retention_period
 
-        if current_period != self.current_period:
+        if dossier_period != self.current_period:
             if self.options.verbose:
-                logger.info('skipping dossier {}, modified'
+                logger.info('skipping dossier {}, dossier retention_period '
+                            'deviated from repository'
                             .format(dossier_path))
             return
 
-        if current_period == self.new_period:
+        if dossier_period == self.new_period:
             if self.options.verbose:
-                logger.info('skipping dossier {}, not changed'
+                logger.info('skipping dossier {}, dossier period already '
+                            'matches new repo period'
                             .format(dossier_path))
             return
 
         if self.options.verbose:
             logger.info('fixing dossier {}, {}->{}'
-                        .format(dossier_path, current_period, self.new_period))
-        self.make_retention_period_backup(dossier, current_period)
+                        .format(dossier_path, dossier_period, self.new_period))
+        self.make_retention_period_backup(dossier, dossier_period)
         ILifeCycle(dossier).retention_period = self.new_period
         self.add_journal_entry(dossier, dossier,
-                               current_period, self.new_period)
+                               dossier_period, self.new_period)
 
     def add_journal_entry(self, journal_context, fixed_context,
                           old_period, new_period):
@@ -342,7 +346,7 @@ class RetentionPeriodFixer(XlsSource):
         self.portal_setup = api.portal.get_tool('portal_setup')
         self.catalog = api.portal.get_tool('portal_catalog')
         self.diffs = {}
-        self.fixed_folders = set()
+        self.handled_folders = set()
 
         registry = getUtility(IRegistry)
         proxy = registry.forInterface(IReferenceNumberSettings)
@@ -377,7 +381,7 @@ class RetentionPeriodFixer(XlsSource):
             logger.warn('could not find repository folder: {}'.format(path))
             return
 
-        RepoFolderDiff(repo_root, self.diffs, self.fixed_folders, context,
+        RepoFolderDiff(repo_root, self.diffs, self.handled_folders, context,
                        item, self.reference_formatter, self.catalog,
                        self.options)
 
@@ -391,9 +395,9 @@ class RetentionPeriodFixer(XlsSource):
 
         logger.info(20*'-')
         logger.info("{} of {} repository folders have been checked/fixed"
-                    .format(len(self.fixed_folders), len(repo_folders)))
+                    .format(len(self.handled_folders), len(repo_folders)))
 
-        omitted_folders = repo_folders.difference(self.fixed_folders)
+        omitted_folders = repo_folders.difference(self.handled_folders)
         omitted_folders = sorted(omitted_folders,
                                  key=lambda content: content.absolute_url())
         logger.info('The following repository folders have not been '
@@ -458,7 +462,11 @@ def main():
 
     plone = setup_plone(app, options)
     RetentionPeriodFixer(plone, options).run()
-    transaction.commit()
+    if options.dry_run:
+        logger.warn('skipping commit because we are in dry-mode.')
+    else:
+        transaction.commit()
+        logger.info('done.')
 
 
 if __name__ == '__main__':
