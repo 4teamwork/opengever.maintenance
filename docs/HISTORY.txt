@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Make @@health-check view also available on Zope App Root.
+  [lgraf]
+
 - Add scripts to dump catalog stats grouped by month.
   [lgraf]
 
