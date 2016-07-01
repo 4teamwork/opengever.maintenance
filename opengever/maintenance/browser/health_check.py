@@ -1,5 +1,5 @@
 from five import grok
-from Products.CMFPlone.interfaces import IPloneSiteRoot
+from zope.interface import Interface
 import json
 
 try:
@@ -15,11 +15,11 @@ class HealthCheckView(grok.View):
 
     WARNING: Keep this cheap, because
     1) it will be called regularly
-    2) it's protected with zope.Public -> accessible for Anonymous users
+    2) it's protected with zope2.Public -> accessible for Anonymous users
     """
 
     grok.name('health-check')
-    grok.context(IPloneSiteRoot)
+    grok.context(Interface)
     grok.require('zope2.Public')
 
     def render(self):
