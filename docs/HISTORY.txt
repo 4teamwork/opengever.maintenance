@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Move bumblebee installation script from og.core to og.maintenace.
+  [phgross]
+
 - Make @@health-check view also available on Zope App Root.
   [lgraf]
 
