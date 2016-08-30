@@ -46,6 +46,7 @@ from zope.component import getUtility
 import logging
 import sys
 import transaction
+from opengever.mail.mail import IOGMailMarker
 
 
 # Set global logger to info - this is necessary for the log-output with
@@ -121,7 +122,13 @@ def main(app, argv=sys.argv[1:]):
                 logger=LOG):
 
             obj = brain.getObject()
-            for version in repository.getHistory(obj):
+            versions = repository.getHistory(obj)
+            if IOGMailMarker.providedBy(obj):
+                if len(versions) > 0:
+                    LOG.warning('Found mail with versions: {}'.format('/'.join(obj.getPhysicalPath())))
+                continue
+
+            for version in versions:
                 # we have to calculate the checksum on the "restored" object
                 # returned by `portal_repository`. The archived object does not
                 # contain an accessible file without `portal_repository` magic.
