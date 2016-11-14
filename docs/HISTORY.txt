@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Make pdb breakpoint view, accessible on every context.
+  [phgross]
+
 - Move bumblebee installation script from og.core to og.maintenace.
   [phgross]
 
