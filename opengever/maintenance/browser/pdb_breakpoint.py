@@ -1,5 +1,5 @@
 from five import grok
-from Products.CMFPlone.interfaces import IPloneSiteRoot
+from zope.interface import Interface
 
 
 class PdbBreakpointView(grok.View):
@@ -7,7 +7,7 @@ class PdbBreakpointView(grok.View):
     """
 
     grok.name('pdb-breakpoint')
-    grok.context(IPloneSiteRoot)
+    grok.context(Interface)
     grok.require('cmf.ManagePortal')
 
 
