@@ -1,9 +1,29 @@
 """
+Migrates a GEVER SQL DB from MySQL to PostgreSQL.
+
+
 Usage:
 
 bin/instance run mysql2postgres.py --old-dsn mysql://olduser:oldpw@host/olddb
 
+
 Tested for: KGS Version 3.4.8
+
+Detailed usage instructions:
+
+- Create Backups as necessary
+- Shut down your MySQL-based GEVER deployment
+- Make sure PostgreSQL is running, and create the new PG DB using `createdb`
+- Include psycopg2 in your ${buildout:instance-eggs}
+- Change the OGDS connection string (<db:engine url="..." />) from MySQL to
+  the new PostgreSQL DB to be migrated into
+- Run bin/buildout
+- Start ZEO using bin/zeo start
+- Run this migration script:
+  bin/instance0 run mysql2postgres.py --old-dsn $OLD_MYSQL_DSN
+- Remove opengever.mysqlconfig / MySQL-python from buildout
+- Run bin/buildout
+- Start the deployment up again
 """
 
 from opengever.base.hooks import create_models
