@@ -8,6 +8,7 @@ Tested for: KGS Version 3.4.8
 
 from opengever.base.hooks import create_models
 from opengever.base.model import create_session
+from opengever.core.upgrade import TRACKING_TABLE_NAME
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
@@ -15,7 +16,10 @@ from opengever.ogds.base.setup import create_sql_tables
 from sqlalchemy import create_engine
 from sqlalchemy import DDL
 from sqlalchemy import MetaData
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func
+from sqlalchemy.sql.sqltypes import INTEGER
 import logging
 import transaction
 
@@ -24,6 +28,29 @@ log = logging.getLogger('mysql2postgres')
 log.setLevel(logging.INFO)
 stream_handler = log.root.handlers[0]
 stream_handler.setLevel(logging.INFO)
+
+
+# The second group of sequences don't follow the default naming scheme of
+# {table}_{column}_seq, which is why we have to hardcode a mapping
+
+SEQUENCES_BY_COLUMN = {
+    ('activities', 'id'): 'activities_id_seq',
+    ('agendaitems', 'id'): 'agendaitems_id_seq',
+    ('notification_defaults', 'id'): 'notification_defaults_id_seq',
+    ('notifications', 'id'): 'notifications_id_seq',
+    ('resources', 'id'): 'resources_id_seq',
+    ('watchers', 'id'): 'watchers_id_seq',
+
+    ('committees', 'id'): 'committee_id_seq',
+    ('generateddocuments', 'id'): 'generateddocument_id_seq',
+    ('meetings', 'id'): 'meeting_id_seq',
+    ('members', 'id'): 'member_id_seq',
+    ('memberships', 'id'): 'membership_id_seq',
+    ('proposals', 'id'): 'proposal_id_seq',
+    ('proposalhistory', 'id'): 'proposal_history_id_seq',
+    ('submitteddocuments', 'id'): 'submitteddocument_id_seq',
+    ('tasks', 'id'): 'task_id_seq',
+}
 
 
 def create_schemas(plone):
@@ -79,6 +106,11 @@ def enable_triggers(new_engine, new_table):
     new_engine.execute(stmt)
 
 
+def get_sequence_names(new_session):
+    stmt = text("SELECT c.relname FROM pg_class c WHERE c.relkind = 'S'")
+    return [r for (r, ) in new_session.execute(stmt).fetchall()]
+
+
 def cast_row_values(rows, new_table):
     """Read each row into a Python dict, and cast values to the appropriate
     type, as defined by the new column's `python_type`.
@@ -102,6 +134,36 @@ def cast_row_values(rows, new_table):
     return records
 
 
+def restart_sequence(new_session, seq_name, new_col):
+    assert isinstance(new_col.type, INTEGER)
+    max_value = new_session.query(func.max(new_col)).scalar()
+    if max_value is not None:
+        log.info("Setting sequence %r to value %r" % (seq_name, max_value))
+        stmt = text("SELECT pg_catalog.setval(:seq, :val, true)")
+        new_session.execute(stmt, {'seq': seq_name, 'val': max_value})
+
+
+def update_sequences(new_session, new_meta):
+    """Set sequences to max value of their corresponding column
+    """
+    log.info('Updating sequences...')
+    sequences_to_process = get_sequence_names(new_session)
+    for new_table in new_meta.tables.values():
+        for new_col in new_table.columns:
+            seq_name = SEQUENCES_BY_COLUMN.get((new_table.name, new_col.name))
+            if seq_name:
+                # Column matches a sequence, update sequence as needed
+                restart_sequence(new_session, seq_name, new_col)
+                sequences_to_process.remove(seq_name)
+
+    if sequences_to_process:
+        log.error("Not all sequences could be processed!")
+        log.error("Unmatched sequences: %r" % sequences_to_process)
+        raise Exception("Unprocessed sequences")
+
+    log.info("All sequences updated.")
+
+
 def migrate_data(plone, options):
     new_session, new_engine, new_meta = get_postgres_connection()
     old_session, old_engine, old_meta = get_mysql_connection(options)
@@ -109,6 +171,10 @@ def migrate_data(plone, options):
 
     # Iterate over reflected old tables, and migrate them one by one
     for old_tblname in old_meta.tables:
+        if old_tblname == TRACKING_TABLE_NAME:
+            # Skip schema upgrade tracking table
+            continue
+
         old_table = old_meta.tables[old_tblname]
         new_table = new_meta.tables[old_tblname]
 
@@ -127,6 +193,9 @@ def migrate_data(plone, options):
         else:
             log.info("(Empty table, nothing to migrate)")
         log.info('')
+
+    # Set sequences to max value of their corresponding column
+    update_sequences(new_session, new_meta)
 
     log.info("Migration done.")
 
