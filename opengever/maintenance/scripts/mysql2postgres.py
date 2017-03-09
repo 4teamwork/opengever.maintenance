@@ -37,6 +37,7 @@ from sqlalchemy import create_engine
 from sqlalchemy import DDL
 from sqlalchemy import MetaData
 from sqlalchemy import text
+from sqlalchemy import TEXT
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 from sqlalchemy.sql.sqltypes import INTEGER
@@ -146,6 +147,12 @@ def cast_row_values(rows, new_table):
                 # converting values like tinyint 1 (MySQL) to bool true (PG)
                 new_type = new_column.type.python_type
                 if not isinstance(value, new_type):
+                    # Can store unicode directly to columns of  type TEXT
+                    if all([isinstance(value, unicode),
+                           isinstance(new_column.type, TEXT)]):
+                        record[fieldname] = value
+                        continue
+
                     log.info("Casting '%s' %r to %r" % (
                         new_column.name, value, new_type))
                     record[fieldname] = new_type(value)
