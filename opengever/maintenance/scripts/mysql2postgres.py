@@ -38,6 +38,7 @@ from sqlalchemy import DDL
 from sqlalchemy import MetaData
 from sqlalchemy import text
 from sqlalchemy import TEXT
+from sqlalchemy import VARCHAR
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 from sqlalchemy.sql.sqltypes import INTEGER
@@ -147,10 +148,17 @@ def cast_row_values(rows, new_table):
                 # converting values like tinyint 1 (MySQL) to bool true (PG)
                 new_type = new_column.type.python_type
                 if not isinstance(value, new_type):
-                    # Can store unicode directly to columns of  type TEXT
+                    # Can store unicode directly to columns of type TEXT
                     if all([isinstance(value, unicode),
                            isinstance(new_column.type, TEXT)]):
                         record[fieldname] = value
+                        continue
+                    # For VARCHAR columns, unicode values need to be encoded
+                    if all([isinstance(value, unicode),
+                           isinstance(new_column.type, VARCHAR)]):
+                        log.info("Casting '%s' %r to %r" % (
+                            new_column.name, value, value.encode('utf-8')))
+                        record[fieldname] = value.encode('utf-8')
                         continue
 
                     log.info("Casting '%s' %r to %r" % (
