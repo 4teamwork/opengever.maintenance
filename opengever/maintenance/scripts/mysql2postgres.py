@@ -33,9 +33,13 @@ from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.ogds.base.setup import create_sql_tables
+from sqlalchemy import BigInteger
+from sqlalchemy import Column
 from sqlalchemy import create_engine
 from sqlalchemy import DDL
 from sqlalchemy import MetaData
+from sqlalchemy import String
+from sqlalchemy import Table
 from sqlalchemy import text
 from sqlalchemy import TEXT
 from sqlalchemy import VARCHAR
@@ -75,10 +79,24 @@ SEQUENCES_BY_COLUMN = {
 }
 
 
-def create_schemas(plone):
+def create_schemas(plone, new_meta):
     log.info("Creating schemas in new PostgreSQL DB...")
     create_sql_tables()
     create_models()
+    # Reflect new metadata again after creating tables
+    new_meta.reflect()
+
+
+def create_tracking_table(new_session, new_engine, new_meta):
+    log.info("Creating tracking table in new PostgreSQL DB...")
+    tracking_table = Table(
+        TRACKING_TABLE_NAME, new_meta,
+        Column('profileid', String(50), primary_key=True),
+        Column('upgradeid', BigInteger, nullable=False),
+    )
+    tracking_table.create()
+    # Reflect new metadata again after creating tracking table
+    new_meta.reflect()
 
 
 def get_postgres_connection():
@@ -199,20 +217,15 @@ def update_sequences(new_session, new_meta):
     log.info("All sequences updated.")
 
 
-def migrate_data(plone, options):
-    new_session, new_engine, new_meta = get_postgres_connection()
-    old_session, old_engine, old_meta = get_mysql_connection(options)
+def migrate_data(plone,
+                 old_session, old_engine, old_meta,
+                 new_session, new_engine, new_meta):
     log.info('')
 
     # Iterate over reflected old tables, and migrate them one by one
     for old_tblname in old_meta.tables:
-        if old_tblname == TRACKING_TABLE_NAME:
-            # Skip schema upgrade tracking table
-            continue
-
         old_table = old_meta.tables[old_tblname]
         new_table = new_meta.tables[old_tblname]
-
         log.info("Querying MySQL table '%s'" % old_tblname)
         rows = old_session.query(old_table)
 
@@ -252,12 +265,17 @@ def main():
 
     # Validate DB connections before we do anything else
     log.info('Checking old connection (MySQL)')
-    get_mysql_connection(options)
+    old_session, old_engine, old_meta = get_mysql_connection(options)
     log.info('Checking new connection (PostgreSQL)')
-    get_postgres_connection()
+    new_session, new_engine, new_meta = get_postgres_connection()
 
-    create_schemas(plone)
-    migrate_data(plone, options)
+    create_schemas(plone, new_meta)
+    create_tracking_table(new_session, new_engine, new_meta)
+    migrate_data(
+        plone,
+        old_session, old_engine, old_meta,
+        new_session, new_engine, new_meta,
+    )
     transaction.commit()
 
 
