@@ -82,6 +82,11 @@ parser.add_option("-p", "--plone", dest="plone_path",
 parser.add_option("-c", "--config", dest="config",
                   help="Zope-Config (do not use this)")
 
+parser.add_option("-i", "--intermediate-commit", dest="intermediate_commit",
+                  default=None, type="int",
+                  help="Intermediate commit every n processed elements. "
+                       "Only has an effect on '-m history' at the moment.")
+
 
 def main(app, argv=sys.argv[1:]):
     options, args = parser.parse_args()
@@ -117,9 +122,9 @@ def main(app, argv=sys.argv[1:]):
         brains = catalog.unrestrictedSearchResults(
             {'object_provides': 'ftw.bumblebee.interfaces.IBumblebeeable'})
 
-        for brain in ProgressLogger(
+        for index, brain in enumerate(ProgressLogger(
                 'Create checksums for objects in portal repository', brains,
-                logger=LOG):
+                logger=LOG)):
 
             obj = brain.getObject()
             versions = repository.getHistory(obj)
@@ -138,6 +143,11 @@ def main(app, argv=sys.argv[1:]):
                 annotations = IAnnotations(archived_obj)
                 annotations[DOCUMENT_CHECKSUM_ANNOTATION_KEY] = version_checksum
                 archived_obj._p_changed = True
+
+            if options.intermediate_commit and index > 0:
+                if index % options.intermediate_commit == 0:
+                    LOG.info("Committing at {} documents.".format(index))
+                    transaction.commit()
 
         return transaction.commit()
 
