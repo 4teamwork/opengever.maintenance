@@ -85,7 +85,8 @@ parser.add_option("-c", "--config", dest="config",
 parser.add_option("-i", "--intermediate-commit", dest="intermediate_commit",
                   default=None, type="int",
                   help="Intermediate commit every n processed elements. "
-                       "Only has an effect on '-m history' at the moment.")
+                       "Works with '-m history' and '-m reindex' at the "
+                       "moment.")
 
 
 def main(app, argv=sys.argv[1:]):
@@ -111,7 +112,14 @@ def main(app, argv=sys.argv[1:]):
 
     if mode == 'reindex':
         LOG.info("Start indexing objects...")
-        converter.reindex()
+        try:
+            converter.reindex(intermediate_commit=options.intermediate_commit)
+        except TypeError:
+            if options.intermediate_commit:
+                LOG.warn("Unsupported option intermediate_commit, updating "
+                         "ftw.bumblebee is recommended.")
+            converter.reindex()
+
         return transaction.commit()
 
     elif mode == 'history':
