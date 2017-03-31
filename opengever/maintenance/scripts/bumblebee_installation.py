@@ -130,12 +130,21 @@ def main(app, argv=sys.argv[1:]):
         brains = catalog.unrestrictedSearchResults(
             {'object_provides': 'ftw.bumblebee.interfaces.IBumblebeeable'})
 
+        skipped = []
         for index, brain in enumerate(ProgressLogger(
                 'Create checksums for objects in portal repository', brains,
                 logger=LOG)):
 
             obj = brain.getObject()
             versions = repository.getHistory(obj)
+
+            if len(versions) > 50:
+                LOG.info(
+                    'Skipping object with more than 50 versions: %s' % obj.id)
+                skipped.append((obj.id, obj.absolute_url()))
+                continue
+
+            LOG.info('  Calculating version checksums for %s' % obj.id)
             if IOGMailMarker.providedBy(obj):
                 if len(versions) > 0:
                     LOG.warning('Found mail with versions: {}'.format('/'.join(obj.getPhysicalPath())))
@@ -157,7 +166,15 @@ def main(app, argv=sys.argv[1:]):
                     LOG.info("Committing at {} documents.".format(index))
                     transaction.commit()
 
-        return transaction.commit()
+        transaction.commit()
+
+        if skipped:
+            LOG.warn('The following objects have been skipped:')
+            for obj_id, obj_url in skipped:
+                LOG.info("%s - %s" % (obj_id, obj_url))
+            LOG.info('Skipped: %r' % [obj_id for obj_id, obj_url in skipped])
+
+        return
 
     elif mode == 'store':
         LOG.info("Start storing objects...")
