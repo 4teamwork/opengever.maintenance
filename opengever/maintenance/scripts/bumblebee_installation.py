@@ -88,6 +88,12 @@ parser.add_option("-i", "--intermediate-commit", dest="intermediate_commit",
                        "Works with '-m history' and '-m reindex' at the "
                        "moment.")
 
+parser.add_option("--skip-many-versions",
+                  action="store_true",
+                  default=False,
+                  help="Skip objects with many (>50) versions when "
+                       "calculating checksums for versions using -m history")
+
 
 def main(app, argv=sys.argv[1:]):
     options, args = parser.parse_args()
@@ -138,11 +144,12 @@ def main(app, argv=sys.argv[1:]):
             obj = brain.getObject()
             versions = repository.getHistory(obj)
 
-            if len(versions) > 50:
-                LOG.info(
-                    'Skipping object with more than 50 versions: %s' % obj.id)
-                skipped.append((obj.id, obj.absolute_url()))
-                continue
+            if options.skip_many_versions:
+                if len(versions) > 50:
+                    LOG.info('Skipping object with more '
+                             'than 50 versions: %s' % obj.id)
+                    skipped.append((obj.id, obj.absolute_url()))
+                    continue
 
             LOG.info('  Calculating version checksums for %s' % obj.id)
             if IOGMailMarker.providedBy(obj):
