@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script for exporting the ordnungssystem into an xlsx file.
+  [raphael-s]
+
 - Make pdb breakpoint view, accessible on every context.
   [phgross]
 
