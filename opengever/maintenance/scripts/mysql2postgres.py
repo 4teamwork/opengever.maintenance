@@ -7,7 +7,9 @@ Usage:
 bin/instance run mysql2postgres.py --old-dsn mysql://olduser:oldpw@host/olddb
 
 
-Tested for: KGS Version 3.4.8
+Tested for KGS versions:
+    - 3.4.8
+    - 2017.3.0
 
 Detailed usage instructions:
 
@@ -62,18 +64,33 @@ stream_handler.setLevel(logging.INFO)
 SEQUENCES_BY_COLUMN = {
     ('activities', 'id'): 'activities_id_seq',
     ('agendaitems', 'id'): 'agendaitems_id_seq',
+    ('contacts', 'id'): 'contacts_id_seq',
+    ('locks', 'id'): 'locks_id_seq',
     ('notification_defaults', 'id'): 'notification_defaults_id_seq',
     ('notifications', 'id'): 'notifications_id_seq',
+    ('org_roles', 'id'): 'org_roles_id_seq',
+    ('participation_roles', 'id'): 'participation_roles_id_seq',
+    ('participations', 'id'): 'participations_id_seq',
+    ('periods', 'id'): 'periods_id_seq',
     ('resources', 'id'): 'resources_id_seq',
+    ('urls', 'id'): 'urls_id_seq',
     ('watchers', 'id'): 'watchers_id_seq',
 
+    ('addresses', 'id'): 'adresses_id_seq',
+    ('archived_addresses', 'id'): 'archived_address_id_seq',
+    ('archived_contacts', 'id'): 'archived_contact_id_seq',
+    ('archived_mail_addresses', 'id'): 'archived_mail_address_id_seq',
+    ('archived_phonenumbers', 'id'): 'archived_phonenumber_id_seq',
+    ('archived_urls', 'id'): 'archived_url_id_seq',
     ('committees', 'id'): 'committee_id_seq',
     ('generateddocuments', 'id'): 'generateddocument_id_seq',
+    ('mail_addresses', 'id'): 'mail_adresses_id_seq',
     ('meetings', 'id'): 'meeting_id_seq',
     ('members', 'id'): 'member_id_seq',
     ('memberships', 'id'): 'membership_id_seq',
-    ('proposals', 'id'): 'proposal_id_seq',
+    ('phonenumbers', 'id'): 'phonenumber_id_seq',
     ('proposalhistory', 'id'): 'proposal_history_id_seq',
+    ('proposals', 'id'): 'proposal_id_seq',
     ('submitteddocuments', 'id'): 'submitteddocument_id_seq',
     ('tasks', 'id'): 'task_id_seq',
 }
