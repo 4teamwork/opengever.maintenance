@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Update MySQL2PostgreSQL script: Add new sequence definitions.
+  [lgraf]
+
 - Make pdb breakpoint view, accessible on every context.
   [phgross]
 
