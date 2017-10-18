@@ -69,4 +69,11 @@
       permission="cmf.ManagePortal"
       />
 
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="refnum-selfcheck"
+      class=".refnum_selfcheck.RefnumSelfcheckView"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>

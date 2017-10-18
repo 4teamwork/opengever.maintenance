@@ -1,6 +1,5 @@
 from Acquisition import aq_inner
 from Acquisition import aq_parent
-from five import grok
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.dossier.behaviors.dossier import IDossierMarker
@@ -10,7 +9,7 @@ from opengever.repository.repositoryroot import IRepositoryRoot
 from persistent.dict import PersistentDict
 from persistent.list import PersistentList
 from plone.registry.interfaces import IRegistry
-from Products.CMFPlone.interfaces import IPloneSiteRoot
+from Products.Five.browser import BrowserView
 from zope.annotation.interfaces import IAnnotations
 from zope.app.intid.interfaces import IIntIds
 from zope.component import getAdapter
@@ -42,19 +41,14 @@ except ImportError:
     REFNUM_FORMATTER_AVAILABLE = False
 
 
-class RefnumSelfcheckView(grok.View):
+class RefnumSelfcheckView(BrowserView):
     """A view to run self-checks on reference numbers.
     """
-
-    grok.name('refnum-selfcheck')
-    grok.context(IPloneSiteRoot)
-    grok.require('cmf.ManagePortal')
-
 
     def log(self, msg):
         self.request.response.write(msg + "\n")
 
-    def render(self):
+    def __call__(self):
         transaction.doom()
 
         site = self.context
