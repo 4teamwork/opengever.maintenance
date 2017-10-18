@@ -11,4 +11,11 @@
       permission="cmf.ManagePortal"
       />
 
+  <browser:page
+      for="*"
+      name="health-check"
+      class=".health_check.HealthCheckView"
+      permission="zope2.Public"
+      />
+
 </configure>
