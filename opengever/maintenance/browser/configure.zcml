@@ -32,4 +32,12 @@
       permission="cmf.ManagePortal"
       />
 
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="lock_maintenance"
+      class=".lock_maintenance.LockMaintenanceView"
+      permission="cmf.ManagePortal"
+      template="templates/lockmaintenanceview.pt"
+      />
+
 </configure>

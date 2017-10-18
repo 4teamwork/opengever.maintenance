@@ -1,8 +1,7 @@
 from datetime import datetime
-from five import grok
 from opengever.document.checkout.manager import ICheckinCheckoutManager
 from plone.locking.interfaces import IRefreshableLockable
-from Products.CMFPlone.interfaces import IPloneSiteRoot
+from Products.Five.browser import BrowserView
 from zope.component import getMultiAdapter
 
 
@@ -13,18 +12,14 @@ def strfdelta(tdelta, fmt):
     return fmt.format(**d)
 
 
-class LockMaintenanceView(grok.View):
+class LockMaintenanceView(BrowserView):
     """A view to list current WebDAV locks.
     """
 
-    grok.name('lock_maintenance')
-    grok.context(IPloneSiteRoot)
-    grok.require('cmf.ManagePortal')
-
-    def update(self):
+    def __call__(self):
         # disable Plone's editable border
         self.request.set('disable_border', True)
-        super(LockMaintenanceView, self).update()
+        return self.index()
 
     def get_lock_infos(self):
         results = []
