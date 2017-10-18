@@ -1,26 +1,19 @@
 from collections import Counter
-from five import grok
 from opengever.maintenance.pdf_conversion.helpers import DocumentCollector
 from opengever.maintenance.pdf_conversion.helpers import get_status
-from Products.CMFPlone.interfaces import IPloneSiteRoot
-from opengever.maintenance.pdf_conversion.helpers import reset_conversion_status
 from opengever.maintenance.pdf_conversion.helpers import PDFConverter
+from opengever.maintenance.pdf_conversion.helpers import reset_conversion_status
+from Products.Five.browser import BrowserView
 
 
-class PDFConversionStatusView(grok.View):
+class PDFConversionStatusView(BrowserView):
     """A view to list pending PDF preview conversions.
     """
 
-    grok.name('pdf-conversion-status')
-    grok.context(IPloneSiteRoot)
-    grok.require('cmf.ManagePortal')
-
-    def update(self):
+    def __call__(self):
         # disable Plone's editable border
         self.request.set('disable_border', True)
-        super(PDFConversionStatusView, self).update()
 
-    def __call__(self):
         form = self.request.form
         if form.get('reset_conversion_status'):
             return self.reset_conversion_status()
@@ -29,7 +22,7 @@ class PDFConversionStatusView(grok.View):
             return self.queue_conversion_jobs(n)
         else:
             # Render template
-            return super(PDFConversionStatusView, self).__call__()
+            return self.index()
 
     @property
     def collector(self):

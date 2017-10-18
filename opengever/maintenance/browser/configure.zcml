@@ -83,4 +83,12 @@
       permission="cmf.ManagePortal"
       />
 
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="pdf-conversion-status"
+      class=".pdf_conversion_status.PDFConversionStatusView"
+      permission="cmf.ManagePortal"
+      template="templates/pdfconversionstatusview.pt"
+      />
+
 </configure>
