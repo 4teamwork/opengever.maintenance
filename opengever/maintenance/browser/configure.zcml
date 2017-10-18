@@ -76,4 +76,11 @@
       permission="cmf.ManagePortal"
       />
 
+  <browser:page
+      for="opengever.maintenance.browser.re_generate_excerpts.IMeetingWrapper"
+      name="re-generate-excerpts"
+      class=".re_generate_excerpts.ReGenerateExcerpts"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>
