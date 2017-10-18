@@ -1,18 +1,13 @@
 from Acquisition import aq_parent
-from five import grok
 from opengever.repository.behaviors import referenceprefix
 from plone import api
-from Products.CMFPlone.interfaces import IPloneSiteRoot
+from Products.Five.browser import BrowserView
 
 
-class CheckReferencePrefixCollisionsView(grok.View):
+class CheckReferencePrefixCollisionsView(BrowserView):
     """Checks whether there are any repository folders with duplicate
     reference number prefixes on the same level.
     """
-
-    grok.name('check-reference-prefix-collisions')
-    grok.context(IPloneSiteRoot)
-    grok.require('cmf.ManagePortal')
 
     def get_prefix(self, repo_folder):
         """Get the reference number prefix for a particular repository folder
@@ -86,7 +81,7 @@ class CheckReferencePrefixCollisionsView(grok.View):
                     repr(collision[0]), repr(collision[1]), collision[2]))
         return '\n'.join(output)
 
-    def render(self):
+    def __call__(self):
         collisions = []
         for root in self.get_repo_roots():
             collision_list = self.find_collisions(root)

@@ -4,4 +4,11 @@
     xmlns:i18n="http://namespaces.zope.org/i18n"
     i18n_domain="opengever.maintenance">
 
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="check-reference-prefix-collisions"
+      class=".check_reference_prefix_collisions.CheckReferencePrefixCollisionsView"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>
