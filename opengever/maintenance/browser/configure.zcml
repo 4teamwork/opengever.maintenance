@@ -25,4 +25,11 @@
       permission="cmf.ManagePortal"
       />
 
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="list-truncated-rows"
+      class=".list_truncated_rows.ListTruncatedRowsView"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>
