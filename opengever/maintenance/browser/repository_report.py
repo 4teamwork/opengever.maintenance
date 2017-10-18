@@ -1,10 +1,9 @@
-from five import grok
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberSettings
 from opengever.repository.behaviors.responsibleorg import IResponsibleOrgUnit
-from opengever.repository.repositoryroot import IRepositoryRoot
 from plone import api
+from Products.Five.browser import BrowserView
 from StringIO import StringIO
 from zope.component import queryAdapter
 import csv
@@ -37,16 +36,12 @@ def grouped_by_three_sorter(brain):
     return (parts[0], map(int, parts[1:]))
 
 
-class RepositoryReport(grok.View):
+class RepositoryReport(BrowserView):
     """Produce a CSV report of the repository folders in the adapted
     repository root.
     """
 
-    grok.name('repository-report')
-    grok.context(IRepositoryRoot)
-    grok.require('cmf.ManagePortal')
-
-    def render(self):
+    def __call__(self):
         catalog = api.portal.get_tool('portal_catalog')
 
         brains = catalog(self._query())

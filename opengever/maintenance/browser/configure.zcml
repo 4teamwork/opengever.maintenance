@@ -62,4 +62,11 @@
       permission="cmf.ManagePortal"
       />
 
+  <browser:page
+      for="opengever.repository.repositoryroot.IRepositoryRoot"
+      name="repository-report"
+      class=".repository_report.RepositoryReport"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>
