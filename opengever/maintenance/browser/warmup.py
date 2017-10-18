@@ -1,4 +1,3 @@
-from five import grok
 from opengever.contact.contact import IContact
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
@@ -8,10 +7,9 @@ from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task.task import ITask
 from opengever.tasktemplates.content.tasktemplate import ITaskTemplate
 from plone import api
-from Products.CMFPlone.interfaces import IPloneSiteRoot
+from Products.Five.browser import BrowserView
 import logging
 import transaction
-
 
 log = logging.getLogger('opengever.maintenance')
 
@@ -27,15 +25,11 @@ COMMON_TYPES = [
 ]
 
 
-class WarmupView(grok.View):
+class WarmupView(BrowserView):
     """View to warm up a GEVER instance.
     """
 
-    grok.name('mnt-warmup')
-    grok.context(IPloneSiteRoot)
-    grok.require('zope2.Public')
-
-    def render(self):
+    def __call__(self):
         # XXX: Check for filesystem token or ManagePortal permission
         transaction.doom()
         self.catalog = api.portal.get_tool('portal_catalog')

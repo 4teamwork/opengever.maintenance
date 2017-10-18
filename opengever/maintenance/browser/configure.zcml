@@ -40,4 +40,11 @@
       template="templates/lockmaintenanceview.pt"
       />
 
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="mnt-warmup"
+      class=".warmup.WarmupView"
+      permission="zope2.Public"
+      />
+
 </configure>
