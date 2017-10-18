@@ -55,4 +55,11 @@
       template="templates/upload_headers.pt"
       />
 
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="transmogrify"
+      class=".transmogrify.TransmogrifyView"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>

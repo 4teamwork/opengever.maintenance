@@ -1,6 +1,5 @@
 from collective.transmogrifier.transmogrifier import Transmogrifier
-from five import grok
-from Products.CMFPlone.interfaces import IPloneSiteRoot
+from Products.Five.browser import BrowserView
 from transaction.interfaces import DoomedTransaction
 import logging
 import transaction
@@ -9,15 +8,11 @@ import transaction
 log = logging.getLogger('opengever.maintenance')
 
 
-class TransmogrifyView(grok.View):
+class TransmogrifyView(BrowserView):
     """A view to run a transmogrifier config.
     """
 
-    grok.name('transmogrify')
-    grok.context(IPloneSiteRoot)
-    grok.require('cmf.ManagePortal')
-
-    def render(self):
+    def __call__(self):
         cfg = self.request.form.get('cfg')
         if not cfg:
             raise Exception("Please specify 'cfg' query parameter!")
