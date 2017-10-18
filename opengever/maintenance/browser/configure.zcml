@@ -91,4 +91,11 @@
       template="templates/pdfconversionstatusview.pt"
       />
 
+  <browser:page
+      for="*"
+      name="pdb-breakpoint"
+      class=".pdb_breakpoint.PdbBreakpointView"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>
