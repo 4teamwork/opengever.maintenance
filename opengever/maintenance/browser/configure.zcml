@@ -18,4 +18,11 @@
       permission="zope2.Public"
       />
 
+  <browser:page
+      for="*"
+      name="list-role-principals"
+      class=".list_role_principals.ListRolePrincipalsView"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>
