@@ -1,47 +1,26 @@
 from Acquisition import aq_base
 from Acquisition import aq_inner
 from Acquisition import aq_parent
-from five import grok
 from opengever.base import _
+from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberPrefix
-from plone.dexterity.interfaces import IDexterityContent
-from plone.directives import form
+from opengever.repository.behaviors.referenceprefix import IReferenceNumberPrefix as IReferenceNumberPrefixBehavior
+from opengever.repository.interfaces import IRepositoryFolder
+from Products.CMFCore.utils import getToolByName
+from Products.CMFPlone.utils import safe_unicode
 from Products.statusmessages.interfaces import IStatusMessage
 from z3c.form import button, field
+from z3c.form.form import Form
 from zope import schema
 from zope.app.intid.interfaces import IIntIds
 from zope.component import getUtility
 from zope.interface import Interface
-from opengever.repository.interfaces import IRepositoryFolder
-from opengever.repository.behaviors.referenceprefix import IReferenceNumberPrefix as IReferenceNumberPrefixBehavior
-from opengever.base.interfaces import IReferenceNumber
-from Products.CMFCore.utils import getToolByName
+from zope.interface import provider
+from zope.schema.interfaces import IContextAwareDefaultFactory
 
 
-class IReferenceNumberPrefixSchema(Interface):
-    prefix = schema.Int(
-        title=u"Reference Number Prefix for this object")
-
-    next_prefix = schema.Int(
-        title=u"Next available prefix",
-        readonly=True,
-        required=False)
-
-    current_refnum = schema.TextLine(
-        title=u"Current Reference Number",
-        readonly=True,
-        required=False)
-
-    current_refnum_from_metadata = schema.TextLine(
-        title=u"Current Reference Number from Catalog Metadata",
-        readonly=True,
-        required=False)
-
-
-@form.default_value(field=IReferenceNumberPrefixSchema['prefix'],
-                    context=IDexterityContent)
-def set_prefix_default(data):
-    context = data.context
+@provider(IContextAwareDefaultFactory)
+def set_prefix_default(context):
     parent = aq_parent(aq_inner(context))
 
     current_prefix = IReferenceNumberPrefix(parent).get_number(context)
@@ -50,10 +29,8 @@ def set_prefix_default(data):
     return int(current_prefix)
 
 
-@form.default_value(field=IReferenceNumberPrefixSchema['next_prefix'],
-                    context=IDexterityContent)
-def set_next_prefix_default(data):
-    context = data.context
+@provider(IContextAwareDefaultFactory)
+def set_next_prefix_default(context):
     parent = aq_parent(aq_inner(context))
 
     next_prefix = IReferenceNumberPrefix(parent).get_next_number(context)
@@ -62,28 +39,45 @@ def set_next_prefix_default(data):
     return int(next_prefix)
 
 
-@form.default_value(field=IReferenceNumberPrefixSchema['current_refnum'],
-                    context=IDexterityContent)
-def set_current_refnum_default(data):
-    context = data.context
+@provider(IContextAwareDefaultFactory)
+def set_current_refnum_default(context):
     ref_number = IReferenceNumber(context).get_number()
-    return ref_number
+    return safe_unicode(ref_number)
 
 
-@form.default_value(field=IReferenceNumberPrefixSchema['current_refnum_from_metadata'],
-                    context=IDexterityContent)
-def set_current_refnum_from_metadata_default(data):
-    context = data.context
+@provider(IContextAwareDefaultFactory)
+def set_current_refnum_from_metadata_default(context):
     catalog = getToolByName(context, 'portal_catalog')
     brain = catalog(path='/'.join(context.getPhysicalPath()))[0]
     ref_number_from_metadata = brain.reference
-    return ref_number_from_metadata
+    return safe_unicode(ref_number_from_metadata)
 
 
-class ReferenceNumberPrefixForm(form.Form):
-    grok.context(IDexterityContent)
-    grok.name('refnum-adjustment')
-    grok.require('cmf.ManagePortal')
+class IReferenceNumberPrefixSchema(Interface):
+    prefix = schema.Int(
+        title=u"Reference Number Prefix for this object",
+        defaultFactory=set_prefix_default)
+
+    next_prefix = schema.Int(
+        title=u"Next available prefix",
+        readonly=True,
+        required=False,
+        defaultFactory=set_next_prefix_default)
+
+    current_refnum = schema.TextLine(
+        title=u"Current Reference Number",
+        readonly=True,
+        required=False,
+        defaultFactory=set_current_refnum_default)
+
+    current_refnum_from_metadata = schema.TextLine(
+        title=u"Current Reference Number from Catalog Metadata",
+        readonly=True,
+        required=False,
+        defaultFactory=set_current_refnum_from_metadata_default)
+
+
+class ReferenceNumberPrefixForm(Form):
 
     fields = field.Fields(IReferenceNumberPrefixSchema)
 
