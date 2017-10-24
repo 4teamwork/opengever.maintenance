@@ -7,6 +7,7 @@ tests_require = [
     'ftw.testing',
     'plone.app.testing',
     'plone.testing',
+    'five.grok',
     'zope.testing',
     'opengever.core[tests]',
 ]
