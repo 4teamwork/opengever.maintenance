@@ -1,6 +1,14 @@
 <configure xmlns="http://namespaces.zope.org/zope"
            xmlns:i18n="http://namespaces.zope.org/i18n"
+           xmlns:zcml="http://namespaces.zope.org/zcml"
            i18n_domain="opengever.maintenance">
+
+    <!-- Can be removed once we use opengever.core >= 2017.7.x, see
+         https://github.com/4teamwork/opengever.core/pull/3590
+    -->
+    <configure zcml:condition="installed plone.rest ">
+      <include package="plone.rest" file="meta.zcml" />
+    </configure>
 
     <include package="z3c.autoinclude" file="meta.zcml" />
     <includeDependencies package="." />
