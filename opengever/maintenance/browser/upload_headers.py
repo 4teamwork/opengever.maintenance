@@ -1,23 +1,17 @@
-from five import grok
 from pprint import pformat
-from Products.CMFPlone.interfaces import IPloneSiteRoot
-from Products.Five.browser.pagetemplatefile import ViewPageTemplateFile
+from Products.Five.browser import BrowserView
 
 
-class UploadHeadersView(grok.View):
+class UploadHeadersView(BrowserView):
     """
     """
 
-    form_template = ViewPageTemplateFile('upload_headers.pt')
+    def __call__(self):
+        # disable Plone's editable border
+        self.request.set('disable_border', True)
 
-    grok.name('upload-headers')
-    grok.context(IPloneSiteRoot)
-    grok.require('cmf.ManagePortal')
-
-    def render(self):
         if not self.request.form.get('submitted'):
-            html = self.form_template()
-            return html
+            return self.index()
         else:
             uploaded_file = self.request.form.get('uploaded_file')
             response = ''
@@ -27,9 +21,3 @@ class UploadHeadersView(grok.View):
             response += "Full Request headers: \n%s" % (
                 pformat(self.request.__dict__))
             return response
-
-    def update(self):
-        # disable Plone's editable border
-        self.request.set('disable_border', True)
-        super(UploadHeadersView, self).update()
-

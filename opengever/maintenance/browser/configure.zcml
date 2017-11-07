@@ -1,0 +1,108 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    xmlns:i18n="http://namespaces.zope.org/i18n"
+    i18n_domain="opengever.maintenance">
+
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="check-reference-prefix-collisions"
+      class=".check_reference_prefix_collisions.CheckReferencePrefixCollisionsView"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      for="*"
+      name="health-check"
+      class=".health_check.HealthCheckView"
+      permission="zope2.Public"
+      />
+
+  <browser:page
+      for="*"
+      name="list-role-principals"
+      class=".list_role_principals.ListRolePrincipalsView"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="list-truncated-rows"
+      class=".list_truncated_rows.ListTruncatedRowsView"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="lock_maintenance"
+      class=".lock_maintenance.LockMaintenanceView"
+      permission="cmf.ManagePortal"
+      template="templates/lockmaintenanceview.pt"
+      />
+
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="mnt-warmup"
+      class=".warmup.WarmupView"
+      permission="zope2.Public"
+      />
+
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="upload-headers"
+      class=".upload_headers.UploadHeadersView"
+      permission="cmf.ManagePortal"
+      template="templates/upload_headers.pt"
+      />
+
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="transmogrify"
+      class=".transmogrify.TransmogrifyView"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      for="opengever.repository.repositoryroot.IRepositoryRoot"
+      name="repository-report"
+      class=".repository_report.RepositoryReport"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="refnum-selfcheck"
+      class=".refnum_selfcheck.RefnumSelfcheckView"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      for="opengever.maintenance.browser.re_generate_excerpts.IMeetingWrapper"
+      name="re-generate-excerpts"
+      class=".re_generate_excerpts.ReGenerateExcerpts"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="pdf-conversion-status"
+      class=".pdf_conversion_status.PDFConversionStatusView"
+      permission="cmf.ManagePortal"
+      template="templates/pdfconversionstatusview.pt"
+      />
+
+  <browser:page
+      for="*"
+      name="pdb-breakpoint"
+      class=".pdb_breakpoint.PdbBreakpointView"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      for="plone.dexterity.interfaces.IDexterityContent"
+      name="refnum-adjustment"
+      class=".refnum_adjustment.ReferenceNumberPrefixForm"
+      permission="cmf.ManagePortal"
+      />
+
+</configure>

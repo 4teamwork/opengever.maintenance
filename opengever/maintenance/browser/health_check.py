@@ -1,5 +1,4 @@
-from five import grok
-from zope.interface import Interface
+from Products.Five.browser import BrowserView
 import json
 
 try:
@@ -9,7 +8,7 @@ except ImportError:
     from opengever.ogds.base.utils import create_session
 
 
-class HealthCheckView(grok.View):
+class HealthCheckView(BrowserView):
     """Health check view to be used by superlance httpok plugin and/or
     HAProxy to determine whether an instance is in a healthy state.
 
@@ -18,11 +17,7 @@ class HealthCheckView(grok.View):
     2) it's protected with zope2.Public -> accessible for Anonymous users
     """
 
-    grok.name('health-check')
-    grok.context(Interface)
-    grok.require('zope2.Public')
-
-    def render(self):
+    def __call__(self):
         # Access the session in order to trigger a possible
         # 'MySQL server has gone away' error
         session = create_session()

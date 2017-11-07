@@ -7,6 +7,7 @@ tests_require = [
     'ftw.testing',
     'plone.app.testing',
     'plone.testing',
+    'five.grok',
     'zope.testing',
     'opengever.core[tests]',
 ]
@@ -32,7 +33,6 @@ setup(name='opengever.maintenance',
       zip_safe=False,
       install_requires=[
           'apachelog',
-          'five.grok',
           'opengever.core',
           'Plone',
           'plone.api',

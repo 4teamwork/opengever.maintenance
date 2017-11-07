@@ -1,5 +1,4 @@
-from five import grok
-from Products.CMFPlone.interfaces import IPloneSiteRoot
+from Products.Five.browser import BrowserView
 from sqlalchemy import MetaData
 
 try:
@@ -9,21 +8,17 @@ except ImportError:
     from opengever.ogds.base.utils import create_session
 
 
-class ListTruncatedRowsView(grok.View):
+class ListTruncatedRowsView(BrowserView):
     """This view lists all SQL rows that have a value that has the exact same
     length as the column's max length. These are rows that are likely to have
     had their values truncated.
     """
 
-    grok.name('list-truncated-rows')
-    grok.context(IPloneSiteRoot)
-    grok.require('cmf.ManagePortal')
-
     def display(self, msg):
         print msg
         self.result.append(msg)
 
-    def render(self):
+    def __call__(self):
         self.result = []
         session = create_session()
 

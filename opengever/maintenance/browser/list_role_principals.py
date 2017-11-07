@@ -1,8 +1,7 @@
-from five import grok
 from plone import api
 from Products.CMFPlone.interfaces import IPloneSiteRoot
+from Products.Five.browser import BrowserView
 from zope.component.hooks import getSite
-from zope.interface import Interface
 
 
 def get_principals_from_local_roles(obj):
@@ -43,7 +42,7 @@ def get_all_role_principals(context):
     return all_principals
 
 
-class ListRolePrincipalsView(grok.View):
+class ListRolePrincipalsView(BrowserView):
     """Lists all the unique principals that are used in role assignments
     (below the adapted context).
 
@@ -51,11 +50,7 @@ class ListRolePrincipalsView(grok.View):
     from global role assignments in portal_role_manager.
     """
 
-    grok.name('list-role-principals')
-    grok.context(Interface)
-    grok.require('cmf.ManagePortal')
-
-    def render(self):
+    def __call__(self):
         all_principals = get_all_role_principals(self.context)
         result = '\n'.join(sorted(p for p in all_principals))
         return result

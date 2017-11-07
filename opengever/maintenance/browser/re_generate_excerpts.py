@@ -1,6 +1,6 @@
 from copy import copy
-from five import grok
 from plone import api
+from Products.Five.browser import BrowserView
 from zope.globalrequest import getRequest
 from zope.i18n import translate
 from zope.interface import Interface
@@ -17,19 +17,15 @@ except ImportError:
         """Mock interface to make imports happy."""
 
 
-class ReGenerateExcerpts(grok.View):
+class ReGenerateExcerpts(BrowserView):
     """Add a view to re-generate excerpts for a meeting.
     """
-
-    grok.name('re-generate-excerpts')
-    grok.context(IMeetingWrapper)
-    grok.require('cmf.ManagePortal')
 
     def __init__(self, context, request):
         super(ReGenerateExcerpts, self).__init__(context, request)
         self.repository = api.portal.get_tool('portal_repository')
 
-    def render(self):
+    def __call__(self):
         return self.re_generate_excerpts()
 
     def re_generate_excerpts(self):
