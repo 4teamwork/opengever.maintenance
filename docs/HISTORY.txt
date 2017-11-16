@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Warmup view: Run with elevated privileges in order to be able to fetch
+  objects, and use unrestrictedSearchResults(). [lgraf]
+
 - Warmup view: Drop 'full' mode - it's prohibitively expensive and rather
   pointless anyway. [lgraf]
 

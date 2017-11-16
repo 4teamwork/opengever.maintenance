@@ -3,6 +3,7 @@ from opengever.contact.contact import IContact
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.inbox.forwarding import IForwarding
+from opengever.maintenance.utils import elevated_privileges
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task.task import ITask
@@ -19,9 +20,9 @@ from Products.PluginIndexes.KeywordIndex.KeywordIndex import KeywordIndex
 from Products.PluginIndexes.UUIDIndex.UUIDIndex import UUIDIndex
 from Products.ZCTextIndex.ZCTextIndex import ZCTextIndex
 import logging
+import threading
 import time
 import transaction
-import threading
 
 log = logging.getLogger('opengever.maintenance')
 
@@ -42,8 +43,11 @@ class WarmupView(BrowserView):
     """
 
     def __call__(self):
-        # XXX: Check for filesystem token or ManagePortal permission
+        # Doom transaction to ensure no writes can ever happen. This view
+        # is accessible to Anonymous (zope2.Public), and we run it with
+        # elevated privileges.
         transaction.doom()
+
         self.catalog = api.portal.get_tool('portal_catalog')
         thread = threading.current_thread().name
         conn = self.context._p_jar
@@ -51,20 +55,22 @@ class WarmupView(BrowserView):
         mode = self.request.form.get('mode', 'minimal')
         lexicons = self._to_bool(self.request.form.get('lexicons', True))
 
-        log.info(
-            'Warming up instance (mode == {}, Thread {!r}, '
-            'Connection {!r})...'.format(mode, thread, conn))
+        # Elevate privileges in order to be able to load objects
+        with elevated_privileges():
+            log.info(
+                'Warming up instance (mode == {}, Thread {!r}, '
+                'Connection {!r})...'.format(mode, thread, conn))
 
-        if mode == 'minimal':
-            self._warmup_minimal()
-        elif mode == 'medium':
-            self._warmup_medium()
-        elif mode == 'catalog':
-            self._warmup_catalog(lexicons=lexicons)
-        else:
-            raise Exception('Warmup mode {!r} not recognized!'.format(mode))
+            if mode == 'minimal':
+                self._warmup_minimal()
+            elif mode == 'medium':
+                self._warmup_medium()
+            elif mode == 'catalog':
+                self._warmup_catalog(lexicons=lexicons)
+            else:
+                raise Exception('Warmup mode {!r} not recognized!'.format(mode))
 
-        log.info('Done warming up.')
+            log.info('Done warming up.')
         return 'OK'
 
     def _to_bool(self, value):
@@ -72,16 +78,17 @@ class WarmupView(BrowserView):
 
     def _warmup_minimal(self):
         # Fetch repository brains and objects
-        repo_brains = self.catalog(
+        repo_brains = self.catalog.unrestrictedSearchResults(
             object_provides=IRepositoryFolder.__identifier__)
         for brain in repo_brains:
-            repo = brain.getObject()
+            brain.getObject()
 
     def _warmup_medium(self):
         # Fetch brains for all common types
         for type_iface in COMMON_TYPES:
             count = 0
-            brains = self.catalog(object_provides=type_iface.__identifier__)
+            brains = self.catalog.unrestrictedSearchResults(
+                object_provides=type_iface.__identifier__)
             for brain in brains:
                 count += 1
             log.info('Fetched {} brains for type {}'.format(
