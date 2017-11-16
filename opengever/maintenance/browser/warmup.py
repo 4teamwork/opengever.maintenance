@@ -59,8 +59,6 @@ class WarmupView(BrowserView):
             self._warmup_minimal()
         elif mode == 'medium':
             self._warmup_medium()
-        elif mode == 'full':
-            self._warmup_full()
         elif mode == 'catalog':
             self._warmup_catalog(lexicons=lexicons)
         else:
@@ -89,20 +87,6 @@ class WarmupView(BrowserView):
             log.info('Fetched {} brains for type {}'.format(
                 count, type_iface.__identifier__))
 
-        self._warmup_minimal()
-
-    def _warmup_full(self):
-        # Fetch brains and objects for all common types
-        for type_iface in COMMON_TYPES:
-            count = 0
-            brains = self.catalog(object_provides=type_iface.__identifier__)
-            for brain in brains:
-                obj = brain.getObject()
-                count += 1
-            log.info('Fetched {} brains and objects for type {}'.format(
-                count, type_iface.__identifier__))
-
-        self._warmup_medium()
         self._warmup_minimal()
 
     def _warmup_catalog(self, lexicons=True):

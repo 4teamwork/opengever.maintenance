@@ -5,6 +5,9 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Warmup view: Drop 'full' mode - it's prohibitively expensive and rather
+  pointless anyway. [lgraf]
+
 - Warmup view: Add mode to warm up entire catalog. [lgraf]
 
 - Add script to fix mail message caches. [lgraf]
