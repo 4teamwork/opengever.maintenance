@@ -5,6 +5,8 @@ from AccessControl.User import UnrestrictedUser as BaseUnrestrictedUser
 from contextlib import contextmanager
 from plone import api
 from zope.globalrequest import getRequest
+import os
+import subprocess
 
 
 def join_lines(fn):
@@ -13,6 +15,17 @@ def join_lines(fn):
     def wrapped(self, *args, **kwargs):
         return '\n'.join(fn(self, *args, **kwargs))
     return wrapped
+
+
+def get_rss():
+    """Get current memory usage (RSS) of this process.
+    """
+    out = subprocess.check_output(
+        ["ps", "-p", "%s" % os.getpid(), "-o", "rss"])
+    try:
+        return int(out.splitlines()[-1].strip())
+    except ValueError:
+        return 0
 
 
 class UnrestrictedUser(BaseUnrestrictedUser):

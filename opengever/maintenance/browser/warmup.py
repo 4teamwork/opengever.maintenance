@@ -4,6 +4,7 @@ from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.inbox.forwarding import IForwarding
 from opengever.maintenance.utils import elevated_privileges
+from opengever.maintenance.utils import get_rss
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task.task import ITask
@@ -117,6 +118,8 @@ class WarmupView(BrowserView):
         log.info("Cache size (# objs) (%s): %s" % (when, db.cacheSize()))
         log.info("Total estimated cache size (%s): %.2f MiB" %
                  (when, conn._cache.total_estimated_size / 1024.0 / 1024.0))
+        log.info("Current instance RSS (%s): %.2f MiB" % (
+            when, get_rss() / 1024.0))
         log.info('')
 
 
