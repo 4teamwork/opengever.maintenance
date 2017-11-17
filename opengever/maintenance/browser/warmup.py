@@ -53,6 +53,8 @@ class WarmupView(BrowserView):
         conn = self.context._p_jar
 
         mode = self.request.form.get('mode', 'minimal')
+        zctext_indexes = self._to_bool(
+            self.request.form.get('zctext_indexes', True))
         lexicons = self._to_bool(self.request.form.get('lexicons', True))
 
         # Elevate privileges in order to be able to load objects
@@ -66,7 +68,8 @@ class WarmupView(BrowserView):
             elif mode == 'medium':
                 self._warmup_medium()
             elif mode == 'catalog':
-                self._warmup_catalog(lexicons=lexicons)
+                self._warmup_catalog(
+                    zctext_indexes=zctext_indexes, lexicons=lexicons)
             else:
                 raise Exception('Warmup mode {!r} not recognized!'.format(mode))
 
@@ -96,11 +99,12 @@ class WarmupView(BrowserView):
 
         self._warmup_minimal()
 
-    def _warmup_catalog(self, lexicons=True):
+    def _warmup_catalog(self, zctext_indexes=True, lexicons=True):
         start = time.time()
 
         self._log_cache_stats('before warmup')
-        warmup_catalog(self.catalog, lexicons=lexicons)
+        warmup_catalog(
+            self.catalog, zctext_indexes=zctext_indexes, lexicons=lexicons)
         self._log_cache_stats('after warmup')
 
         duration = time.time() - start
@@ -116,14 +120,16 @@ class WarmupView(BrowserView):
         log.info('')
 
 
-def warmup_catalog(catalog, lexicons=True):
+def warmup_catalog(catalog, zctext_indexes=True, lexicons=True):
     log.info('Loading metadata...')
     list(catalog._catalog.data.items())
 
     log.info('Loading indexes...')
     for index_name in catalog.indexes():
-        log.info('Loading index %r...' % index_name)
         index = catalog._catalog.indexes[index_name]
+        if not zctext_indexes and isinstance(index, ZCTextIndex):
+            continue
+        log.info('Loading index %r...' % index_name)
         warmup_index(index, lexicons=lexicons)
 
     log.info('Done warming up catalog.')
