@@ -2,6 +2,8 @@
 #
 # Helper script to LOCALLY test opengever.maintenance with all test-*.cfgs
 
+set -euo pipefail
+
 PYTHON="python2.7"
 
 for CFG in test-og-*
