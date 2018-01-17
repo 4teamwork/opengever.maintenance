@@ -15,7 +15,6 @@ import transaction
 
 INDEXES_TO_REMOVE = [
     'SearchableText',
-    'Title',
     'Description',
     'document_author',
 ]
@@ -79,9 +78,15 @@ def remove_catalog_indexes(portal):
         if index in indexes:
             catalog.delIndex(index)
             logger.info('Removed catalog index %s.', index)
+
+    catalog.clearIndex('Title')
     lexicon = catalog['plone_lexicon']
     lexicon.clear()
-    logger.info('plone_lexicon cleared.')
+    logger.info('plone_lexicon cleared. Reindexing Title...')
+    title_index = catalog._catalog.getIndex('Title')
+    items = catalog.unrestrictedSearchResults()
+    for item in items:
+        title_index.index_object(item.getRID(), item)
 
 
 if __name__ == '__main__':
