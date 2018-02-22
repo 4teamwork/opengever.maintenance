@@ -5,6 +5,8 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to list .url files. [lgraf]
+
 - Add persist_default_value_for_paperform script. [Rotonen]
 
 - Add fix_one_note_mimetype script. [phgross]
