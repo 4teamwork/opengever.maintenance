@@ -37,14 +37,14 @@ def fix_document_end_date(brain):
     document = brain.getObject()
     dossier_end_date = IDossier(document.get_parent_dossier()).end
 
-    print "Fixing document_date for {} at {}".format(
-        brain.Title, brain.getPath())
     if not dossier_end_date:
         return  # uhm, may be not closed yet. not sure what to do.
 
     document_date = IDocumentMetadata(document).document_date
     if not document_date or document_date > dossier_end_date:
         IDocumentMetadata(document).document_date = dossier_end_date
+        print "Fixing document_date for {} at {}".format(
+            brain.Title, brain.getPath())
 
 
 def main():
