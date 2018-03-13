@@ -26,7 +26,7 @@ def fix_dossier_resolvability(plone, path):
     catalog = api.portal.get_tool('portal_catalog')
     query = {
         'path': '/'.join(dossier.getPhysicalPath()),
-        'portal_type': 'opengever.document.document'
+        'object_provides': ['opengever.document.behaviors.IBaseDocument'],
     }
 
     for brain in catalog.unrestrictedSearchResults(**query):
@@ -37,14 +37,16 @@ def fix_document_end_date(brain):
     document = brain.getObject()
     dossier_end_date = IDossier(document.get_parent_dossier()).end
 
-    print "Fixing document_date for {} at {}".format(
-        brain.Title, brain.getPath())
     if not dossier_end_date:
         return  # uhm, may be not closed yet. not sure what to do.
 
     document_date = IDocumentMetadata(document).document_date
     if not document_date or document_date > dossier_end_date:
         IDocumentMetadata(document).document_date = dossier_end_date
+        print "Fixing document_date for {} at {}".format(
+            brain.Title, brain.getPath())
+        IDocumentMetadata(document).document_date = dossier_end_date
+        document.reindexObject(idxs=['document_date'])
 
 
 def main():
