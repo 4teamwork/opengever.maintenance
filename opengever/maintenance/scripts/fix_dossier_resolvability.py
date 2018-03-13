@@ -26,7 +26,7 @@ def fix_dossier_resolvability(plone, path):
     catalog = api.portal.get_tool('portal_catalog')
     query = {
         'path': '/'.join(dossier.getPhysicalPath()),
-        'portal_type': 'opengever.document.document'
+        'object_provides': ['opengever.document.behaviors.IBaseDocument'],
     }
 
     for brain in catalog.unrestrictedSearchResults(**query):
