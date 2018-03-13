@@ -45,6 +45,8 @@ def fix_document_end_date(brain):
         IDocumentMetadata(document).document_date = dossier_end_date
         print "Fixing document_date for {} at {}".format(
             brain.Title, brain.getPath())
+        IDocumentMetadata(document).document_date = dossier_end_date
+        document.reindexObject(idxs=['document_date'])
 
 
 def main():
