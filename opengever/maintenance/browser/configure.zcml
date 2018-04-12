@@ -99,6 +99,13 @@
       />
 
   <browser:page
+      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+      name="calculate-missing-bumblebee-checksums"
+      class=".calculate_missing_bumblebee_checksums.CaluclateMissingBumblebeeChecksumsView"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
       for="plone.dexterity.interfaces.IDexterityContent"
       name="refnum-adjustment"
       class=".refnum_adjustment.ReferenceNumberPrefixForm"
