@@ -15,14 +15,13 @@ logging.root.addHandler(handler)
 logging.root.setLevel(logging.INFO)
 
 
-class RetentionPeriodResetter(object):
-    """Resets the retention periods
+class CustodyPeriodResetter(object):
+    """Resets the custody periods
     """
 
     def __init__(self, plone, options):
         self.plone = plone
         self.options = options
-        self.portal_setup = api.portal.get_tool('portal_setup')
         self.catalog = api.portal.get_tool('portal_catalog')
 
     def run(self):
@@ -30,7 +29,7 @@ class RetentionPeriodResetter(object):
                 object_provides=[ILifeCycleMarker.__identifier__]):
             obj = item.getObject()
 
-            ILifeCycle(obj).retention_period = 0
+            ILifeCycle(obj).custody_periods = 0
 
 
 def main():
@@ -44,7 +43,7 @@ def main():
         transaction.doom()
 
     plone = setup_plone(app, options)
-    RetentionPeriodResetter(plone, options).run()
+    CustodyPeriodResetter(plone, options).run()
     if options.dry_run:
         logger.warn('skipping commit because we are in dry-mode.')
     else:
