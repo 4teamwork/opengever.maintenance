@@ -84,14 +84,6 @@
       />
 
   <browser:page
-      for="Products.CMFPlone.interfaces.IPloneSiteRoot"
-      name="pdf-conversion-status"
-      class=".pdf_conversion_status.PDFConversionStatusView"
-      permission="cmf.ManagePortal"
-      template="templates/pdfconversionstatusview.pt"
-      />
-
-  <browser:page
       for="*"
       name="pdb-breakpoint"
       class=".pdb_breakpoint.PdbBreakpointView"
