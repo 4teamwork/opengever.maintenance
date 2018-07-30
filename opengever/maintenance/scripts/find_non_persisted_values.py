@@ -32,6 +32,7 @@ class NonPersistedValueFinder(object):
         self.intids = getUtility(IIntIds)
 
         self.stats = Counter()
+        self.stats['by_field'] = Counter()
 
     def run(self):
         sys.stderr.write("Checking for non-persisted values...\n\n")
@@ -104,13 +105,24 @@ class NonPersistedValueFinder(object):
     def update_stats(self, missing_fields):
         if missing_fields:
             self.stats['missing'] += 1
+
+            for schema_name, field_name in missing_fields:
+                self.stats['by_field'][(schema_name, field_name)] += 1
         else:
             self.stats['ok'] += 1
 
     def display_stats(self):
         sys.stderr.write("\n")
 
-        sys.stderr.write("Summary:\n")
+        sys.stderr.write("Missing (by field):\n")
+        stats_by_field = sorted(self.stats['by_field'].items())
+        for (schema_name, field_name), count in stats_by_field:
+            dotted_name = '.'.join((schema_name, field_name))
+            sys.stderr.write("  %-120s %s\n" % (dotted_name, count))
+
+        sys.stderr.write("\n")
+
+        sys.stderr.write("Summary (by object):\n")
         sys.stderr.write("Missing: %s\n" % self.stats['missing'])
         sys.stderr.write("OK: %s\n" % self.stats['ok'])
 
