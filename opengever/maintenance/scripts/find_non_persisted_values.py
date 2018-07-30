@@ -21,86 +21,97 @@ import sys
 import transaction
 
 
-SCHEMA_CACHE = {}
-FIELD_CACHE = {}
+class NonPersistedValueFinder(object):
 
-CSV_HEADER = "intid;path;created;missing_fields"
+    CSV_HEADER = "intid;path;created;missing_fields"
+    SCHEMA_CACHE = {}
+    FIELD_CACHE = {}
 
+    def __init__(self):
+        self.catalog = api.portal.get_tool('portal_catalog')
+        self.intids = getUtility(IIntIds)
 
-def find_non_peristed_values(plone, options):
-    sys.stderr.write("Checking for non-persisted values...\n\n")
+        self.stats = Counter()
 
-    catalog = api.portal.get_tool('portal_catalog')
-    intids = getUtility(IIntIds)
+    def run(self):
+        sys.stderr.write("Checking for non-persisted values...\n\n")
 
-    all_brains = catalog.unrestrictedSearchResults()
-    total = len(all_brains)
+        all_brains = self.catalog.unrestrictedSearchResults()
+        total = len(all_brains)
 
-    counts = Counter()
-    for i, brain in enumerate(all_brains):
-        obj = brain.getObject()
-        missing_fields = check_for_missing_fields(obj)
+        for i, brain in enumerate(all_brains):
+            obj = brain.getObject()
+            missing_fields = self.check_for_missing_fields(obj)
+            self.update_stats(missing_fields)
 
+            if missing_fields:
+                self.write_csv_row(obj, missing_fields)
+
+            if i % 100 == 0:
+                sys.stderr.write("Progress: %s of %s objects\n" % (i, total))
+
+        self.display_stats()
+
+    def check_for_missing_fields(self, obj):
+        missing_fields = []
+        portal_type = obj.portal_type
+
+        if portal_type not in self.SCHEMA_CACHE:
+            self.SCHEMA_CACHE[portal_type] = list(iterSchemataForType(portal_type))
+        schemas = self.SCHEMA_CACHE[portal_type]
+
+        for schema in schemas:
+            if schema.__identifier__ not in self.FIELD_CACHE:
+                self.FIELD_CACHE[schema.__identifier__] = map(
+                    itemgetter(1), getFieldsInOrder(schema))
+            fields = self.FIELD_CACHE[schema.__identifier__]
+
+            for field in fields:
+                name = field.getName()
+
+                if name == 'changeNote':
+                    # The changeNote field from p.a.versioningbehavior
+                    # is a "fake" field - it never gets persisted, but
+                    # written to request annotations instead
+                    continue
+
+                if name == 'reference_number':
+                    # reference_number is a special field. It never gets
+                    # set directly, but instead acts as a computed field
+                    # for all intents and purposes.
+                    continue
+
+                try:
+                    get_persisted_value_for_field(obj, field)
+                except AttributeError:
+                    missing_fields.append((schema.__identifier__, name))
+
+        missing_fields.sort()
+        return missing_fields
+
+    def write_csv_row(self, obj, missing_fields):
+        created = str(obj.created())
+        intid = self.intids.queryId(obj)
+        row = [
+            str(intid),
+            '/'.join(obj.getPhysicalPath()),
+            created,
+            str([f[1] for f in missing_fields]),
+        ]
+        print ';'.join(row)
+
+    def update_stats(self, missing_fields):
         if missing_fields:
-            counts['missing'] += 1
-            missing_fields.sort()
-            created = str(obj.created())
-            intid = intids.queryId(obj)
-            row = [
-                str(intid),
-                '/'.join(obj.getPhysicalPath()),
-                created,
-                str(missing_fields),
-            ]
-            print ';'.join(row)
-
+            self.stats['missing'] += 1
         else:
-            counts['ok'] += 1
+            self.stats['ok'] += 1
 
-        if i % 100 == 0:
-            sys.stderr.write("Progress: %s of %s objects\n" % (i, total))
+    def display_stats(self):
+        sys.stderr.write("\n")
 
-    sys.stderr.write("\n")
-    sys.stderr.write("Summary:\n")
-    sys.stderr.write("Missing: %s\n" % counts['missing'])
-    sys.stderr.write("OK: %s\n" % counts['ok'])
-
-
-def check_for_missing_fields(obj):
-    missing_fields = []
-    portal_type = obj.portal_type
-
-    if portal_type not in SCHEMA_CACHE:
-        SCHEMA_CACHE[portal_type] = list(iterSchemataForType(portal_type))
-    schemas = SCHEMA_CACHE[portal_type]
-
-    for schema in schemas:
-        if schema.__identifier__ not in FIELD_CACHE:
-            FIELD_CACHE[schema.__identifier__] = map(
-                itemgetter(1), getFieldsInOrder(schema))
-        fields = FIELD_CACHE[schema.__identifier__]
-
-        for field in fields:
-            name = field.getName()
-
-            if name == 'changeNote':
-                # The changeNote field from p.a.versioningbehavior
-                # is a "fake" field - it never gets persisted, but
-                # written to request annotations instead
-                continue
-
-            if name == 'reference_number':
-                # reference_number is a special field. It never gets
-                # set directly, but instead acts as a computed field
-                # for all intents and purposes.
-                continue
-
-            try:
-                get_persisted_value_for_field(obj, field)
-            except AttributeError:
-                missing_fields.append(name)
-
-    return missing_fields
+        sys.stderr.write("Summary:\n")
+        sys.stderr.write("Missing: %s\n" % self.stats['missing'])
+        sys.stderr.write("OK: %s\n" % self.stats['ok'])
 
 
 if __name__ == '__main__':
@@ -113,4 +124,5 @@ if __name__ == '__main__':
 
     transaction.doom()
 
-    find_non_peristed_values(plone, options)
+    finder = NonPersistedValueFinder()
+    finder.run()
