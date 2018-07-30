@@ -23,7 +23,7 @@ import transaction
 
 class NonPersistedValueFinder(object):
 
-    CSV_HEADER = "intid;path;created;missing_fields"
+    CSV_HEADER = "intid;portal_type;path;created;missing_fields"
     SCHEMA_CACHE = {}
     FIELD_CACHE = {}
 
@@ -94,6 +94,7 @@ class NonPersistedValueFinder(object):
         intid = self.intids.queryId(obj)
         row = [
             str(intid),
+            obj.portal_type,
             '/'.join(obj.getPhysicalPath()),
             created,
             str([f[1] for f in missing_fields]),
