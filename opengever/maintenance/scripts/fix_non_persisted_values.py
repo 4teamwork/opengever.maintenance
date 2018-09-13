@@ -12,6 +12,8 @@ from collections import Counter
 from collections import namedtuple
 from datetime import datetime
 from datetime import timedelta
+from ftw.solr.interfaces import ISolrConnectionManager
+from ftw.solr.interfaces import ISolrIndexHandler
 from opengever.base.default_values import get_persisted_value_for_field
 from opengever.dossier.dossiertemplate.behaviors import IDossierTemplateSchema
 from opengever.maintenance.debughelpers import setup_app
@@ -26,8 +28,10 @@ from plone.dexterity.utils import iterSchemataForType
 from plone.indexer.interfaces import IIndexableObject
 from plone.indexer.interfaces import IIndexer
 from Products.PluginIndexes.DateIndex.DateIndex import DateIndex
+from zope.component import getMultiAdapter
 from zope.component import getUtility
 from zope.component import queryMultiAdapter
+from zope.component import queryUtility
 from zope.intid.interfaces import IIntIds
 from zope.schema import getFieldsInOrder
 import logging
@@ -256,6 +260,7 @@ class NonPersistedValueFixer(object):
 
         self.catalog = api.portal.get_tool('portal_catalog')
         self.intids = getUtility(IIntIds)
+        self.reindexer = None
 
         self.stats = Counter()
         self.stats['by_field'] = Counter()
@@ -278,6 +283,8 @@ class NonPersistedValueFixer(object):
 
         all_brains = self.catalog.unrestrictedSearchResults()
         total = len(all_brains)
+
+        self.reindexer = Reindexer(self)
 
         with open(self.csv_log_path, 'w') as self.csv_log:
             with open(self.summary_log_path, 'w') as self.summary_log:
@@ -309,6 +316,9 @@ class NonPersistedValueFixer(object):
                         sys.stderr.write("Progress: %s of %s objects\n" % (
                             i, total))
 
+                if self.reindexer.solr_enabled:
+                    self.reindexer._commit_to_solr()
+
                 self.display_stats()
 
     def get_fields_for_schema(self, schema):
@@ -332,8 +342,6 @@ class NonPersistedValueFixer(object):
         """
         fixed_fields = []
         portal_type = obj.portal_type
-
-        reindexer = Reindexer(self)
 
         schemas = self.get_schemas_for_type(portal_type)
         for schema in schemas:
@@ -378,7 +386,7 @@ class NonPersistedValueFixer(object):
                     )
 
         if fixed_fields and self.reindex:
-            reindexer.reindex_if_necessary(obj, fixed_fields, brain)
+            self.reindexer.reindex_if_necessary(obj, fixed_fields, brain)
 
         fixed_fields.sort()
         return fixed_fields
@@ -726,6 +734,22 @@ class Reindexer(object):
 
         self._metadata_names = None
         self._index_names = None
+        self._solr_enabled = None
+        self.processed = 0
+
+    @property
+    def solr_connection_manager(self):
+        return queryUtility(ISolrConnectionManager)
+
+    @property
+    def solr_enabled(self):
+        """Boolean from registry to indicate whether Solr is enabled (memoized).
+        """
+        if self._solr_enabled is None:
+            self._solr_enabled = api.portal.get_registry_record(
+                'opengever.base.interfaces.ISearchSettings.use_solr',
+                default=False)
+        return self._solr_enabled
 
     @property
     def metadata_names(self):
@@ -766,6 +790,30 @@ class Reindexer(object):
                     obj, update_metadata, idxs_needing_reindex))
             self.catalog.reindexObject(obj, idxs=idxs_needing_reindex,
                                        update_metadata=update_metadata)
+            if self.solr_enabled:
+                self.reindex_in_solr(obj, idxs_needing_reindex, update_metadata)
+
+    def reindex_in_solr(self, obj, idxs, update_metadata):
+        if update_metadata:
+            # If update_metadata is True, we need to force an update of all
+            # indexes, irrespective of what `idxs` says. Setting `idxs` to
+            # something falsy will cause the handler to not do atomic updates.
+            idxs = None
+
+        handler = getMultiAdapter(
+            (obj, self.solr_connection_manager), ISolrIndexHandler)
+        handler.add(idxs)
+
+        if self.processed % 100 == 0:
+            self._commit_to_solr()
+
+        self.processed += 1
+
+    def _commit_to_solr(self):
+        conn = self.solr_connection_manager.connection
+        conn.commit(extract_after_commit=False)
+        print('Intermediate commit to solr (%d items '
+              'processed)' % self.processed)
 
     def get_metadata_indexers(self, obj):
         """Get a mapping of (metadata_name => indexer) of the indexers for
