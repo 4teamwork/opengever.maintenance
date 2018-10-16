@@ -33,6 +33,54 @@ some progress info and stats on STDERR/STDOUT.
 """
 
 
+class TextTable(object):
+
+    def __init__(self, column_definitions=None, separator=" | ", with_title=True):
+        self.column_definitions = column_definitions
+        self.separator = separator
+        self.data = []
+        self.with_title = with_title
+
+    def add_row(self, row):
+        self.data.append(row)
+
+    @property
+    def ncols(self):
+        if len(self.data) == 0:
+            return 0
+        return len(self.data[0])
+
+    def calculate_column_width(self):
+
+        self.widths = [0 for i in range(self.ncols)]
+        for row in self.data:
+            for i, el in enumerate(row):
+                if len(str(el)) > self.widths[i]:
+                    self.widths[i] = len(str(el))
+
+    def get_format_string(self):
+        self.calculate_column_width()
+        frmtstr = []
+        if not self.column_definitions:
+            self.column_definitions = "".join("<" for el in self.ncols)
+        for col_format, width in zip(self.column_definitions, self.widths):
+            frmtstr.append("{{:{}{}}}".format(col_format, width))
+        return self.separator.join(frmtstr)
+
+    def generate_output(self):
+        if len(self.data) == 0 or (self.with_title and len(self.data) == 1):
+            return ""
+        self.frmtstr = self.get_format_string()
+        output=""
+        start_index = 0
+        if self.with_title:
+            output += self.frmtstr.format(*self.data[0]) + "\n"
+            tot_width = sum(self.widths) + (len(self.widths)-1)*len(self.separator)
+            output += "{{:->{}}}\n".format(tot_width).format("")
+            start_index = 1
+        return output + "\n".join(self.frmtstr.format(*row) for row in self.data[start_index:])
+
+
 class SchemaNonConformingObjectsFinder(object):
 
     CSV_HEADER = "intid;portal_type;path;created;missing_fields;invalid_fields;failed_fields"
@@ -179,9 +227,9 @@ class SchemaNonConformingObjectsFinder(object):
 
     def display_stats(self):
 
-        global_frmt = "{:<50} {:>10} {:>10} {:>10} {:>10}\n"
-        detailed_frmt = "{:<50} {:>10} {:>10} {:>10} {:>10}\n"
-        error_frmt = "{:<50} {:<70} {:>10}\n"
+        global_frmt = "<>>>>"
+        detailed_frmt = "<>>>>"
+        error_frmt = "<<>"
 
         def log(line):
             sys.stdout.write(line)
@@ -193,7 +241,7 @@ class SchemaNonConformingObjectsFinder(object):
             total = conforming + non_conforming
             frac = int(100*non_conforming/float(total))
             type_label = self.get_portal_type_label(portal_type)
-            return global_frmt.format(type_label, total, conforming, non_conforming, frac)
+            return (type_label, total, conforming, non_conforming, frac)
 
         def get_detailed_stat_line(portal_type, field):
             missing = self.stats[portal_type][field]["missing"]
@@ -201,44 +249,48 @@ class SchemaNonConformingObjectsFinder(object):
             failed = self.stats[portal_type][field]["failed"]
             total = (self.stats["per_portal_type"][portal_type]["conforming"] +
                      self.stats["per_portal_type"][portal_type]["non_conforming"])
-            return detailed_frmt.format(field, total, missing, invalid, failed)
+            return (field, total, missing, invalid, failed)
 
         def get_error_stat_line(portal_type, field, err):
             count = self.stats[portal_type][field][err]
-            return error_frmt.format(field, err, count)
+            return (field, err, count)
 
         log("\n")
 
         log("{:=>134}\n".format(""))
         log("Overall statistics:\n\n")
-        log(global_frmt.format("Type", "Total", "Ok", "Not OK", "% Not OK"))
-        log("{:->94}\n".format(""))
-        log(get_global_stat_line("global", self.stats))
+        global_table = TextTable(global_frmt)
+        global_table.add_row(("Type", "Total", "Ok", "Not OK", "% Not OK"))
+        global_table.add_row(get_global_stat_line("global", self.stats))
 
         for portal_type in sorted(self.stats["per_portal_type"]):
-            log(get_global_stat_line(portal_type, self.stats["per_portal_type"]))
+            global_table.add_row(get_global_stat_line(portal_type, self.stats["per_portal_type"]))
+        log(global_table.generate_output())
 
         log("\n\n")
         for portal_type in sorted(self.stats):
             if portal_type in ("global", "per_portal_type"):
                 continue
+            log("\n\n")
             log("{:=>134}\n".format(""))
             log("\n\n")
             log("{}\n\n".format(portal_type))
 
-            log(detailed_frmt.format("Field", "Total", "Missing", "Invalid", "Failed"))
-            log("{:->94}\n".format(""))
+            detailed_table = TextTable(detailed_frmt)
+            detailed_table.add_row(("Field", "Total", "Missing", "Invalid", "Failed"))
             for field in sorted(self.stats[portal_type]):
-                log(get_detailed_stat_line(portal_type, field))
+                detailed_table.add_row(get_detailed_stat_line(portal_type, field))
+            log(detailed_table.generate_output())
             log("\n\n")
 
-            log(error_frmt.format("Field", "Error", "Count"))
-            log("{:->132}\n".format(""))
+            error_table = TextTable(error_frmt)
+            error_table.add_row(("Field", "Error", "Count"))
             for field in sorted(self.stats[portal_type]):
                 for err in sorted(self.stats[portal_type][field]):
                     if err in ("missing", "invalid", "failed"):
                         continue
-                    log(get_error_stat_line(portal_type, field, err))
+                    error_table.add_row(get_error_stat_line(portal_type, field, err))
+            log(error_table.generate_output())
             log("\n\n")
 
         log("\n")
