@@ -1,4 +1,7 @@
 from Acquisition import aq_base
+from App.config import getConfiguration
+from collections import OrderedDict
+from datetime import datetime
 from functools import wraps
 from opengever.contact.contact import IContact
 from opengever.document.behaviors import IBaseDocument
@@ -22,7 +25,9 @@ from Products.PluginIndexes.interfaces import IPluggableIndex
 from Products.PluginIndexes.KeywordIndex.KeywordIndex import KeywordIndex
 from Products.PluginIndexes.UUIDIndex.UUIDIndex import UUIDIndex
 from Products.ZCTextIndex.ZCTextIndex import ZCTextIndex
+import json
 import logging
+import os
 import threading
 import time
 import transaction
@@ -43,10 +48,11 @@ COMMON_TYPES = [
 
 class CacheStats(object):
 
-    def __init__(self, conn):
+    def __init__(self, conn, settings):
         self.conn = conn
         self.db = conn.db()
         self.stats_by_idx = {}
+        self.settings = settings
 
     def get_rss(self):
         """Returns this process' current RSS (in kb).
@@ -181,6 +187,35 @@ class CacheStats(object):
                  self.format_rss_delta(data['rss_delta']))
         log.info('Cache size growth: %s' %
                  self.format_obj_delta(data['obj_delta']))
+
+    def dump_warmup_stats(self):
+        """Dump warmup stats to a file in var/log/.
+
+        The file will be named uniqely per connection, and will be overwritten
+        on every warmup (for that instance and connection).
+        """
+        eventlog_path = get_eventlog_path()
+        logdir, logname = os.path.split(eventlog_path)
+        deployment_name = logdir.split(os.sep)[-3]
+        instance_name, _ = os.path.splitext(logname)
+        thread_name = threading.current_thread().name
+
+        # Choose a name that's unique per connection
+        dump_name = 'warmup-stats-%s-%s.json' % (instance_name, thread_name)
+        dump_path = os.path.join(logdir, dump_name)
+
+        stats_dump = OrderedDict()
+        stats_dump['timestamp'] = datetime.now().isoformat()
+        stats_dump['deployment'] = deployment_name
+        stats_dump['instance'] = instance_name
+        stats_dump['thread'] = thread_name
+        stats_dump['settings'] = self.settings
+        stats_dump['stats_by_idx'] = self.stats_by_idx
+
+        with open(dump_path, 'w') as stats_dump_file:
+            json.dump(stats_dump, stats_dump_file,
+                      indent=4, separators=(',', ': '))
+        log.info('Warmup stats dumped to %r' % dump_path)
 
 
 class WarmupView(BrowserView):
@@ -360,3 +395,19 @@ class WarmupView(BrowserView):
 
         # wid -> word
         list(lexicon._words.items())
+
+
+def get_eventlog_path():
+    """Determine the path of the instance's eventlog.
+    """
+    zconf = getConfiguration()
+    eventlog = getattr(zconf, 'eventlog', None)
+    if eventlog is None:
+        log.warn(
+            "Warmup: Couldn't find eventlog configuration in order "
+            "to determine logfile location!")
+        return None
+
+    handler_factories = eventlog.handler_factories
+    eventlog_path = handler_factories[0].section.path
+    return eventlog_path
