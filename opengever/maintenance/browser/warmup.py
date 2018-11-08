@@ -208,6 +208,9 @@ class WarmupView(BrowserView):
             log.info(
                 'Warming up instance (mode == {}, Thread {!r}, '
                 'Connection {!r})...'.format(mode, thread, conn))
+            log.info(
+                'Warmup settings: zctext_indexes={!r} lexicons={!r} unindexes={!r} '.format(
+                    zctext_indexes, lexicons, unindexes))
 
             if mode == 'minimal':
                 self._warmup_minimal()
