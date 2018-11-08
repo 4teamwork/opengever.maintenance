@@ -201,6 +201,7 @@ class WarmupView(BrowserView):
         zctext_indexes = self._to_bool(
             self.request.form.get('zctext_indexes', True))
         lexicons = self._to_bool(self.request.form.get('lexicons', True))
+        unindexes = self._to_bool(self.request.form.get('unindexes', False))
 
         # Elevate privileges in order to be able to load objects
         with elevated_privileges():
@@ -215,7 +216,9 @@ class WarmupView(BrowserView):
             elif mode == 'catalog':
                 self.cache_stats = CacheStats(conn)
                 self._warmup_catalog(
-                    zctext_indexes=zctext_indexes, lexicons=lexicons)
+                    zctext_indexes=zctext_indexes,
+                    lexicons=lexicons,
+                    unindexes=unindexes)
             else:
                 raise Exception(
                     'Warmup mode {!r} not recognized!'.format(mode))
@@ -246,12 +249,12 @@ class WarmupView(BrowserView):
 
         self._warmup_minimal()
 
-    def _warmup_catalog(self, zctext_indexes=True, lexicons=True):
+    def _warmup_catalog(self, zctext_indexes=True, lexicons=True, unindexes=False):
         log.info('')
         log.info('Stats before warmup (absolute):')
         self.cache_stats.display_current_stats()
 
-        self.warmup_catalog(zctext_indexes=zctext_indexes, lexicons=lexicons)
+        self.warmup_catalog(zctext_indexes=zctext_indexes, lexicons=lexicons, unindexes=unindexes)
         self.cache_stats.display_summary()
 
         log.info('')
@@ -259,7 +262,7 @@ class WarmupView(BrowserView):
         self.cache_stats.display_current_stats()
 
     @CacheStats.track
-    def warmup_catalog(self, zctext_indexes=True, lexicons=True):
+    def warmup_catalog(self, zctext_indexes=True, lexicons=True, unindexes=False):
         log.info('Loading metadata...')
         self.warmup_metadata()
 
@@ -269,7 +272,7 @@ class WarmupView(BrowserView):
             if not zctext_indexes and isinstance(index, ZCTextIndex):
                 continue
             log.info('Loading index %r...' % index_name)
-            self.warmup_index(index, lexicons=lexicons)
+            self.warmup_index(index, lexicons=lexicons, unindexes=unindexes)
 
         log.info('Done warming up catalog.')
 
@@ -278,7 +281,7 @@ class WarmupView(BrowserView):
         list(self.catalog._catalog.data.items())
 
     @CacheStats.track
-    def warmup_index(self, index, lexicons=True):
+    def warmup_index(self, index, lexicons=True, unindexes=False):
         """Load internal index data structures by iterating over contents of
         *BTrees and *TreeSets, causing their respective buckets to be loaded.
         """
@@ -287,8 +290,9 @@ class WarmupView(BrowserView):
             for key, value in index._index.items():
                 list(value)
 
-            # docid -> field value
-            list(index._unindex.items())
+            if unindexes:
+                # docid -> field value
+                list(index._unindex.items())
 
         elif isinstance(index, ZCTextIndex):
             # wid -> doc2score
@@ -303,7 +307,8 @@ class WarmupView(BrowserView):
 
         elif isinstance(index, BooleanIndex):
             list(index._index)
-            list(index._unindex.items())
+            if unindexes:
+                list(index._unindex.items())
 
         elif isinstance(index, ExtendedPathIndex):
             # path component -> level -> set of docids
@@ -319,14 +324,16 @@ class WarmupView(BrowserView):
             for path, docid in index._index_items.items():
                 assert isinstance(docid, int)
 
-            # docid -> path
-            for docid, path in index._unindex.items():
-                assert isinstance(docid, int)
+            if unindexes:
+                # docid -> path
+                for docid, path in index._unindex.items():
+                    assert isinstance(docid, int)
 
         elif isinstance(index, DateRangeIndex):
-            # no forward index
-            for docid, date_range in index._unindex.items():
-                assert isinstance(docid, int)
+            if unindexes:
+                # no forward index
+                for docid, date_range in index._unindex.items():
+                    assert isinstance(docid, int)
 
         elif isinstance(index, GopipIndex):
             # not a real index
@@ -334,7 +341,8 @@ class WarmupView(BrowserView):
 
         elif isinstance(index, UUIDIndex):
             list(index._index.items())
-            list(index._unindex.items())
+            if unindexes:
+                list(index._unindex.items())
 
         else:
             log.warn('Unexpected index type %r for index %r, skipping.' %
