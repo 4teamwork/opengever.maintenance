@@ -24,6 +24,12 @@ COMMON_TYPES = [
     ITaskTemplate,
 ]
 
+WARMUP_INDEXES = [
+    'allowedRolesAndUsers',
+    'trashed',
+    'object_provides',
+]
+
 
 class WarmupView(BrowserView):
     """View to warm up a GEVER instance.
@@ -43,6 +49,8 @@ class WarmupView(BrowserView):
             self._warmup_medium()
         elif mode == 'full':
             self._warmup_full()
+        elif mode == 'catalog':
+            self._warmup_catalog()
         else:
             raise Exception('Warmup mode {!r} not recognized!'.format(mode))
 
@@ -81,3 +89,26 @@ class WarmupView(BrowserView):
 
         self._warmup_medium()
         self._warmup_minimal()
+
+    def _warmup_catalog(self):
+        # Load catalog BTrees and forward index BTrees of the most used indexes
+
+        def load_btree(node, level=0, maxlevel=2):
+            if level >= maxlevel:
+                return
+            bucket = getattr(node, '_firstbucket', None)
+            while bucket is not None:
+                for key in bucket.keys():
+                    load_btree(key, level+1, maxlevel)
+                if hasattr(bucket, 'values'):
+                    for value in bucket.values():
+                        load_btree(value, level+1, maxlevel)
+                bucket = bucket._next
+
+        catalog = api.portal.get_tool('portal_catalog')
+        load_btree(catalog._catalog.uids)
+        load_btree(catalog._catalog.paths)
+        load_btree(catalog._catalog.data)
+        for index_name in WARMUP_INDEXES:
+            index = catalog._catalog.indexes[index_name]
+            load_btree(index._index)
