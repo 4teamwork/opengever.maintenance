@@ -1,0 +1,13 @@
+<configure xmlns="http://namespaces.zope.org/zope"
+           xmlns:browser="http://namespaces.zope.org/browser"
+           i18n_domain="collective.monitor">
+
+    <include package="five.z2monitor"/>
+
+    <utility
+        component=".health.health_check"
+        provides="zc.z3monitor.interfaces.IZ3MonitorPlugin"
+        name="health_check"
+        />
+
+</configure>
