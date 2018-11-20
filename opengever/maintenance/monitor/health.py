@@ -1,4 +1,5 @@
 from Zope2 import app as App
+from opengever.maintenance.browser import warmup
 
 
 def health_check(connection):
@@ -15,6 +16,10 @@ def health_check(connection):
                     "Error: Database '{}'' disconnected.\n".format(dbname))
     finally:
         app._p_jar.close()
+
+    if warmup.warmup_in_progress:
+        ok = False
+        connection.write("Warmup in progress\n")
 
     if ok:
         connection.write('OK\n')
