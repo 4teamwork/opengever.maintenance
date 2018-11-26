@@ -33,6 +33,7 @@ setup(name='opengever.maintenance',
       zip_safe=False,
       install_requires=[
           'apachelog',
+          'five.z2monitor',
           'opengever.core',
           'Plone',
           'plone.api',

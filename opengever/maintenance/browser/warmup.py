@@ -30,29 +30,37 @@ WARMUP_INDEXES = [
     'object_provides',
 ]
 
+warmup_in_progress = False
+
 
 class WarmupView(BrowserView):
     """View to warm up a GEVER instance.
     """
 
     def __call__(self):
-        # XXX: Check for filesystem token or ManagePortal permission
-        transaction.doom()
-        self.catalog = api.portal.get_tool('portal_catalog')
+        global warmup_in_progress
+        warmup_in_progress = True
 
-        mode = self.request.form.get('mode', 'minimal')
-        log.info('Warming up instance (mode == {})...'.format(mode))
+        try:
+            transaction.doom()
+            self.catalog = api.portal.get_tool('portal_catalog')
 
-        if mode == 'minimal':
-            self._warmup_minimal()
-        elif mode == 'medium':
-            self._warmup_medium()
-        elif mode == 'full':
-            self._warmup_full()
-        elif mode == 'catalog':
-            self._warmup_catalog()
-        else:
-            raise Exception('Warmup mode {!r} not recognized!'.format(mode))
+            mode = self.request.form.get('mode', 'minimal')
+            log.info('Warming up instance (mode == {})...'.format(mode))
+
+            if mode == 'minimal':
+                self._warmup_minimal()
+            elif mode == 'medium':
+                self._warmup_medium()
+            elif mode == 'full':
+                self._warmup_full()
+            elif mode == 'catalog':
+                self._warmup_catalog()
+            else:
+                raise Exception('Warmup mode {!r} not recognized!'.format(mode))
+
+        finally:
+            warmup_in_progress = False
 
         log.info('Done warming up.')
         return 'OK'
