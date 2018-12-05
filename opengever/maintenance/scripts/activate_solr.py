@@ -39,7 +39,7 @@ def main():
     portal = setup_plone(app, options)
     portal.REQUEST.response.stdout = StringIO()
     if not options.no_indexing:
-        reindex(portal)
+        sync(portal)
 
     # Abort current transaction after Solr reindexing because we didn't modify
     # any ZODB data and we don't want to retry the transaction because of a
@@ -56,11 +56,11 @@ def main():
     trx.commit()
 
 
-def reindex(portal):
-    logger.info('Reindexing Solr...')
+def sync(portal):
+    logger.info('Indexing Solr using sync mode')
     solr_maintenance = queryMultiAdapter(
         (portal, portal.REQUEST), name=u'solr-maintenance')
-    solr_maintenance.reindex()
+    solr_maintenance.sync()
     solr_maintenance.optimize()
 
 
