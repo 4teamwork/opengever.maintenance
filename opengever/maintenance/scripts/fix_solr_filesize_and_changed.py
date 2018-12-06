@@ -71,7 +71,7 @@ def reindex(portal):
     solr_maintenance = queryMultiAdapter(
         (portal, portal.REQUEST), name=u'solr-maintenance')
 
-    solr_maintenance.reindex(idxs=['filesize'], doom=False)
+    solr_maintenance.reindex(idxs=['filesize', 'changed'], doom=False)
 
 
 if __name__ == '__main__':
