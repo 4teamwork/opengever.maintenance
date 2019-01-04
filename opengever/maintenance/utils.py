@@ -2,9 +2,14 @@ from AccessControl.SecurityManagement import getSecurityManager
 from AccessControl.SecurityManagement import newSecurityManager
 from AccessControl.SecurityManagement import setSecurityManager
 from AccessControl.User import UnrestrictedUser as BaseUnrestrictedUser
+from App.config import getConfiguration
 from contextlib import contextmanager
+from datetime import datetime
 from plone import api
 from zope.globalrequest import getRequest
+import logging
+import os
+import sys
 
 
 def join_lines(fn):
@@ -129,3 +134,38 @@ class TextTable(object):
             file.write(frmtstr.format(*row)+"\n")
 
 
+class LogFilePathFinder(object):
+
+    def __init__(self):
+        self.root_logger = logging.root
+
+    def get_logfile_path(self, filename_basis, add_timestamp=True, extension="log"):
+        log_dir = self.get_logdir()
+        filename = filename_basis
+        if add_timestamp:
+            ts = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
+            filename += "-{}".format(ts)
+        filename += ".{}".format(extension)
+        return os.path.join(log_dir, filename)
+
+    def get_logdir(self):
+        """Determine the log directory.
+        This will be derived from Zope2's EventLog location, in order to not
+        have to figure out the path to var/log/ ourselves.
+        """
+        zconf = getConfiguration()
+        eventlog = getattr(zconf, 'eventlog', None)
+
+        if eventlog is None:
+            self.root_logger.error('')
+            self.root_logger.error(
+                "Couldn't find eventlog configuration in order to determine "
+                "logfile location - aborting!")
+            self.root_logger.error('')
+            sys.exit(1)
+
+        handler_factories = eventlog.handler_factories
+        eventlog_path = handler_factories[0].section.path
+        assert eventlog_path.endswith('.log')
+        log_dir = os.path.dirname(eventlog_path)
+        return log_dir
