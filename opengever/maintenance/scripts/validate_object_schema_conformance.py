@@ -5,6 +5,7 @@ from datetime import datetime
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.maintenance.utils import TextTable
 from plone import api
 from plone.dexterity.utils import iterSchemataForType
 from zope.component import getUtility
@@ -31,54 +32,6 @@ Options:
 This script logs a detailed CSV report and a summary to var/log/, and displays
 some progress info and stats on STDERR/STDOUT.
 """
-
-
-class TextTable(object):
-
-    def __init__(self, column_definitions=None, separator=" | ", with_title=True):
-        self.column_definitions = column_definitions
-        self.separator = separator
-        self.data = []
-        self.with_title = with_title
-
-    def add_row(self, row):
-        self.data.append(row)
-
-    @property
-    def ncols(self):
-        if len(self.data) == 0:
-            return 0
-        return len(self.data[0])
-
-    def calculate_column_width(self):
-
-        self.widths = [0 for i in range(self.ncols)]
-        for row in self.data:
-            for i, el in enumerate(row):
-                if len(str(el)) > self.widths[i]:
-                    self.widths[i] = len(str(el))
-
-    def get_format_string(self):
-        self.calculate_column_width()
-        frmtstr = []
-        if not self.column_definitions:
-            self.column_definitions = "".join("<" for el in self.ncols)
-        for col_format, width in zip(self.column_definitions, self.widths):
-            frmtstr.append("{{:{}{}}}".format(col_format, width))
-        return self.separator.join(frmtstr)
-
-    def generate_output(self):
-        if len(self.data) == 0 or (self.with_title and len(self.data) == 1):
-            return ""
-        self.frmtstr = self.get_format_string()
-        output=""
-        start_index = 0
-        if self.with_title:
-            output += self.frmtstr.format(*self.data[0]) + "\n"
-            tot_width = sum(self.widths) + (len(self.widths)-1)*len(self.separator)
-            output += "{{:->{}}}\n".format(tot_width).format("")
-            start_index = 1
-        return output + "\n".join(self.frmtstr.format(*row) for row in self.data[start_index:])
 
 
 class SchemaNonConformingObjectsFinder(object):

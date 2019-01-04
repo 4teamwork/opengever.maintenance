@@ -55,3 +55,69 @@ def elevated_privileges():
     finally:
         # Restore the old security manager
         setSecurityManager(old_manager)
+
+
+class TextTable(object):
+    """ class used to create a text table that can be printed to stout or to log
+    for example.
+
+    column_definitions: a string or list of python format specifiers, for example "<>"
+                        for a first column left aligned and a second column right aligned
+
+    separator:          string used to separate elements of a row
+
+    with_title:         whether the first row is a title row. Title row will be
+                        separated from data by a horizontal line
+    """
+    def __init__(self, column_definitions=None, separator=" | ", with_title=True):
+        self.column_definitions = column_definitions
+        self.separator = separator
+        self.data = []
+        self.with_title = with_title
+
+    def add_row(self, row):
+        self.data.append(row)
+
+    @property
+    def nrows(self):
+        if len(self.data) == 0 or (self.with_title and len(self.data) == 1):
+            return 0
+        if self.with_title:
+            return len(self.data) - 1
+        return len(self.data)
+
+    @property
+    def ncols(self):
+        if len(self.data) == 0:
+            return 0
+        return len(self.data[0])
+
+    def calculate_column_width(self):
+
+        self.widths = [0 for i in range(self.ncols)]
+        for row in self.data:
+            for i, el in enumerate(row):
+                if len(str(el)) > self.widths[i]:
+                    self.widths[i] = len(str(el))
+
+    def get_format_string(self):
+        self.calculate_column_width()
+        frmtstr = []
+        if not self.column_definitions:
+            self.column_definitions = "".join("<" for i in range(self.ncols))
+        for col_format, width in zip(self.column_definitions, self.widths):
+            frmtstr.append("{{:{}{}}}".format(col_format, width))
+        return self.separator.join(frmtstr)
+
+    def generate_output(self):
+        if len(self.data) == 0 or (self.with_title and len(self.data) == 1):
+            return ""
+        self.frmtstr = self.get_format_string()
+        output = ""
+        start_index = 0
+        if self.with_title:
+            output += self.frmtstr.format(*self.data[0]) + "\n"
+            tot_width = sum(self.widths) + (len(self.widths) - 1) * len(self.separator)
+            output += "{{:->{}}}\n".format(tot_width).format("")
+            start_index = 1
+        return output + "\n".join(self.frmtstr.format(*row) for row in self.data[start_index:])
