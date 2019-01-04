@@ -109,15 +109,23 @@ class TextTable(object):
             frmtstr.append("{{:{}{}}}".format(col_format, width))
         return self.separator.join(frmtstr)
 
-    def generate_output(self):
+    def generate_output(self, frmtstr=None):
         if len(self.data) == 0 or (self.with_title and len(self.data) == 1):
             return ""
-        self.frmtstr = self.get_format_string()
+        if frmtstr is None:
+            frmtstr = self.get_format_string()
         output = ""
         start_index = 0
         if self.with_title:
-            output += self.frmtstr.format(*self.data[0]) + "\n"
+            output += frmtstr.format(*self.data[0]) + "\n"
             tot_width = sum(self.widths) + (len(self.widths) - 1) * len(self.separator)
             output += "{{:->{}}}\n".format(tot_width).format("")
             start_index = 1
-        return output + "\n".join(self.frmtstr.format(*row) for row in self.data[start_index:])
+        return output + "\n".join(frmtstr.format(*row) for row in self.data[start_index:])
+
+    def write_csv(self, file):
+        frmtstr = " , ".join("{}" for i in range(self.ncols))
+        for row in self.data:
+            file.write(frmtstr.format(*row)+"\n")
+
+
