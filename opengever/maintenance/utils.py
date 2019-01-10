@@ -6,6 +6,8 @@ from App.config import getConfiguration
 from contextlib import contextmanager
 from datetime import datetime
 from plone import api
+from Products.CMFDiffTool.utils import safe_unicode
+from Products.CMFDiffTool.utils import safe_utf8
 from zope.globalrequest import getRequest
 import logging
 import os
@@ -74,14 +76,14 @@ class TextTable(object):
     with_title:         whether the first row is a title row. Title row will be
                         separated from data by a horizontal line
     """
-    def __init__(self, column_definitions=None, separator=" | ", with_title=True):
+    def __init__(self, column_definitions=None, separator=u" | ", with_title=True):
         self.column_definitions = column_definitions
         self.separator = separator
         self.data = []
         self.with_title = with_title
 
     def add_row(self, row):
-        self.data.append(row)
+        self.data.append(map(safe_unicode, row))
 
     @property
     def nrows(self):
@@ -102,36 +104,36 @@ class TextTable(object):
         self.widths = [0 for i in range(self.ncols)]
         for row in self.data:
             for i, el in enumerate(row):
-                if len(str(el)) > self.widths[i]:
-                    self.widths[i] = len(str(el))
+                if len(el) > self.widths[i]:
+                    self.widths[i] = len(el)
 
     def get_format_string(self):
         self.calculate_column_width()
         frmtstr = []
         if not self.column_definitions:
-            self.column_definitions = "".join("<" for i in range(self.ncols))
+            self.column_definitions = u"".join("<" for i in range(self.ncols))
         for col_format, width in zip(self.column_definitions, self.widths):
-            frmtstr.append("{{:{}{}}}".format(col_format, width))
+            frmtstr.append(u"{{:{}{}}}".format(col_format, width))
         return self.separator.join(frmtstr)
 
     def generate_output(self, frmtstr=None):
         if len(self.data) == 0 or (self.with_title and len(self.data) == 1):
-            return ""
+            return u""
         if frmtstr is None:
             frmtstr = self.get_format_string()
-        output = ""
+        output = u""
         start_index = 0
         if self.with_title:
-            output += frmtstr.format(*self.data[0]) + "\n"
+            output += frmtstr.format(*self.data[0]) + u"\n"
             tot_width = sum(self.widths) + (len(self.widths) - 1) * len(self.separator)
-            output += "{{:->{}}}\n".format(tot_width).format("")
+            output += u"{{:->{}}}\n".format(tot_width).format(u"")
             start_index = 1
-        return output + "\n".join(frmtstr.format(*row) for row in self.data[start_index:])
+        return output + u"\n".join(frmtstr.format(*row) for row in self.data[start_index:])
 
     def write_csv(self, file):
-        frmtstr = " , ".join("{}" for i in range(self.ncols))
+        frmtstr = u" , ".join(u"{}" for i in range(self.ncols))
         for row in self.data:
-            file.write(frmtstr.format(*row)+"\n")
+            file.write(safe_utf8(frmtstr.format(*row) + u"\n"))
 
 
 class LogFilePathFinder(object):
