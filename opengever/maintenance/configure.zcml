@@ -16,4 +16,12 @@
     <include package=".browser" />
     <include package=".monitor" />
 
+    <adapter
+        factory=".migrations.LocalRolesAssignmentMigration"
+        provides="ftw.usermigration.interfaces.IPreMigrationHook"
+        for="Products.CMFPlone.interfaces.siteroot.IPloneSiteRoot
+             zope.publisher.interfaces.browser.IBrowserRequest"
+        name="GEVER: Local roles assignments"
+        />
+
 </configure>
