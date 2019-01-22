@@ -5,6 +5,8 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to fix filenames with missing extensions. [njohner]
+
 - Add script to check object conformance to their schema. [njohner]
 
 - Add script to fix journal pdf document date. [njohner]
