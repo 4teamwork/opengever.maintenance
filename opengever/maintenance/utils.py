@@ -12,6 +12,7 @@ from zope.globalrequest import getRequest
 import logging
 import os
 import sys
+import textwrap
 
 
 def join_lines(fn):
@@ -76,11 +77,13 @@ class TextTable(object):
     with_title:         whether the first row is a title row. Title row will be
                         separated from data by a horizontal line
     """
-    def __init__(self, column_definitions=None, separator=u" | ", with_title=True):
+    def __init__(self, column_definitions=None, separator=u" | ", with_title=True, col_max_width=None):
         self.column_definitions = column_definitions
         self.separator = separator
         self.data = []
         self.with_title = with_title
+        self.col_max_width = col_max_width
+        self._wrap = False
 
     def add_row(self, row):
         self.data.append(map(safe_unicode, row))
@@ -100,12 +103,18 @@ class TextTable(object):
         return len(self.data[0])
 
     def calculate_column_width(self):
-
         self.widths = [0 for i in range(self.ncols)]
         for row in self.data:
             for i, el in enumerate(row):
                 if len(el) > self.widths[i]:
                     self.widths[i] = len(el)
+        if not self.col_max_width:
+            return
+        self._wrap = False
+        for i, width in enumerate(self.widths):
+            if width > self.col_max_width:
+                self._wrap = True
+                self.widths[i] = self.col_max_width
 
     def get_format_string(self):
         self.calculate_column_width()
@@ -128,7 +137,21 @@ class TextTable(object):
             tot_width = sum(self.widths) + (len(self.widths) - 1) * len(self.separator)
             output += u"{{:->{}}}\n".format(tot_width).format(u"")
             start_index = 1
-        return output + u"\n".join(frmtstr.format(*row) for row in self.data[start_index:])
+        if not self._wrap:
+            return output + u"\n".join(frmtstr.format(*row) for row in self.data[start_index:])
+
+        wrapper = textwrap.TextWrapper(width=self.col_max_width)
+        for row in self.data[start_index:]:
+            for line in self.wrap_row(wrapper, row):
+                output += frmtstr.format(*line) + "\n"
+        return output
+
+    def wrap_row(self, wrapper, row):
+        wrapped_row = map(wrapper.wrap, row)
+        nlines = max(map(len, wrapped_row))
+        # Make sure every cell has the same number of lines (elements in the list)
+        # We add an empty line to separate rows in the table, hence "nlines + 1"
+        return [[cell[i] if i < len(cell) else "" for cell in wrapped_row] for i in range(nlines + 1)]
 
     def write_csv(self, file):
         frmtstr = u" , ".join(u"{}" for i in range(self.ncols))

@@ -7,6 +7,8 @@ Changelog
 
 - Add script to fix filenames with missing extensions. [njohner]
 
+- Add script to list proposals with no returned excerpt. [njohner]
+
 - Add script to check object conformance to their schema. [njohner]
 
 - Add script to fix journal pdf document date. [njohner]
