@@ -6,6 +6,7 @@ Options:
   -n : dry run
   -p : path in which to search files
 """
+from opengever.base.filename import GeverFileNameNormalizer
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
@@ -26,6 +27,7 @@ class FilenameExtensionFixer(object):
         self.skipped = TextTable()
         self.skipped.add_row(("Path", "Filename", "Mimetype"))
         self.registry = api.portal.get_tool("mimetypes_registry")
+        self.normalizer = GeverFileNameNormalizer()
 
     def fix_extensions(self):
         for document in self.get_documents_with_missing_extension():
@@ -54,13 +56,12 @@ class FilenameExtensionFixer(object):
         """
         document_brains = api.content.find(portal_type=['opengever.document.document', 'ftw.mail.mail'],
                                            path=self.search_path)
-
         for brain in document_brains:
             document = brain.getObject()
             if not document.has_file():
                 continue
             filename = document.get_filename()
-            extension = os.path.splitext(filename)[1]
+            extension = self.normalizer.split_filename_extension(filename)[1]
             if not extension:
                 yield document
 
