@@ -43,6 +43,9 @@ class FilenameExtensionFixer(object):
         try:
             mimetype = document.get_mimetype()[0]
             extension = self.registry.lookup(mimetype)[0].extensions[0]
+            if extension == "pjpg":
+                if "jpg" in self.registry.lookup(mimetype)[0].extensions:
+                    extension = "jpg"
             new_filename = u"{}.{}".format(filename, extension)
             document.get_file().filename = new_filename
             self.corrected.add_row((path, filename, mimetype, new_filename))
