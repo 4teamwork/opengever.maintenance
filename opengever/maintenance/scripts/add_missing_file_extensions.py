@@ -13,7 +13,6 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
 from plone import api
-import os
 import sys
 import transaction
 
@@ -22,6 +21,7 @@ class FilenameExtensionFixer(object):
 
     def __init__(self, options):
         self.search_path = options.path
+        self.creator = options.creator
         self.corrected = TextTable()
         self.corrected.add_row(("Path", "Filename", "Mimetype", "New filename"))
         self.skipped = TextTable()
@@ -57,8 +57,12 @@ class FilenameExtensionFixer(object):
     def get_documents_with_missing_extension(self):
         """ Search for documents with missing filename extensions.
         """
-        document_brains = api.content.find(portal_type=['opengever.document.document', 'ftw.mail.mail'],
-                                           path=self.search_path)
+        query = {"portal_type": ['opengever.document.document', 'ftw.mail.mail'],
+                 "path": self.search_path}
+        if self.creator:
+            query["Creator"] = self.creator
+        document_brains = api.content.find(**query)
+
         for brain in document_brains:
             document = brain.getObject()
             if not document.has_file():
@@ -77,6 +81,9 @@ def main():
     parser.add_option("-p", "--path", action="store",
                       dest="path", type="string", default="",
                       help="restrict search to given path")
+    parser.add_option("--creator", action="store",
+                      dest="creator", type="string", default="",
+                      help="restrict search to documents created by the given user")
     (options, args) = parser.parse_args()
 
     if not len(args) == 0:
@@ -89,6 +96,9 @@ def main():
 
     if options.path:
         print "restricting search to {}".format(options.path)
+
+    if options.creator:
+        print "restricting search to documents created by {}".format(options.creator)
 
     app = setup_app()
     setup_plone(app)
