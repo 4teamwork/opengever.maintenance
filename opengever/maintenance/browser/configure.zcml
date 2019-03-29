@@ -104,4 +104,11 @@
       permission="cmf.ManagePortal"
       />
 
+  <browser:page
+      for="zope.interface.Interface"
+      name="archival-pdf-report"
+      class=".archival_pdf_report.ArchivalPDFReport"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>
