@@ -13,6 +13,7 @@ class Surgery(object):
     def __init__(self, catalog, unhealthy_rid):
         self.catalog = catalog
         self.unhealthy_rid = unhealthy_rid
+        self.surgery_log = []
 
     def perform(self):
         raise NotImplementedError
@@ -21,14 +22,30 @@ class Surgery(object):
         for index in self.catalog.indexes.values():
             index.unindex_object(rid)  # fail in case of no `unindex_object`
 
+        self.surgery_log.append(
+            "Removed rid from all catalog indexes.")
+
     def delete_rid_from_paths(self, rid):
         del self.catalog.paths[rid]
+
+        self.surgery_log.append(
+            "Removed rid from paths (the rid->path mapping).")
 
     def delete_rid_from_metadata(self, rid):
         del self.catalog.data[rid]
 
+        self.surgery_log.append(
+            "Removed rid from catalog metadata.")
+
     def change_catalog_length(self, delta):
         self.catalog._length.change(delta)
+
+    def write_result(self, formatter):
+        """Write surgery result to formatter."""
+
+        formatter.info("{}:".format(self.unhealthy_rid))
+        for entry in self.surgery_log:
+            formatter.info('\t- {}'.format(entry))
 
 
 class RemoveExtraRid(Surgery):
@@ -47,7 +64,7 @@ class RemoveExtraRid(Surgery):
                 "Expected exactly one affected path, got: {}"
                 .format(", ".join(self.unhealthy_rid.paths)))
 
-        path = list(self.unhealthy_rid.paths)[0]
+        path = self.unhealthy_rid.paths[0]
         if self.catalog.uids[path] == rid:
             raise CantPerformSurgery(
                 "Expected different rid in catalog uids mapping for path {}"
@@ -57,8 +74,6 @@ class RemoveExtraRid(Surgery):
         self.delete_rid_from_paths(rid)
         self.delete_rid_from_metadata(rid)
         self.change_catalog_length(-1)
-
-        return "Removed {} from catalog.".format(rid)
 
 
 class RemoveOrphanedRid(Surgery):
@@ -94,8 +109,6 @@ class RemoveOrphanedRid(Surgery):
         self.delete_rid_from_metadata(rid)
         self.change_catalog_length(-1)
 
-        return "Removed {} from catalog.".format(rid)
-
 
 class CatalogDoctor(object):
     """Performs surgery for an unhealthy_rid, if possible.
@@ -127,11 +140,13 @@ class CatalogDoctor(object):
         return self.surgeries.get(symptoms, None)
 
     def perform_surgery(self):
-        surgery = self.get_surgery()
-        if not surgery:
+        surgery_cls = self.get_surgery()
+        if not surgery_cls:
             return None
 
-        return surgery(self.catalog, self.unhealthy_rid).perform()
+        surgery = surgery_cls(self.catalog, self.unhealthy_rid)
+        surgery.perform()
+        return surgery
 
 
 class CantPerformSurgery(Exception):
@@ -162,8 +177,10 @@ class CatalogHealthCheck(object):
         uids_values = set(self.catalog.uids.values())
         data = self.catalog.data
 
+        uid_index = self.catalog.indexes['UID']
         result.report_catalog_stats(
-            len(self.catalog), len(uids), len(paths), len(data))
+            len(self.catalog), len(uids), len(paths), len(data),
+            len(uid_index), len(uid_index._index), len(uid_index._unindex))
 
         for path, rid in uids.items():
             if rid not in paths:
@@ -218,11 +235,11 @@ class UnhealthyRid(object):
     """
     def __init__(self, rid):
         self.rid = rid
-        self.paths = set()
+        self._paths = set()
         self._catalog_symptoms = set()
 
     def attach_path(self, path):
-        self.paths.add(path)
+        self._paths.add(path)
 
     def report_catalog_symptom(self, name):
         """Report a symptom found in the the catalog."""
@@ -233,12 +250,19 @@ class UnhealthyRid(object):
     def catalog_symptoms(self):
         return tuple(sorted(self._catalog_symptoms))
 
-    def write_result(self, formatter):
+    @property
+    def paths(self):
+        return tuple(sorted(self._paths))
+
+    def __str__(self):
         if self.paths:
             paths = ", ".join("'{}'".format(p) for p in self.paths)
         else:
             paths = "--no path--"
-        formatter.info("rid: {} ({})".format(self.rid, paths))
+        return "rid {} ({})".format(self.rid, paths)
+
+    def write_result(self, formatter):
+        formatter.info("{}:".format(self))
         for symptom in self.catalog_symptoms:
             formatter.info('\t- {}'.format(symptom))
 
@@ -253,15 +277,25 @@ class HealthCheckResult(object):
         self.uids_length = None
         self.paths_length = None
         self.data_length = None
+        self.uid_index_claimed_length = None
+        self.uid_index_index_length = None
+        self.uid_index_unindex_length = None
 
     def get_unhealthy_rids(self):
         return self.unhealthy_rids.values()
 
-    def report_catalog_stats(self, claimed_length, uids_length, paths_length, data_length):
+    def report_catalog_stats(self, claimed_length, uids_length, paths_length,
+                             data_length,
+                             uid_index_claimed_length,
+                             uid_index_index_length,
+                             uid_index_unindex_length):
         self.claimed_length = claimed_length
         self.uids_length = uids_length
         self.paths_length = paths_length
         self.data_length = data_length
+        self.uid_index_claimed_length = uid_index_claimed_length
+        self.uid_index_index_length = uid_index_index_length
+        self.uid_index_unindex_length = uid_index_unindex_length
 
     def _make_unhealthy_rid(self, rid, path=None):
         if rid not in self.unhealthy_rids:
@@ -294,6 +328,9 @@ class HealthCheckResult(object):
             == self.uids_length
             == self.paths_length
             == self.data_length
+            == self.uid_index_claimed_length
+            == self.uid_index_index_length
+            == self.uid_index_unindex_length
         )
 
     def write_result(self, formatter):
@@ -311,6 +348,12 @@ class HealthCheckResult(object):
             formatter.info(" uids length: {}".format(self.uids_length))
             formatter.info(" paths length: {}".format(self.paths_length))
             formatter.info(" metadata length: {}".format(self.data_length))
+            formatter.info(" uid index claimed length: {}".format(
+                self.uid_index_claimed_length))
+            formatter.info(" uid index index length: {}".format(
+                self.uid_index_index_length))
+            formatter.info(" uid index unindex length: {}".format(
+                self.uid_index_unindex_length))
 
         if self.is_index_data_healthy():
             formatter.info("Index data is healthy.")
@@ -335,6 +378,49 @@ class ConsoleOutput(object):
         print(msg, file=sys.stderr)
 
 
+def healthcheck_command(portal_catalog, formatter):
+    result = CatalogHealthCheck(catalog=portal_catalog).run()
+    result.write_result(formatter)
+    return result
+
+
+def doctor(portal_catalog):
+    formatter = ConsoleOutput()
+
+    result = healthcheck_command(portal_catalog, formatter)
+    if result.is_healthy():
+        transaction.doom()  # extra paranoia, prevent erroneous commit
+        formatter.info('Catalog is healthy, no surgery is needed.')
+        return
+
+    there_is_nothing_we_can_do = []
+    formatter.info('Performing surgery:')
+    for unhealthy_rid in result.get_unhealthy_rids():
+        doctor = CatalogDoctor(result.catalog, unhealthy_rid)
+        if doctor.can_perform_surgery():
+            surgery = doctor.perform_surgery()
+            surgery.write_result(formatter)
+            formatter.info('')
+        else:
+            there_is_nothing_we_can_do.append(unhealthy_rid)
+
+    if there_is_nothing_we_can_do:
+        formatter.info('The following unhealthy rids could not be fixed:')
+        for unhealthy_rid in there_is_nothing_we_can_do:
+            unhealthy_rid.write_result(formatter)
+            formatter.info('')
+
+    formatter.info('Performing post-surgery healthcheck:')
+    post_result = healthcheck_command(portal_catalog, formatter)
+    if not post_result.is_healthy():
+        transaction.doom()   # extra paranoia, prevent erroneous commit
+        formatter.info('Not all health problems could be fixed, aborting.')
+        return
+
+    formatter.info('Surgery would have been successful, but was aborted '
+                   'due to dryrun!')
+
+
 if __name__ == '__main__':
     app = setup_app()
 
@@ -342,29 +428,7 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     plone = setup_plone(app, options)
+    portal_catalog = plone.portal_catalog
 
     transaction.doom()
-
-    result = CatalogHealthCheck(catalog=plone.portal_catalog).run()
-    result.write_result(formatter=ConsoleOutput())
-
-    formatter = ConsoleOutput()
-    formatter.info('Performing surgery:')
-    there_is_nothing_we_can_do = []
-
-    for unhealthy_rid in result.get_unhealthy_rids():
-        doctor = CatalogDoctor(result.catalog, unhealthy_rid)
-        if doctor.can_perform_surgery():
-            formatter.info(doctor.perform_surgery())
-        else:
-            there_is_nothing_we_can_do.append(unhealthy_rid)
-
-    if there_is_nothing_we_can_do:
-        formatter.info('The following unhealthy rids could not be fixed')
-        for unhealthy_rid in there_is_nothing_we_can_do:
-            unhealthy_rid.write_result(formatter)
-
-    formatter.info('')
-    formatter.info('Performing post-surgery checkup:')
-    result_post = CatalogHealthCheck(catalog=plone.portal_catalog).run()
-    result_post.write_result(formatter=ConsoleOutput())
+    doctor(portal_catalog)
