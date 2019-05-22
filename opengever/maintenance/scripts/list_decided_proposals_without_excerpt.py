@@ -18,11 +18,16 @@ class DecidedProposalWithoutExcerptLister(object):
 
     def __init__(self):
         self.table = TextTable(col_max_width=60)
-        self.table.add_row(["proposal path", "proposal title"])
+        self.table.add_row(["proposal path", "proposal title", "has_excerpts"])
+        self.table.nrows_without_excerpts = 0
 
     def list_proposals_without_excerpt(self):
         for proposal in self.get_proposals_without_excerpt():
-            self.table.add_row([proposal.physical_path, proposal.title])
+            submitted_proposal = proposal.resolve_submitted_proposal()
+            has_excerpts = bool(submitted_proposal.get_excerpts(unrestricted=True))
+            self.table.add_row([proposal.physical_path, proposal.title, has_excerpts])
+            if not has_excerpts:
+                self.table.nrows_without_excerpts += 1
 
     def print_table(self):
         print("Table of proposals in closed meetings lacking a returned excerpt")
@@ -30,6 +35,8 @@ class DecidedProposalWithoutExcerptLister(object):
         print("\nSummary:")
         print("There are {} proposals in closed meetings lacking a returned excerpt"
               .format(self.table.nrows))
+        print("Among which {} have no excerpts at all"
+              .format(self.table.nrows_without_excerpts))
 
     def get_proposals_without_excerpt(self):
         """ Searches for all resolved proposals with no excerpt and yields them.
