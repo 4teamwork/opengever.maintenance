@@ -118,7 +118,7 @@ class CatalogHealthCheck(object):
                     'in_uuid_index_not_in_uuid_unindex', rid)
             elif uuid_index._unindex[rid] != uuid:
                 result.report_symptom(
-                    'uuid_index_tuple_mismatches_uuid_unndex_tuple', rid)
+                    'uuid_index_tuple_mismatches_uuid_unindex_tuple', rid)
             if rid not in rids_in_catalog:
                 result.report_symptom(
                     'in_uuid_index_not_in_catalog', rid)
@@ -130,6 +130,14 @@ class CatalogHealthCheck(object):
             if rid not in rids_in_catalog:
                 result.report_symptom(
                     'in_uuid_unindex_not_in_catalog', rid)
+
+        for rid in rids_in_catalog:
+            if rid not in index_values:
+                result.report_symptom(
+                    'in_catalog_not_in_uuid_index', rid)
+            if rid not in uuid_index._unindex:
+                result.report_symptom(
+                    'in_catalog_not_in_uuid_unindex', rid)
 
         return result
 
