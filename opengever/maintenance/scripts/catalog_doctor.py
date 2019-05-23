@@ -131,13 +131,13 @@ class CatalogHealthCheck(object):
                 result.report_symptom(
                     'in_uuid_unindex_not_in_catalog', rid)
 
-        for rid in rids_in_catalog:
+        for path, rid in uids.items():
             if rid not in index_values:
                 result.report_symptom(
-                    'in_catalog_not_in_uuid_index', rid)
+                    'in_catalog_not_in_uuid_index', rid, path=path)
             if rid not in uuid_index._unindex:
                 result.report_symptom(
-                    'in_catalog_not_in_uuid_unindex', rid)
+                    'in_catalog_not_in_uuid_unindex', rid, path=path)
 
         return result
 
