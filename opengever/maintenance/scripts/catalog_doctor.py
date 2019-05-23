@@ -432,7 +432,9 @@ class CatalogDoctor(object):
         (
             'in_metadata_keys_not_in_uids_values',
             'in_paths_keys_not_in_uids_values',
-            'in_paths_values_not_in_uids_keys'
+            'in_paths_values_not_in_uids_keys',
+            'in_uuid_unindex_not_in_catalog',
+            'in_uuid_unindex_not_in_uuid_index',
         ): RemoveOrphanedRid,
     }
 
