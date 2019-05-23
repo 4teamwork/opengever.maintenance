@@ -115,10 +115,10 @@ class CatalogHealthCheck(object):
         for uuid, rid in uuid_index._index.items():
             if rid not in uuid_index._unindex:
                 result.report_symptom(
-                    'uin_uuid_index_not_in_uuid_unindex', rid)
+                    'in_uuid_index_not_in_uuid_unindex', rid)
             elif uuid_index._unindex[rid] != uuid:
                 result.report_symptom(
-                    'uuuid_index_tuple_mismatches_uuid_unndex_tuple', rid)
+                    'uuid_index_tuple_mismatches_uuid_unndex_tuple', rid)
             if rid not in rids_in_catalog:
                 result.report_symptom(
                     'in_uuid_index_not_in_catalog', rid)
@@ -305,6 +305,7 @@ class Surgery(object):
                 raise CantPerformSurgery(
                     'Unhandled index type: {0!r}'.format(idx))
 
+            removed_from_forward_index = False
             entries_pointing_to_rid = [
                 val for val, rid_in_index in idx._index.items()
                 if rid_in_index == rid]
@@ -316,15 +317,18 @@ class Surgery(object):
                         ' '.join(entries_pointing_to_rid)))
                 entry = entries_pointing_to_rid[0]
                 del idx._index[entry]
+                removed_from_forward_index = True
 
             if rid in idx._unindex:
                 del idx._unindex[rid]
 
-            # This should eventually converge to
-            # len(_index) == len(_unindex) == _length.value
-            actual_min_length = min(len(idx._index), len(idx._unindex))
-            length_delta = idx._length.value - actual_min_length
-            idx._length.change(length_delta)
+            # The method removeForwardIndexEntry from UnIndex updates the
+            # index length. We assume we only have to update the index length
+            # when we remove the entry from the forward index, assuming somehow
+            # removeForwardIndexEntry has not been called or raised an
+            # exception
+            if removed_from_forward_index:
+                idx._length.change(-1)
 
         self.surgery_log.append(
             "Removed rid from all catalog indexes.")
