@@ -229,6 +229,7 @@ SAFE_INDEXERS = [
     'Subject',
     'delivery_date',
     'document_date',
+    'has_sametype_children',
 
     'start',
     'responsible',
