@@ -230,6 +230,7 @@ SAFE_INDEXERS = [
     'delivery_date',
     'document_date',
     'has_sametype_children',
+    'changed',
 
     'start',
     'responsible',
