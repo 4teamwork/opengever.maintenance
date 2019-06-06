@@ -78,6 +78,7 @@ OPTIONAL_WITH_STATIC_DEFAULT = {
     ],
     'ITask': [
         'relatedItems',  # RelationList - default=[]
+        'revoke_permissions',  # Bool - default=True
     ],
     'ISubmittedProposal': [
         'excerpts',  # RelationList - default=[]
