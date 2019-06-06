@@ -915,15 +915,15 @@ class Reindexer(object):
                            if name not in SAFE_INDEXERS and
                            name not in DEPENDENT_INDEXERS}
         if unsafe_indexers:
-            self.log("Obj has indexers not explicitly declared as safe:")
+            self.fixer.log("Obj has indexers not explicitly declared as safe:")
             for name, indexer in unsafe_indexers.items():
-                self.log("%s (%r, %r)" % (
+                self.fixer.log("%s (%r, %r)" % (
                     name, indexer.callable.__name__,
                     indexer.callable.__module__))
 
             # Fall back to doing a full metadata diff
-            self.log("Falling back to full metadata diff for %r "
-                     "(fields: %r)" % (obj.id, fixed_fieldnames))
+            self.fixer.log("Falling back to full metadata diff for %r "
+                           "(fields: %r)" % (obj.id, fixed_fieldnames))
             changed_columns = self.has_metadata_changed(obj, brain)
             if changed_columns:
                 return True
