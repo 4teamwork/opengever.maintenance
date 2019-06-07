@@ -264,6 +264,7 @@ class NonPersistedValueFixer(object):
 
         self.stats = Counter()
         self.stats['by_field'] = Counter()
+        self.stats['value_changed_by_field'] = Counter()
         self.stats['update_metadata'] = Counter()
 
         ts = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
@@ -490,6 +491,8 @@ class NonPersistedValueFixer(object):
 
             for f in missing_fields:
                 self.stats['by_field'][(f.schema_name, f.field_name)] += 1
+                if f.value_changed:
+                    self.stats['value_changed_by_field'][(f.schema_name, f.field_name)] += 1
         else:
             self.stats['ok'] += 1
 
@@ -499,6 +502,14 @@ class NonPersistedValueFixer(object):
         self.log("Missing (by field):")
         stats_by_field = sorted(self.stats['by_field'].items())
         for (schema_name, field_name), count in stats_by_field:
+            dotted_name = '.'.join((schema_name, field_name))
+            self.log("  %-120s %s" % (dotted_name, count))
+
+        self.log("")
+
+        self.log("Value changed (by field):")
+        value_changed_by_field = sorted(self.stats['value_changed_by_field'].items())
+        for (schema_name, field_name), count in value_changed_by_field:
             dotted_name = '.'.join((schema_name, field_name))
             self.log("  %-120s %s" % (dotted_name, count))
 
