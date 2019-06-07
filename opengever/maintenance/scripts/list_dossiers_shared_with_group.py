@@ -21,31 +21,36 @@ import sys
 
 class DossierSharedWithGroupLister(object):
 
-    def __init__(self, group):
+    def __init__(self, group_id):
         self.table = TextTable(col_max_width=60)
         self.table.add_row(["dossier path", "dossier title", "roles"])
-        self.group = group
+        self.group_id = group_id
 
     def list_dossiers_shared_with_group(self):
         for dossier, assignment in self.get_dossiers_shared_with_group():
             self.table.add_row([dossier.absolute_url_path(), dossier.Title(), assignment.roles])
 
     def print_table(self):
-        print("Table of dossiers shared with {}".format(self.group.id))
+        print("Table of dossiers shared with {}".format(self.group_id))
         print(self.table.generate_output())
         print("\nSummary:")
         print("There are {} dossiers shared with {}".format(self.table.nrows,
-                                                            self.group.id))
+                                                            self.group_id))
 
     def get_dossiers_shared_with_group(self):
         """ Searches for all dossier shared with a given group.
         We make the assumption that the group has at least view permissions
         on such dossiers.
         """
-        dossier_brains = api.content.find(allowedRolesAndUsers=u'user:{}'.format(self.group.id))
-        for dossier_brain in dossier_brains:
+        dossier_brains = api.content.find(allowedRolesAndUsers=u'user:{}'.format(self.group_id))
+        ndossiers = len(dossier_brains)
+        print("found {} dossiers".format(ndossiers))
+        for i, dossier_brain in enumerate(dossier_brains):
+            if i % 5000 == 0:
+                print("done with {}/{}; {:.2}%".format(i, ndossiers,
+                                                       100. * i / ndossiers))
             dossier = dossier_brain.getObject()
-            assignments = RoleAssignmentManager(dossier).get_assignments_by_principal_id(self.group.id)
+            assignments = RoleAssignmentManager(dossier).get_assignments_by_principal_id(self.group_id)
             sharing_assignment = self._find_sharing_assignment(assignments)
             if sharing_assignment:
                 yield (dossier, sharing_assignment)
@@ -61,6 +66,8 @@ class DossierSharedWithGroupLister(object):
 
 def main():
     parser = setup_option_parser()
+    parser.add_option("-f", "--force", action="store_true",
+                      dest="force", default=False)
     (options, args) = parser.parse_args()
 
     if not len(args) == 1:
@@ -72,13 +79,13 @@ def main():
 
     groupname = args[0]
     group = api.group.get(groupname)
-    if not group:
+    if not group and not options.force:
         print "Group does not exist"
         print "Available groups"
         print map(lambda group: group.id, api.group.get_groups())
         sys.exit(1)
 
-    dossier_lister = DossierSharedWithGroupLister(group)
+    dossier_lister = DossierSharedWithGroupLister(groupname)
     dossier_lister.list_dossiers_shared_with_group()
     dossier_lister.print_table()
 
