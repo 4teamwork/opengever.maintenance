@@ -478,13 +478,14 @@ class NonPersistedValueFixer(object):
     def write_csv_row(self, obj, missing_fields):
         created = str(obj.created())
         intid = self.intids.queryId(obj)
+        values_changed = [f.value_changed for f in missing_fields]
         row = [
             str(intid),
             obj.portal_type,
             '/'.join(obj.getPhysicalPath()),
             created,
             str([f.field_name for f in missing_fields]),
-            str(f.value_changed),
+            str(any(values_changed)),
         ]
         self.csv_log.write(';'.join(row) + '\n')
 
