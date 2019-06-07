@@ -443,9 +443,12 @@ class NonPersistedValueFixer(object):
             return volatile_value
 
         if fieldname in OPTIONAL_WITH_STATIC_DEFAULT.get(schema_name, []):
-            assert field.required is False
-            assert field.default is not None
-            assert field.defaultFactory is None
+            assert field.required is False, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+            assert field.default is not None, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+            assert field.defaultFactory is None, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
 
             volatile_value = get_volatile_value(obj, field)
             # Field has a default - volatile value should therefore
@@ -454,9 +457,12 @@ class NonPersistedValueFixer(object):
             return volatile_value
 
         if fieldname in OPTIONAL_WITHOUT_DEFAULT.get(schema_name, []):
-            assert field.required is False
-            assert field.default is None
-            assert field.defaultFactory is None
+            assert field.required is False, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+            assert field.default is None, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+            assert field.defaultFactory is None, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
 
             volatile_value = get_volatile_value(obj, field)
             # Field has no default - volatile value should therefore
