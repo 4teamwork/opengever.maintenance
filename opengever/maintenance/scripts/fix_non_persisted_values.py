@@ -679,6 +679,11 @@ class CustomValueHandler(object):
 
         We use the date of the latest CMFEditions version for this.
         """
+        if obj.portal_type == "ftw.mail.mail":
+            timestamp = utils.get_date_header(obj.msg, 'Date') or 0.0
+            date_time = datetime.fromtimestamp(timestamp)
+            return date_time.date()
+
         repository = api.portal.get_tool('portal_repository')
         history_metadata = repository.getHistoryMetadata(obj)
         latest_version_id = history_metadata.getLength(countPurged=False) - 1
