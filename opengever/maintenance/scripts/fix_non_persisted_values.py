@@ -12,6 +12,7 @@ from collections import Counter
 from collections import namedtuple
 from datetime import datetime
 from datetime import timedelta
+from ftw.mail import utils
 from ftw.solr.interfaces import ISolrConnectionManager
 from ftw.solr.interfaces import ISolrIndexHandler
 from opengever.base.default_values import get_persisted_value_for_field
@@ -246,6 +247,16 @@ DEPENDENT_INDEXERS = {
 }
 
 
+def get_volatile_value(obj, field):
+    """Get the volatile field value by using the field accessor.
+    This will trigger any fallbacks to default / missing
+    value that are in place.
+    """
+    bound_field = field.bind(obj)
+    volatile_value = bound_field.get(field.interface(obj))
+    return volatile_value
+
+
 class NonPersistedValueFixer(object):
     """Queries the catalog for all objects, and persists any field values that
     currently aren't persisted by
@@ -375,7 +386,7 @@ class NonPersistedValueFixer(object):
                 try:
                     get_persisted_value_for_field(obj, field)
                 except AttributeError:
-                    volatile_value = self.get_volatile_value(obj, field)
+                    volatile_value = get_volatile_value(obj, field)
                     value = self.determine_value(obj, field)
                     field.set(field.interface(obj), value)
 
@@ -420,23 +431,40 @@ class NonPersistedValueFixer(object):
             value = CustomValueHandler().get_value(obj, field)
             return value
 
-        if fieldname in OPTIONAL_WITH_STATIC_DEFAULT.get(schema_name, []):
-            assert field.required is False
-            assert field.default is not None
-            assert field.defaultFactory is None
+        # If the field is required we want to persist the value. Under the
+        # hood this will eventually call the `determine_default_value` from
+        # `opengever.base.default_values` also used in default value patches
+        # in `opengever.core`.
+        # This case occurs with old objects in the database in combination
+        # with fields added to the schema after the objects were created or
+        # modified.
+        if field.required:
+            volatile_value = get_volatile_value(obj, field)
+            return volatile_value
 
-            volatile_value = self.get_volatile_value(obj, field)
+        if fieldname in OPTIONAL_WITH_STATIC_DEFAULT.get(schema_name, []):
+            assert field.required is False, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+            assert field.default is not None, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+            assert field.defaultFactory is None, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+
+            volatile_value = get_volatile_value(obj, field)
             # Field has a default - volatile value should therefore
             # be equal to the field's default
             assert volatile_value == field.default
             return volatile_value
 
         if fieldname in OPTIONAL_WITHOUT_DEFAULT.get(schema_name, []):
-            assert field.required is False
-            assert field.default is None
-            assert field.defaultFactory is None
+            assert field.required is False, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+            assert field.default is None, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
+            assert field.defaultFactory is None, "Schema: %s Fieldname %s" % (
+                schema_name, fieldname)
 
-            volatile_value = self.get_volatile_value(obj, field)
+            volatile_value = get_volatile_value(obj, field)
             # Field has no default - volatile value should therefore
             # be equal to the field's missing value
             assert volatile_value == field.missing_value
@@ -657,8 +685,20 @@ class CustomValueHandler(object):
 
         We use the date of the latest CMFEditions version for this.
         """
+        if obj.portal_type == "ftw.mail.mail":
+            timestamp = utils.get_date_header(obj.msg, 'Date') or 0.0
+            date_time = datetime.fromtimestamp(timestamp)
+            return date_time.date()
+
         repository = api.portal.get_tool('portal_repository')
         history_metadata = repository.getHistoryMetadata(obj)
+        # we've encountered empty lists as history_metadata, i.e. no
+        # versions for the document. Could be the case when there is no
+        # initial version yet, or for older documents. Fall back to
+        # creation date in such cases.
+        if not history_metadata:
+            return obj.created().asdatetime().date()
+
         latest_version_id = history_metadata.getLength(countPurged=False) - 1
         latest_version = history_metadata.retrieve(latest_version_id)
         ts = latest_version['metadata']['sys_metadata']['timestamp']
