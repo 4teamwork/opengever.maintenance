@@ -692,6 +692,13 @@ class CustomValueHandler(object):
 
         repository = api.portal.get_tool('portal_repository')
         history_metadata = repository.getHistoryMetadata(obj)
+        # we've encountered empty lists as history_metadata, i.e. no
+        # versions for the document. Could be the case when there is no
+        # initial version yet, or for older documents. Fall back to
+        # creation date in such cases.
+        if not history_metadata:
+            return obj.created().asdatetime().date()
+
         latest_version_id = history_metadata.getLength(countPurged=False) - 1
         latest_version = history_metadata.retrieve(latest_version_id)
         ts = latest_version['metadata']['sys_metadata']['timestamp']
