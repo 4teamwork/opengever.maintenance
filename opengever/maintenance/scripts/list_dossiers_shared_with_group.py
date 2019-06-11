@@ -90,7 +90,7 @@ def main():
     dossier_lister.print_table()
 
     log_filename = LogFilePathFinder().get_logfile_path(
-        'list_dossiers_shared_with_{}'.format(group), extension="csv")
+        'list_dossiers_shared_with_{}'.format(groupname), extension="csv")
     with open(log_filename, "w") as logfile:
         dossier_lister.table.write_csv(logfile)
 
