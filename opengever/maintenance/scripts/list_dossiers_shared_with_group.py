@@ -28,7 +28,8 @@ class DossierSharedWithGroupLister(object):
 
     def list_dossiers_shared_with_group(self):
         for dossier, assignment in self.get_dossiers_shared_with_group():
-            self.table.add_row([dossier.absolute_url_path(), dossier.Title(), assignment.roles])
+            self.table.add_row([dossier.absolute_url_path(), dossier.Title(),
+                                "; ".join(map(str, assignment.roles))])
 
     def print_table(self):
         print("Table of dossiers shared with {}".format(self.group_id))
