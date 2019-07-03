@@ -510,7 +510,7 @@ class NonPersistedValueFixer(object):
         self.log("default: %r" % safe_format_op(field.__dict__['default']))
         self.log("defaultFactory: %r" % field.defaultFactory)
 
-        raise Exception('Unhandled field: %s' % fieldname)
+        raise Exception('Unhandled field: %s.%s' % (schema_name, fieldname))
 
     def write_csv_row(self, obj, missing_fields):
         created = str(obj.created())
