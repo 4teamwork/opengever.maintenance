@@ -103,6 +103,7 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'container_location',  # TextLine - mv=None
         'container_type',  # Choice - mv=None
         'external_reference',  # TextLine - mv=None
+        'end',  # Date - mv=None
         'filing_prefix',  # Choice - mv=None
         'former_reference_number',  # TextLine - mv=None
         'number_of_containers',  # Int - mv=None
