@@ -60,6 +60,7 @@ OPTIONAL_WITH_STATIC_DEFAULT = {
     ],
     'IDossier': [
         'relatedDossier',  # RelationList - default=[]
+        'keywords',  # Tuple - default=()
     ],
     'IProtectDossier': [
         'reading',  # List - default=[]
