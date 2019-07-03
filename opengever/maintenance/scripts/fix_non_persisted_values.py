@@ -493,12 +493,21 @@ class NonPersistedValueFixer(object):
         # OPTIONAL_WITHOUT_DEFAULT)
         self.log("Unhandled field:\n\n")
 
+        def safe_format_op(param):
+            """Wrap single tuples in an extra tuple as when passed a tuple the
+            format operator uses the tuples contents as arguments.
+            So formatting won't work with an empty or a too long tuple.
+            """
+            if isinstance(param, tuple):
+                return (param,)
+            return param
+
         self.log("Fieldname: %s" % fieldname)
         self.log("Field type: %s" % field.__class__.__name__)
         self.log("Schema: %s" % schema_name)
         self.log("required: %r" % field.required)
-        self.log("missing_value: %r" % field.missing_value)
-        self.log("default: %r" % field.__dict__['default'])
+        self.log("missing_value: %r" % safe_format_op(field.missing_value))
+        self.log("default: %r" % safe_format_op(field.__dict__['default']))
         self.log("defaultFactory: %r" % field.defaultFactory)
 
         raise Exception('Unhandled field: %s' % fieldname)
