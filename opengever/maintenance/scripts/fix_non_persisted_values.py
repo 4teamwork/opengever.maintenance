@@ -120,6 +120,7 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'archival_file',  # NamedBlobFile - mv=None
         'archival_file_state',  # Int - mv=None
         'delivery_date',  # Date - mv=None
+        'description',  # Text - mv=u''
         'document_author',  # TextLine - mv=None
         'document_type',  # Choice - mv=None
         'foreign_reference',  # TextLine - mv=None
