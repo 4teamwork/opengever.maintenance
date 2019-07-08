@@ -60,6 +60,10 @@ OPTIONAL_WITH_STATIC_DEFAULT = {
     ],
     'IDossier': [
         'relatedDossier',  # RelationList - default=[]
+        'keywords',  # Tuple - default=()
+    ],
+    'IDocumentMetadata': [
+        'keywords',  # Tuple - default=()
     ],
     'IProtectDossier': [
         'reading',  # List - default=[]
@@ -102,6 +106,7 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'container_location',  # TextLine - mv=None
         'container_type',  # Choice - mv=None
         'external_reference',  # TextLine - mv=None
+        'end',  # Date - mv=None
         'filing_prefix',  # Choice - mv=None
         'former_reference_number',  # TextLine - mv=None
         'number_of_containers',  # Int - mv=None
@@ -118,6 +123,7 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'archival_file',  # NamedBlobFile - mv=None
         'archival_file_state',  # Int - mv=None
         'delivery_date',  # Date - mv=None
+        'description',  # Text - mv=u''
         'document_author',  # TextLine - mv=None
         'document_type',  # Choice - mv=None
         'foreign_reference',  # TextLine - mv=None
@@ -125,9 +131,16 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'receipt_date',  # Date - mv=None
         'thumbnail',  # NamedBlobFile - mv=None
     ],
+    'IFilingNumber': [
+        'filing_no',  # TextLine - mv=None
+    ],
     'IOGMail': [
         'message_source',  # Choice - mv=None
         'original_message',  # NamedBlobFile - mv=None
+    ],
+    'IPreview': [
+        'preview_file',  # NamedBlobFile - mv=None
+        'conversion_state',  # Int - mv=None
     ],
     'ITask': [
         'date_of_completion',  # Date - mv=None
@@ -138,6 +151,10 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'expectedStartOfWork',  # Date - mv=None
         'predecessor',  # TextLine - mv=None
         'text',  # Text - mv=None
+    ],
+    'ITaskTemplate': [
+        'text',  # Text - mv=None
+        'responsible',  # Choice - mv=None
     ],
     'IForwarding': [
         'deadline',  # Date - required=False - mv=None
@@ -166,6 +183,9 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'predecessor',  # TextLine - mv=None
         'predecessor_proposal',  # RelationChoice - mv=None
 
+    ],
+    'IResponsibleOrgUnit': [
+        'responsible_org_unit',  # TextLine - mv=None
     ],
     'ICommittee': [
         'ad_hoc_template',  # RelationChoice - mv=None
@@ -485,7 +505,8 @@ class NonPersistedValueFixer(object):
 
             self.log("")
             raise Exception(
-                'Unexpected defaultFactory for field %r' % fieldname)
+                'Unexpected defaultFactory for field %r.%r' %
+                (schema_name, fieldname))
 
         # If we end up here, it means that we encountered a field that has
         # not explicitly been handled (by either defining a custom handler,
@@ -493,15 +514,24 @@ class NonPersistedValueFixer(object):
         # OPTIONAL_WITHOUT_DEFAULT)
         self.log("Unhandled field:\n\n")
 
+        def safe_format_op(param):
+            """Wrap single tuples in an extra tuple as when passed a tuple the
+            format operator uses the tuples contents as arguments.
+            So formatting won't work with an empty or a too long tuple.
+            """
+            if isinstance(param, tuple):
+                return (param,)
+            return param
+
         self.log("Fieldname: %s" % fieldname)
         self.log("Field type: %s" % field.__class__.__name__)
         self.log("Schema: %s" % schema_name)
         self.log("required: %r" % field.required)
-        self.log("missing_value: %r" % field.missing_value)
-        self.log("default: %r" % field.__dict__['default'])
+        self.log("missing_value: %r" % safe_format_op(field.missing_value))
+        self.log("default: %r" % safe_format_op(field.__dict__['default']))
         self.log("defaultFactory: %r" % field.defaultFactory)
 
-        raise Exception('Unhandled field: %s' % fieldname)
+        raise Exception('Unhandled field: %s.%s' % (schema_name, fieldname))
 
     def write_csv_row(self, obj, missing_fields):
         created = str(obj.created())
@@ -718,7 +748,6 @@ class CustomValueHandler(object):
         it's safe to assume that the user accepted the default, which would
         have been the current date at that time.
         """
-        assert obj.portal_type in ('opengever.dossier.dossiertemplate', )
         created_date = obj.created().asdatetime().date()
 
         # Verify that the value is valid
@@ -770,7 +799,7 @@ class CustomValueHandler(object):
     handlers = {
         ('IDocumentMetadata', 'preserved_as_paper'): get_preserved_as_paper_value,  # noqa
         ('IDocumentMetadata', 'document_date'): get_document_date_value,
-        ('start'): get_dossier_start_value,
+        ('IDossier', 'start'): get_dossier_start_value,
         ('IProtectDossier', 'dossier_manager'): get_dossier_manager_value,
         ('ITask', 'deadline'): get_deadline_value,
         ('ILifeCycle', 'custody_period'): get_custody_period_value,
@@ -786,6 +815,7 @@ class Reindexer(object):
     def __init__(self, fixer):
         self.catalog = fixer.catalog
         self.stats = fixer.stats
+        self.fixer = fixer
 
         self._metadata_names = None
         self._index_names = None
