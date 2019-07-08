@@ -131,6 +131,9 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'receipt_date',  # Date - mv=None
         'thumbnail',  # NamedBlobFile - mv=None
     ],
+    'IFilingNumber': [
+        'filing_no',  # TextLine - mv=None
+    ],
     'IOGMail': [
         'message_source',  # Choice - mv=None
         'original_message',  # NamedBlobFile - mv=None
