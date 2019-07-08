@@ -808,6 +808,7 @@ class Reindexer(object):
     def __init__(self, fixer):
         self.catalog = fixer.catalog
         self.stats = fixer.stats
+        self.fixer = fixer
 
         self._metadata_names = None
         self._index_names = None
