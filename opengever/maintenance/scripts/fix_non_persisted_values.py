@@ -140,6 +140,7 @@ OPTIONAL_WITHOUT_DEFAULT = {
     ],
     'IPreview': [
         'preview_file',  # NamedBlobFile - mv=None
+        'conversion_state',  # Int - mv=None
     ],
     'ITask': [
         'date_of_completion',  # Date - mv=None
