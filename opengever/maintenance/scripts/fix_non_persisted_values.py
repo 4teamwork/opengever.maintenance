@@ -138,6 +138,9 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'message_source',  # Choice - mv=None
         'original_message',  # NamedBlobFile - mv=None
     ],
+    'IPreview': [
+        'preview_file',  # NamedBlobFile - mv=None
+    ],
     'ITask': [
         'date_of_completion',  # Date - mv=None
         'effectiveCost',  # Float - mv=None
