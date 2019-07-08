@@ -744,7 +744,6 @@ class CustomValueHandler(object):
         it's safe to assume that the user accepted the default, which would
         have been the current date at that time.
         """
-        assert obj.portal_type in ('opengever.dossier.dossiertemplate', )
         created_date = obj.created().asdatetime().date()
 
         # Verify that the value is valid
@@ -796,7 +795,7 @@ class CustomValueHandler(object):
     handlers = {
         ('IDocumentMetadata', 'preserved_as_paper'): get_preserved_as_paper_value,  # noqa
         ('IDocumentMetadata', 'document_date'): get_document_date_value,
-        ('start'): get_dossier_start_value,
+        ('IDossier', 'start'): get_dossier_start_value,
         ('IProtectDossier', 'dossier_manager'): get_dossier_manager_value,
         ('ITask', 'deadline'): get_deadline_value,
         ('ILifeCycle', 'custody_period'): get_custody_period_value,
