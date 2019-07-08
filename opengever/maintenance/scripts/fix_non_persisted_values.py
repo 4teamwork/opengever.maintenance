@@ -501,7 +501,8 @@ class NonPersistedValueFixer(object):
 
             self.log("")
             raise Exception(
-                'Unexpected defaultFactory for field %r' % fieldname)
+                'Unexpected defaultFactory for field %r.%r' %
+                (schema_name, fieldname))
 
         # If we end up here, it means that we encountered a field that has
         # not explicitly been handled (by either defining a custom handler,
