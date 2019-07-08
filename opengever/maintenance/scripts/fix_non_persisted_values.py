@@ -62,6 +62,9 @@ OPTIONAL_WITH_STATIC_DEFAULT = {
         'relatedDossier',  # RelationList - default=[]
         'keywords',  # Tuple - default=()
     ],
+    'IDocumentMetadata': [
+        'keywords',  # Tuple - default=()
+    ],
     'IProtectDossier': [
         'reading',  # List - default=[]
         'reading_and_writing',  # List - default=[]
