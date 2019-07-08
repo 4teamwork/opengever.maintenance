@@ -180,6 +180,9 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'predecessor_proposal',  # RelationChoice - mv=None
 
     ],
+    'IResponsibleOrgUnit': [
+        'responsible_org_unit',  # TextLine - mv=None
+    ],
     'ICommittee': [
         'ad_hoc_template',  # RelationChoice - mv=None
         'agenda_item_header_template',  # RelationChoice - mv=None
