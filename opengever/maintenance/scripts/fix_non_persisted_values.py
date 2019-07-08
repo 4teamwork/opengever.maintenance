@@ -152,6 +152,9 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'predecessor',  # TextLine - mv=None
         'text',  # Text - mv=None
     ],
+    'ITaskTemplate': [
+        'text',  # Text - mv=None
+    ],
     'IForwarding': [
         'deadline',  # Date - required=False - mv=None
     ],
