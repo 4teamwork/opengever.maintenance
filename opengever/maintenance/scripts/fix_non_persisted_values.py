@@ -154,6 +154,7 @@ OPTIONAL_WITHOUT_DEFAULT = {
     ],
     'ITaskTemplate': [
         'text',  # Text - mv=None
+        'responsible',  # Choice - mv=None
     ],
     'IForwarding': [
         'deadline',  # Date - required=False - mv=None
