@@ -16,4 +16,9 @@
     <include package=".browser" />
     <include package=".monitor" />
 
+  <adapter
+      factory=".nightly_archival_file_job.NightlyArchivalFileConversion"
+      name="trigger-missing-archival-file-conversion"
+      />
+
 </configure>
