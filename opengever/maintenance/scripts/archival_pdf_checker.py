@@ -75,17 +75,17 @@ class ArchivalPDFChecker(object):
                 doc = doc_brain.getObject()
 
                 # Determine if this document should have an archival PDF
-                should_have_pdf = self.should_have_pdf(doc)
+                should_have_archival_file = self.should_have_archival_file(doc)
 
-                if should_have_pdf:
-                    dossier_stats['should_have_pdf'] += 1
+                if should_have_archival_file:
+                    dossier_stats['should_have_archival_file'] += 1
 
                 # Check if an archival PDF is present
                 if getattr(doc, 'archival_file', None) is not None:
                     dossier_stats['with_pdf'] += 1
                 else:
                     dossier_stats['without_pdf'] += 1
-                    if should_have_pdf:
+                    if should_have_archival_file:
                         dossier_stats['missing'] += 1
 
                         # Document should be triggered for archival file
@@ -110,7 +110,7 @@ class ArchivalPDFChecker(object):
         self.all_dossier_stats = all_dossier_stats
         self.dossiers_with_missing_pdf = dossiers_with_missing_pdf
 
-    def should_have_pdf(self, doc):
+    def should_have_archival_file(self, doc):
         if doc.portal_type == 'ftw.mail.mail':
             return False
 
@@ -134,7 +134,7 @@ class ArchivalPDFChecker(object):
         dossier_table.add_row((
             'path',
             'total_docs',
-            'should_have_pdf',
+            'should_have_archival_file',
             'with_pdf',
             'without_pdf',
             'missing',
@@ -147,14 +147,14 @@ class ArchivalPDFChecker(object):
             dossier_table.add_row((
                 dossier_path,
                 dossier_stats['total_docs'],
-                dossier_stats['should_have_pdf'],
+                dossier_stats['should_have_archival_file'],
                 dossier_stats['with_pdf'],
                 dossier_stats['without_pdf'],
                 dossier_stats['missing'],
             ))
 
             totals['total_docs'] += dossier_stats['total_docs']
-            totals['total_should_have_pdf'] += dossier_stats['should_have_pdf']
+            totals['total_should_have_archival_file'] += dossier_stats['should_have_archival_file']
             totals['total_missing'] += dossier_stats['missing']
 
         output = ''
@@ -166,14 +166,14 @@ class ArchivalPDFChecker(object):
             'total_resolved_dossiers',
             'total_candidate_dossiers',
             'total_docs',
-            'total_should_have_pdf',
+            'total_should_have_archival_file',
             'total_missing',
         ))
         totals_table.add_row((
             totals['total_resolved_dossiers'],
             totals['total_candidate_dossiers'],
             totals['total_docs'],
-            totals['total_should_have_pdf'],
+            totals['total_should_have_archival_file'],
             totals['total_missing'],
         ))
 
