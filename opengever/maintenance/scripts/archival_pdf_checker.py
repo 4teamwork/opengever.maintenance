@@ -9,8 +9,17 @@ from opengever.document.archival_file import STATE_FAILED_TEMPORARILY
 from opengever.document.archival_file import STATE_MANUALLY_PROVIDED
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
+from opengever.maintenance.debughelpers import setup_app
+from opengever.maintenance.debughelpers import setup_option_parser
+from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import TextTable
 from plone import api
+import logging
+import transaction
+
+
+logger = logging.getLogger('archival_file_checker')
+logger.setLevel(logging.INFO)
 
 
 STATES = {
@@ -154,3 +163,27 @@ class ArchivalPDFChecker(object):
         output += totals_table.generate_output()
 
         return output
+
+def main():
+    app = setup_app()
+    parser = setup_option_parser()
+    parser.add_option("-n", "--dry-run", action="store_true",
+                      dest="dryrun", default=False)
+
+    (options, args) = parser.parse_args()
+    app = setup_app()
+    portal = setup_plone(app, options)
+
+    if options.dryrun:
+        transaction.doom()
+
+    checker = ArchivalPDFChecker(portal)
+    checker.run()
+    print checker.render_result_tables()
+
+    if not options.dryrun:
+        transaction.commit()
+
+
+if __name__ == '__main__':
+    main()
