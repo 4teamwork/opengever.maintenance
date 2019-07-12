@@ -10,11 +10,13 @@ from opengever.document.archival_file import STATE_MANUALLY_PROVIDED
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
-from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import TextTable
 from plone import api
+from pprint import pprint
+import argparse
 import logging
+import sys
 import transaction
 
 
@@ -37,6 +39,7 @@ class ArchivalPDFChecker(object):
     def __init__(self, context):
         self.context = context
         self.all_dossier_stats = None
+        self.dossiers_with_missing_pdf = None
         self.total_resolved_dossiers = 0
 
     def run(self):
@@ -52,6 +55,7 @@ class ArchivalPDFChecker(object):
 
         self.total_resolved_dossiers = len(resolved_dossier_brains)
         all_dossier_stats = OrderedDict()
+        dossiers_with_missing_pdf = []
 
         for brain in resolved_dossier_brains:
             dossier = brain.getObject()
@@ -65,6 +69,8 @@ class ArchivalPDFChecker(object):
                 object_provides=IBaseDocument.__identifier__,
             )
             dossier_stats['total_docs'] = len(contained_docs)
+
+            docs_with_missing_pdf = []
             for doc_brain in contained_docs:
                 doc = doc_brain.getObject()
 
@@ -79,9 +85,12 @@ class ArchivalPDFChecker(object):
                     dossier_stats['with_pdf'] += 1
                 else:
                     dossier_stats['without_pdf'] += 1
-
                     if should_have_pdf:
                         dossier_stats['missing'] += 1
+
+                        # Document should be triggered for archival file
+                        # conversion
+                        docs_with_missing_pdf.append(doc)
 
                 # Record conversion state
                 converter = ArchivalFileConverter(doc)
@@ -91,7 +100,15 @@ class ArchivalPDFChecker(object):
 
             all_dossier_stats[dossier_path] = dossier_stats
 
+            # If the dossier contain documents with missing archival files
+            # add it to the
+            if docs_with_missing_pdf:
+                dossiers_with_missing_pdf.append({
+                    'dossier': dossier,
+                    'missing': docs_with_missing_pdf})
+
         self.all_dossier_stats = all_dossier_stats
+        self.dossiers_with_missing_pdf = dossiers_with_missing_pdf
 
     def should_have_pdf(self, doc):
         if doc.portal_type == 'ftw.mail.mail':
@@ -164,14 +181,21 @@ class ArchivalPDFChecker(object):
 
         return output
 
-def main():
-    app = setup_app()
-    parser = setup_option_parser()
-    parser.add_option("-n", "--dry-run", action="store_true",
-                      dest="dryrun", default=False)
+    def detailed_report(self):
+        return self.dossiers_with_missing_pdf
 
-    (options, args) = parser.parse_args()
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mode', choices=['report_table', 'detailed_report'],
+                        help='solr-maintenance mode')
+    parser.add_argument('-s', dest='site_root', default=None,
+                        help='Absolute path to the Plone site')
+    parser.add_argument('-n', dest='dryrun', default=False, help='Dryrun')
+
+    options = parser.parse_args(sys.argv[3:])
     app = setup_app()
+
     portal = setup_plone(app, options)
 
     if options.dryrun:
@@ -179,7 +203,23 @@ def main():
 
     checker = ArchivalPDFChecker(portal)
     checker.run()
-    print checker.render_result_tables()
+
+    if options.mode == 'report_table':
+        print checker.render_result_tables()
+
+    if options.mode == 'detailed_report':
+        print "Overview table:"
+        print 50 * "="
+        print ""
+        print checker.render_result_tables()
+
+        print ""
+        print ""
+        print "Dossiers with missing archival files"
+        print 50 * "="
+        print ""
+        print ""
+        pprint(checker.detailed_report())
 
     if not options.dryrun:
         transaction.commit()
