@@ -1,6 +1,5 @@
 from collections import Counter
 from collections import OrderedDict
-from DateTime import DateTime
 from ftw.bumblebee.interfaces import IBumblebeeDocument
 from opengever.document.archival_file import ArchivalFileConverter
 from opengever.document.archival_file import STATE_CONVERTED
@@ -23,15 +22,12 @@ STATES = {
     None: 'STATE_NONE',
 }
 
-FEATURE_ACTIVATION_DATE = DateTime('2017/03/31 16:52:24.962264 GMT+2')
-
 
 class ArchivalPDFChecker(object):
 
     def __init__(self, context):
         self.context = context
         self.all_dossier_stats = None
-        self.resolved_before_feature = 0
         self.total_resolved_dossiers = 0
 
     def run(self):
@@ -50,17 +46,6 @@ class ArchivalPDFChecker(object):
 
         for brain in resolved_dossier_brains:
             dossier = brain.getObject()
-            wftool = api.portal.get_tool('portal_workflow')
-            history = wftool.getInfoFor(dossier, "review_history")
-            resolve_date = None
-            for action_info in history:
-                if action_info.get('action') == 'dossier-transition-resolve':
-                    resolve_date = action_info.get('time')
-
-            if FEATURE_ACTIVATION_DATE > resolve_date:
-                print "Skipping non-candidate dossier"
-                self.resolved_before_feature += 1
-                continue
 
             dossier_stats = Counter()
             dossier_stats['states'] = Counter()
@@ -130,7 +115,6 @@ class ArchivalPDFChecker(object):
         ))
 
         totals['total_resolved_dossiers'] = self.total_resolved_dossiers
-        totals['total_resolved_before_feature'] = self.resolved_before_feature
         totals['total_candidate_dossiers'] = len(all_dossier_stats)
 
         for dossier_path, dossier_stats in all_dossier_stats.items():
@@ -154,7 +138,6 @@ class ArchivalPDFChecker(object):
         totals_table = TextTable()
         totals_table.add_row((
             'total_resolved_dossiers',
-            'total_resolved_before_feature',
             'total_candidate_dossiers',
             'total_docs',
             'total_should_have_pdf',
@@ -162,7 +145,6 @@ class ArchivalPDFChecker(object):
         ))
         totals_table.add_row((
             totals['total_resolved_dossiers'],
-            totals['total_resolved_before_feature'],
             totals['total_candidate_dossiers'],
             totals['total_docs'],
             totals['total_should_have_pdf'],
