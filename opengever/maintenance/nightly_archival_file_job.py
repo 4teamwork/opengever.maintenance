@@ -1,5 +1,4 @@
 from opengever.document.archival_file import ArchivalFileConverter
-from opengever.nightlyjobs.interfaces import INightlyJobProvider
 from plone import api
 from Products.CMFPlone.interfaces import IPloneSiteRoot
 from time import sleep
@@ -7,9 +6,19 @@ from zope.annotation import IAnnotations
 from zope.component import adapter
 from zope.component import getUtility
 from zope.interface import implementer
+from zope.interface import Interface
 from zope.intid.interfaces import IIntIds
 from zope.publisher.interfaces.browser import IBrowserRequest
 import logging
+
+# Conditional import to not cause issues on og.core versions where
+# opengever.nightlyjobs.interfaces doesn't exist yet
+try:
+    from opengever.nightlyjobs.interfaces import INightlyJobProvider
+except ImportError:
+    # Older og.core version - provide a dummy interface
+    class INightlyJobProvider(Interface):
+        pass
 
 
 MISSING_ARCHIVAL_FILE_KEY = 'DOCS_WITH_MISSING_ARCHIVAL_FILE'
