@@ -43,6 +43,11 @@ logger = logging.getLogger('archival_file_checker')
 logger.setLevel(logging.INFO)
 
 
+# Duplicating this here instead of importing from opengever.dossier.resolve
+# in order to avoid hard dependency from opengever.maintenance
+AFTER_RESOLVE_JOBS_PENDING_KEY = 'opengever.dossier.resolve.after_resolve_jobs_pending'
+
+
 class ArchivalFileChecker(object):
     """Checks whether documents that should have an archival file actually
     do have one, and reports the ones that don't.
@@ -99,14 +104,17 @@ class ArchivalFileChecker(object):
             is_subdossier=False,
             sort_on='path',
             object_provides=IDossierMarker.__identifier__,
-            review_state='dossier-state-resolved',
-            after_resolve_jobs_pending=False)
+            review_state='dossier-state-resolved')
 
         all_dossier_stats = OrderedDict()
         missing_by_dossier = []
 
         for brain in resolved_dossier_brains:
             dossier = brain.getObject()
+            if self.after_resolve_jobs_pending(dossier):
+                # Nightly resolve job for this dossier hasn't run yet, so
+                # it's archival files *can't* exist yet
+                continue
 
             dossier_stats, docs_missing_archival_file = self._check_dossier(dossier)
             dossier_path = brain.getPath()
@@ -195,6 +203,10 @@ class ArchivalFileChecker(object):
                     docs_missing_archival_file.append(doc)
 
         return dossier_stats, docs_missing_archival_file
+
+    def after_resolve_jobs_pending(self, dossier):
+        ann = IAnnotations(dossier)
+        return ann.get(AFTER_RESOLVE_JOBS_PENDING_KEY, False)
 
     def should_have_archival_file(self, doc):
         """Determine whether an IBaseDocument should have an archival file.
