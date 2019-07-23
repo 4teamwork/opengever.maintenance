@@ -22,7 +22,7 @@ except ImportError:
 
 
 MISSING_ARCHIVAL_FILE_KEY = 'DOCS_WITH_MISSING_ARCHIVAL_FILE'
-MAX_CONVERSION_REQUESTS_PER_NIGHT = 1000
+MAX_CONVERSION_REQUESTS_PER_NIGHT = 2000
 
 # Track total number of conversion requests sent per nightly run
 sent_conversion_requests = 0
