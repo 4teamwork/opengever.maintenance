@@ -21,6 +21,8 @@ from BTrees.IOBTree import IOBTree
 from collections import Counter
 from collections import OrderedDict
 from ftw.bumblebee.interfaces import IBumblebeeDocument
+from opengever.document.archival_file import ArchivalFileConverter
+from opengever.document.archival_file import STATE_FAILED_TEMPORARILY
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
@@ -226,6 +228,13 @@ class ArchivalFileChecker(object):
 
         bdoc = IBumblebeeDocument(doc)
         if not bdoc.is_convertable():
+            return False
+
+        conversion_state = ArchivalFileConverter(doc).get_state()
+        if conversion_state == STATE_FAILED_TEMPORARILY:
+            # FAILED_TEMPORARILY really is quite permanent in most cases.
+            # Currently it rather means that Bumblebee did post back an
+            # explicit error.
             return False
 
         return True
