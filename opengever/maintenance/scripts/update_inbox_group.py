@@ -54,10 +54,9 @@ class InboxGroupMigrator(object):
 
     def migrate(self):
         catalog = api.portal.get_tool('portal_catalog')
-        brains = catalog.unrestrictedSearchResults(
-            object_provides=ITask.__identifier__,
-            responsible_client=self.org_unit)
-        org_units_tasks = [brain.getObject() for brain in brains]
+        brains = catalog.unrestrictedSearchResults(object_provides=ITask.__identifier__)
+        org_units_tasks = [brain.getObject() for brain in brains
+                           if brain.getObject().responsible_client == self.org_unit]
 
         for task in org_units_tasks:
             changed = self.migrate_role_assignments(task)
@@ -71,7 +70,7 @@ class InboxGroupMigrator(object):
                 distinct_parent = LocalRolesSetter(task).get_distinct_parent()
                 self.migrate_role_assignments(distinct_parent, reference_oguid=task_oguid)
 
-                print 'Assigments for {} migrated'.format(task)
+                print 'Assigments for {} migrated'.format(task.absolute_url())
 
     def migrate_role_assignments(self, obj, reference_oguid=None):
         manager = RoleAssignmentManager(obj)
