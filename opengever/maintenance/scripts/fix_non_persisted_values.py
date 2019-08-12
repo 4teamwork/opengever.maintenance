@@ -29,6 +29,7 @@ from plone.dexterity.utils import iterSchemataForType
 from plone.indexer.interfaces import IIndexableObject
 from plone.indexer.interfaces import IIndexer
 from Products.PluginIndexes.DateIndex.DateIndex import DateIndex
+from zope.schema.interfaces import RequiredMissing
 from zope.component import getMultiAdapter
 from zope.component import getUtility
 from zope.component import queryMultiAdapter
@@ -656,7 +657,20 @@ class CustomValueHandler(object):
         volatile_value = bound_field.get(field.interface(obj))
 
         # Verify that the value is valid
-        bound_field.validate(volatile_value)
+        try:
+            bound_field.validate(volatile_value)
+        except RequiredMissing as e:
+            # Check if its a part of the `Abnahme` repositoryfolder,
+            # a relict of the konsulmigration (content which was not
+            # created correctly). In that case we try to use the field default.
+            if bound_field.get(field.interface(obj)) is None:
+                if 'abnahme' in obj.getPhysicalPath():
+                    volatile_value = bound_field.default
+
+            # Re verify that the value is valid - when value has not been
+            # changed or is still not valid it will raise again.
+            bound_field.validate(volatile_value)
+
         return volatile_value
 
     def get_preserved_as_paper_value(self, obj, field):
