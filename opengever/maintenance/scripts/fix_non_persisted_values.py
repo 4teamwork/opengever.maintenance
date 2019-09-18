@@ -260,7 +260,20 @@ OPTIONAL_WITHOUT_DEFAULT = {
     'IGDGEACaseBehavior': [
         'department',  # Choice - mv=None
     ],
-
+    'IBDBDSBaseBehavior': [
+        'bd_department',  # Choice - mv=None
+    ],
+    'IBDBDSCaseBehavior2': [
+        'commune',  # List - mv=None
+        'gsNumber',  # Text - mv=None
+    ],
+    'IBDBDSCaseBDBehavior': [
+        'bdPlaintNumber',  # Textline - mv=None
+    ],
+    'IBDBDSCaseVGBGBehavior': [
+        'vgPlaintNumber',  # Textline - mv=None
+        'bgPlaintNumber',  # Textline - mv=None
+    ],
 }
 
 
