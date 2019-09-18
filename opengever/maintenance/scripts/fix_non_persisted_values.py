@@ -257,6 +257,9 @@ OPTIONAL_WITHOUT_DEFAULT = {
     'IRRProtocolBehavior': [
         'keywordGovernmentMinutes',  # Choice - mv=None
     ],
+    'IGDGEACaseBehavior': [
+        'department',  # Choice - mv=None
+    ],
 
 }
 
