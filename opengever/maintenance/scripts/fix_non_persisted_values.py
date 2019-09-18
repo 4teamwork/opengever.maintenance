@@ -216,6 +216,25 @@ OPTIONAL_WITHOUT_DEFAULT = {
     'IDispositionSchema': [
         'transfer_number',  # TextLine - mv=None
     ],
+    'IARPCaseBehavior2': [
+        'applicant',  # Choice - mv=None
+        'location',   # Textline - mv=None
+        'requestType',   # Choice - mv=None
+        'usage',   # Choice - mv=None
+        'coordinateX',   # Int - mv=None
+        'coordinateY',   # Int - mv=None
+        'areaNew',   # Choice - mv=None
+        'volumeNew',   # Choice - mv=None
+        'volumeNew',   # Choice - mv=None
+        'agent',  # List - mv=None
+        'community',  # List - mv=None
+        'assekNumber',  # List - mv=None
+        'zones',   # List - mv=None
+        'approval',  # Bool - mv=None
+        'conditionDmPf',  # Bool - mv=None
+        'conditionEnvironment',  # Bool - mv=None
+        'legalTitle',  # list - mv=None
+    ],
 }
 
 
