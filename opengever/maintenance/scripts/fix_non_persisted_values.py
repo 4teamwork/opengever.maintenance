@@ -274,6 +274,10 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'vgPlaintNumber',  # Textline - mv=None
         'bgPlaintNumber',  # Textline - mv=None
     ],
+    'IDIADACaseBehavior': [
+        'karcEventIdentifier',  # Textline - mv=None
+        'dmpfObjectIdentifier',  # Textline - mv=None
+    ],
 }
 
 
