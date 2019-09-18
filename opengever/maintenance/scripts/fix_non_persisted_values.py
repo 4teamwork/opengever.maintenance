@@ -254,6 +254,10 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'private_city',  # Textline - mv=None
         'comment',  # Text - mv=None
     ],
+    'IRRProtocolBehavior': [
+        'keywordGovernmentMinutes',  # Choice - mv=None
+    ],
+
 }
 
 
