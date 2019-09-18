@@ -235,6 +235,25 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'conditionEnvironment',  # Bool - mv=None
         'legalTitle',  # list - mv=None
     ],
+    'ISKAKRCaseBehavior': [
+        'tablingNumber',  # Textline - mv=None
+        'presidentOfComission',   # Choice (Textline) - mv=None
+        'appropriate',   # List - mv=None
+        'firstReading',   # Date - mv=None
+        'secondReading',   # Date - mv=None
+    ],
+    'IKRContactAddition': [
+        'community',  # Choice - mv=None
+        'parties',  # Choice - mv=None
+        'entry',  # Date - mv=None
+        'job',  # Tuple - mv=None
+        'hometown',  # Tuple - mv=None
+        'private_address',  # Textline - mv=None
+        'private_zipcode',  # Textline - mv=None
+        'private_city',  # Textline - mv=None
+        'private_city',  # Textline - mv=None
+        'comment',  # Text - mv=None
+    ],
 }
 
 
