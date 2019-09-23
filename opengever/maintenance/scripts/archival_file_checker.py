@@ -69,6 +69,7 @@ class ArchivalFileChecker(object):
         self.log_memory = logger.log_memory
 
         self.catalog = api.portal.get_tool('portal_catalog')
+        self.intids = getUtility(IIntIds)
         self.all_dossier_stats = None
 
         # Bookkeeping stats for memory usage
@@ -128,12 +129,12 @@ class ArchivalFileChecker(object):
             self.log_memstats()
 
             dossier_stats, docs_missing_archival_file = self._check_dossier(dossier)
-            dossier_path = brain.getPath()
-            all_dossier_stats[dossier_path] = dossier_stats
+            dossier_intid = self.intids.getId(dossier)
+            all_dossier_stats[dossier_intid] = dossier_stats
 
             if docs_missing_archival_file:
                 missing_by_dossier.append({
-                    'dossier': dossier,
+                    'dossier': dossier_intid,
                     'missing': docs_missing_archival_file})
 
         self.all_dossier_stats = all_dossier_stats
@@ -154,11 +155,11 @@ class ArchivalFileChecker(object):
         self.log_to_file("")
 
         for group in missing_by_dossier:
-            dossier = group['dossier']
-            docs = group['missing']
-            self.log_to_file(repr(dossier))
-            for doc in docs:
-                self.log_to_file("  %r" % doc)
+            dossier_intid = group['dossier']
+            doc_intids = group['missing']
+            self.log_to_file('Dossier (IntID): %s' % dossier_intid)
+            for doc_intid in doc_intids:
+                self.log_to_file("  Document (IntId): %r" % doc_intid)
             self.log_to_file("")
 
         # Display current queue length, just to be helpful
@@ -216,6 +217,7 @@ class ArchivalFileChecker(object):
         docs_missing_archival_file = []
         for doc_brain in contained_docs:
             doc = doc_brain.getObject()
+            doc_intid = self.intids.getId(doc)
 
             # Determine if this document should have an archival file
             should_have_archival_file = self.should_have_archival_file(doc)
@@ -231,7 +233,7 @@ class ArchivalFileChecker(object):
 
                 if should_have_archival_file:
                     dossier_stats['missing'] += 1
-                    docs_missing_archival_file.append(doc)
+                    docs_missing_archival_file.append(doc_intid)
 
             self.checked_docs_count += 1
 
@@ -266,7 +268,7 @@ class ArchivalFileChecker(object):
 
         dossier_table = TextTable()
         dossier_table.add_row((
-            'path',
+            'dossier_intid',
             'total_docs_in_dossier',
             'should_have_archival_file',
             'with',
@@ -333,21 +335,17 @@ class ArchivalFileChecker(object):
         queue = ann[MISSING_ARCHIVAL_FILE_KEY]
 
         for group in missing_by_dossier:
-            dossier = group['dossier']
+            dossier_intid = group['dossier']
             missing = group['missing']
-            self.log("  Queueing %s documents for %r" % (len(missing), dossier))
-
-            intids = getUtility(IIntIds)
-            dossier_intid = intids.getId(dossier)
+            self.log("  Queueing %s documents for Dossier %r" % (len(missing), dossier_intid))
 
             if dossier_intid in queue:
-                self.log('  (Replacing already queued documents for %r)' % dossier)
+                self.log('  (Replacing already queued documents for Dossier %r)' % dossier_intid)
 
             queue[dossier_intid] = IITreeSet()
-            for doc in missing:
-                intid = intids.getId(doc)
-                queue[dossier_intid].add(intid)
-                self.log("    Queued: IntId %s (%r)" % (intid, doc))
+            for doc_intid in missing:
+                queue[dossier_intid].add(doc_intid)
+                self.log("    Queued Document: IntId %s" % (doc_intid))
 
         self.log("Done. Queued %s documents for conversion" % total_missing)
 
