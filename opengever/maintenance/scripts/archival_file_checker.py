@@ -34,7 +34,10 @@ from zope.annotation import IAnnotations
 from zope.component import getUtility
 from zope.intid.interfaces import IIntIds
 import argparse
+import json
 import logging
+import os
+import subprocess
 import sys
 import transaction
 
@@ -63,9 +66,14 @@ class ArchivalFileChecker(object):
 
         self.log = logger.log
         self.log_to_file = logger.log_to_file
+        self.log_memory = logger.log_memory
 
         self.catalog = api.portal.get_tool('portal_catalog')
         self.all_dossier_stats = None
+
+        # Bookkeeping stats for memory usage
+        self.rss_max = 0
+        self.checked_docs_count = 0
 
     def run(self):
         assert IPloneSiteRoot.providedBy(self.context)
@@ -77,6 +85,7 @@ class ArchivalFileChecker(object):
 
         self.log("")
         self.log("Detailed log written to %s" % self.logger.logfile_path)
+        self.log("Memory log written to %s" % self.logger.memory_logfile_path)
 
     def check(self):
         """For all candidate dossiers, check if the documents contained in
@@ -115,6 +124,8 @@ class ArchivalFileChecker(object):
                 # Nightly resolve job for this dossier hasn't run yet, so
                 # it's archival files *can't* exist yet
                 continue
+
+            self.log_memstats()
 
             dossier_stats, docs_missing_archival_file = self._check_dossier(dossier)
             dossier_path = brain.getPath()
@@ -166,6 +177,26 @@ class ArchivalFileChecker(object):
 
         return missing_by_dossier
 
+    def log_memstats(self):
+        rss = self.get_rss() / 1024.0
+        self.rss_max = max(self.rss_max, rss)
+        memstats = {
+            'items': self.checked_docs_count,
+            'rss_current': rss,
+            'rss_max': self.rss_max,
+        }
+        self.log_memory(json.dumps(memstats))
+
+    def get_rss(self):
+        """Get current memory usage (RSS) of this process.
+        """
+        out = subprocess.check_output(
+            ["ps", "-p", "%s" % os.getpid(), "-o", "rss"])
+        try:
+            return int(out.splitlines()[-1].strip())
+        except ValueError:
+            return 0
+
     def _check_dossier(self, dossier):
         """Check an individual dossier's documents for missing archival file.
 
@@ -201,6 +232,8 @@ class ArchivalFileChecker(object):
                 if should_have_archival_file:
                     dossier_stats['missing'] += 1
                     docs_missing_archival_file.append(doc)
+
+            self.checked_docs_count += 1
 
         return dossier_stats, docs_missing_archival_file
 
@@ -328,12 +361,15 @@ class Logger(LogFilePathFinder):
     def __init__(self, filename_basis):
         super(Logger, self).__init__()
         self.logfile_path = self.get_logfile_path(filename_basis)
+        self.memory_logfile_path = self.get_logfile_path(filename_basis + '-memory')
 
     def __enter__(self):
         self.logfile = open(self.logfile_path, 'w')
+        self.memory_logfile = open(self.memory_logfile_path, 'w')
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.memory_logfile.close()
         self.logfile.close()
 
     def log(self, line):
@@ -346,6 +382,11 @@ class Logger(LogFilePathFinder):
         if not line.endswith('\n'):
             line += '\n'
         self.logfile.write(line)
+
+    def log_memory(self, line):
+        if not line.endswith('\n'):
+            line += '\n'
+        self.memory_logfile.write(line)
 
 
 def main():
