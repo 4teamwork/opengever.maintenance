@@ -32,8 +32,11 @@ from plone import api
 from Products.CMFPlone.interfaces import IPloneSiteRoot
 from zope.annotation import IAnnotations
 from zope.component import getUtility
+from zope.component.hooks import getSite
+from zope.component.hooks import setSite
 from zope.intid.interfaces import IIntIds
 import argparse
+import gc
 import json
 import logging
 import os
@@ -198,6 +201,26 @@ class ArchivalFileChecker(object):
         except ValueError:
             return 0
 
+    def collect_garbage(self, site):
+        # In order to get rid of leaking references, the Plone site needs to be
+        # re-set in regular intervals using the setSite() hook. This reassigns
+        # it to the SiteInfo() module global in zope.component.hooks, and
+        # therefore allows the Python garbage collector to cut loose references
+        # it was previously holding on to.
+        setSite(getSite())
+
+        # Trigger garbage collection for the cPickleCache
+        site._p_jar.cacheGC()
+
+        # Also trigger Python garbage collection.
+        gc.collect()
+
+        # (These two don't seem to affect the memory high-water-mark a lot,
+        # but result in a more stable / predictable growth over time.
+        #
+        # But should this cause problems at some point, it's safe
+        # to remove these without affecting the max memory consumed too much.)
+
     def _check_dossier(self, dossier):
         """Check an individual dossier's documents for missing archival file.
 
@@ -218,6 +241,12 @@ class ArchivalFileChecker(object):
         for doc_brain in contained_docs:
             doc = doc_brain.getObject()
             doc_intid = self.intids.getId(doc)
+
+            # GC every 500 items proved a happy medium between memory
+            # high watermark and slowdown in runtime
+            if self.checked_docs_count % 500 == 0:
+                # Trigger GC to keep memory usage in check
+                self.collect_garbage(self.context)
 
             # Determine if this document should have an archival file
             should_have_archival_file = self.should_have_archival_file(doc)
@@ -403,6 +432,9 @@ def main():
 
     app = setup_app()
     portal = setup_plone(app, options)
+
+    # Set pickle cache size to zero to avoid unbounded memory growth
+    portal._p_jar._cache.cache_size = 0
 
     with Logger('archival-file-checker') as logger:
         if options.dryrun:
