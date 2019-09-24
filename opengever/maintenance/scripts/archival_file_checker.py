@@ -32,9 +32,15 @@ from plone import api
 from Products.CMFPlone.interfaces import IPloneSiteRoot
 from zope.annotation import IAnnotations
 from zope.component import getUtility
+from zope.component.hooks import getSite
+from zope.component.hooks import setSite
 from zope.intid.interfaces import IIntIds
 import argparse
+import gc
+import json
 import logging
+import os
+import subprocess
 import sys
 import transaction
 
@@ -63,9 +69,15 @@ class ArchivalFileChecker(object):
 
         self.log = logger.log
         self.log_to_file = logger.log_to_file
+        self.log_memory = logger.log_memory
 
         self.catalog = api.portal.get_tool('portal_catalog')
+        self.intids = getUtility(IIntIds)
         self.all_dossier_stats = None
+
+        # Bookkeeping stats for memory usage
+        self.rss_max = 0
+        self.checked_docs_count = 0
 
     def run(self):
         assert IPloneSiteRoot.providedBy(self.context)
@@ -77,6 +89,7 @@ class ArchivalFileChecker(object):
 
         self.log("")
         self.log("Detailed log written to %s" % self.logger.logfile_path)
+        self.log("Memory log written to %s" % self.logger.memory_logfile_path)
 
     def check(self):
         """For all candidate dossiers, check if the documents contained in
@@ -116,13 +129,15 @@ class ArchivalFileChecker(object):
                 # it's archival files *can't* exist yet
                 continue
 
+            self.log_memstats()
+
             dossier_stats, docs_missing_archival_file = self._check_dossier(dossier)
-            dossier_path = brain.getPath()
-            all_dossier_stats[dossier_path] = dossier_stats
+            dossier_intid = self.intids.getId(dossier)
+            all_dossier_stats[dossier_intid] = dossier_stats
 
             if docs_missing_archival_file:
                 missing_by_dossier.append({
-                    'dossier': dossier,
+                    'dossier': dossier_intid,
                     'missing': docs_missing_archival_file})
 
         self.all_dossier_stats = all_dossier_stats
@@ -143,11 +158,11 @@ class ArchivalFileChecker(object):
         self.log_to_file("")
 
         for group in missing_by_dossier:
-            dossier = group['dossier']
-            docs = group['missing']
-            self.log_to_file(repr(dossier))
-            for doc in docs:
-                self.log_to_file("  %r" % doc)
+            dossier_intid = group['dossier']
+            doc_intids = group['missing']
+            self.log_to_file('Dossier (IntID): %s' % dossier_intid)
+            for doc_intid in doc_intids:
+                self.log_to_file("  Document (IntId): %r" % doc_intid)
             self.log_to_file("")
 
         # Display current queue length, just to be helpful
@@ -165,6 +180,46 @@ class ArchivalFileChecker(object):
             queued_docs, queued_dossiers))
 
         return missing_by_dossier
+
+    def log_memstats(self):
+        rss = self.get_rss() / 1024.0
+        self.rss_max = max(self.rss_max, rss)
+        memstats = {
+            'items': self.checked_docs_count,
+            'rss_current': rss,
+            'rss_max': self.rss_max,
+        }
+        self.log_memory(json.dumps(memstats))
+
+    def get_rss(self):
+        """Get current memory usage (RSS) of this process.
+        """
+        out = subprocess.check_output(
+            ["ps", "-p", "%s" % os.getpid(), "-o", "rss"])
+        try:
+            return int(out.splitlines()[-1].strip())
+        except ValueError:
+            return 0
+
+    def collect_garbage(self, site):
+        # In order to get rid of leaking references, the Plone site needs to be
+        # re-set in regular intervals using the setSite() hook. This reassigns
+        # it to the SiteInfo() module global in zope.component.hooks, and
+        # therefore allows the Python garbage collector to cut loose references
+        # it was previously holding on to.
+        setSite(getSite())
+
+        # Trigger garbage collection for the cPickleCache
+        site._p_jar.cacheGC()
+
+        # Also trigger Python garbage collection.
+        gc.collect()
+
+        # (These two don't seem to affect the memory high-water-mark a lot,
+        # but result in a more stable / predictable growth over time.
+        #
+        # But should this cause problems at some point, it's safe
+        # to remove these without affecting the max memory consumed too much.)
 
     def _check_dossier(self, dossier):
         """Check an individual dossier's documents for missing archival file.
@@ -185,6 +240,13 @@ class ArchivalFileChecker(object):
         docs_missing_archival_file = []
         for doc_brain in contained_docs:
             doc = doc_brain.getObject()
+            doc_intid = self.intids.getId(doc)
+
+            # GC every 500 items proved a happy medium between memory
+            # high watermark and slowdown in runtime
+            if self.checked_docs_count % 500 == 0:
+                # Trigger GC to keep memory usage in check
+                self.collect_garbage(self.context)
 
             # Determine if this document should have an archival file
             should_have_archival_file = self.should_have_archival_file(doc)
@@ -200,7 +262,9 @@ class ArchivalFileChecker(object):
 
                 if should_have_archival_file:
                     dossier_stats['missing'] += 1
-                    docs_missing_archival_file.append(doc)
+                    docs_missing_archival_file.append(doc_intid)
+
+            self.checked_docs_count += 1
 
         return dossier_stats, docs_missing_archival_file
 
@@ -233,7 +297,7 @@ class ArchivalFileChecker(object):
 
         dossier_table = TextTable()
         dossier_table.add_row((
-            'path',
+            'dossier_intid',
             'total_docs_in_dossier',
             'should_have_archival_file',
             'with',
@@ -300,21 +364,17 @@ class ArchivalFileChecker(object):
         queue = ann[MISSING_ARCHIVAL_FILE_KEY]
 
         for group in missing_by_dossier:
-            dossier = group['dossier']
+            dossier_intid = group['dossier']
             missing = group['missing']
-            self.log("  Queueing %s documents for %r" % (len(missing), dossier))
-
-            intids = getUtility(IIntIds)
-            dossier_intid = intids.getId(dossier)
+            self.log("  Queueing %s documents for Dossier %r" % (len(missing), dossier_intid))
 
             if dossier_intid in queue:
-                self.log('  (Replacing already queued documents for %r)' % dossier)
+                self.log('  (Replacing already queued documents for Dossier %r)' % dossier_intid)
 
             queue[dossier_intid] = IITreeSet()
-            for doc in missing:
-                intid = intids.getId(doc)
-                queue[dossier_intid].add(intid)
-                self.log("    Queued: IntId %s (%r)" % (intid, doc))
+            for doc_intid in missing:
+                queue[dossier_intid].add(doc_intid)
+                self.log("    Queued Document: IntId %s" % (doc_intid))
 
         self.log("Done. Queued %s documents for conversion" % total_missing)
 
@@ -328,12 +388,15 @@ class Logger(LogFilePathFinder):
     def __init__(self, filename_basis):
         super(Logger, self).__init__()
         self.logfile_path = self.get_logfile_path(filename_basis)
+        self.memory_logfile_path = self.get_logfile_path(filename_basis + '-memory')
 
     def __enter__(self):
         self.logfile = open(self.logfile_path, 'w')
+        self.memory_logfile = open(self.memory_logfile_path, 'w')
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.memory_logfile.close()
         self.logfile.close()
 
     def log(self, line):
@@ -346,6 +409,11 @@ class Logger(LogFilePathFinder):
         if not line.endswith('\n'):
             line += '\n'
         self.logfile.write(line)
+
+    def log_memory(self, line):
+        if not line.endswith('\n'):
+            line += '\n'
+        self.memory_logfile.write(line)
 
 
 def main():
@@ -364,6 +432,9 @@ def main():
 
     app = setup_app()
     portal = setup_plone(app, options)
+
+    # Set pickle cache size to zero to avoid unbounded memory growth
+    portal._p_jar._cache.cache_size = 0
 
     with Logger('archival-file-checker') as logger:
         if options.dryrun:
