@@ -216,6 +216,68 @@ OPTIONAL_WITHOUT_DEFAULT = {
     'IDispositionSchema': [
         'transfer_number',  # TextLine - mv=None
     ],
+    'IARPCaseBehavior2': [
+        'applicant',  # Choice - mv=None
+        'location',   # Textline - mv=None
+        'requestType',   # Choice - mv=None
+        'usage',   # Choice - mv=None
+        'coordinateX',   # Int - mv=None
+        'coordinateY',   # Int - mv=None
+        'areaNew',   # Choice - mv=None
+        'volumeNew',   # Choice - mv=None
+        'volumeNew',   # Choice - mv=None
+        'agent',  # List - mv=None
+        'community',  # List - mv=None
+        'assekNumber',  # List - mv=None
+        'zones',   # List - mv=None
+        'approval',  # Bool - mv=None
+        'conditionDmPf',  # Bool - mv=None
+        'conditionEnvironment',  # Bool - mv=None
+        'legalTitle',  # list - mv=None
+    ],
+    'ISKAKRCaseBehavior': [
+        'tablingNumber',  # Textline - mv=None
+        'presidentOfComission',   # Choice (Textline) - mv=None
+        'appropriate',   # List - mv=None
+        'firstReading',   # Date - mv=None
+        'secondReading',   # Date - mv=None
+    ],
+    'IKRContactAddition': [
+        'community',  # Choice - mv=None
+        'parties',  # Choice - mv=None
+        'entry',  # Date - mv=None
+        'job',  # Tuple - mv=None
+        'hometown',  # Tuple - mv=None
+        'private_address',  # Textline - mv=None
+        'private_zipcode',  # Textline - mv=None
+        'private_city',  # Textline - mv=None
+        'private_city',  # Textline - mv=None
+        'comment',  # Text - mv=None
+    ],
+    'IRRProtocolBehavior': [
+        'keywordGovernmentMinutes',  # Choice - mv=None
+    ],
+    'IGDGEACaseBehavior': [
+        'department',  # Choice - mv=None
+    ],
+    'IBDBDSBaseBehavior': [
+        'bd_department',  # Choice - mv=None
+    ],
+    'IBDBDSCaseBehavior2': [
+        'commune',  # List - mv=None
+        'gsNumber',  # Text - mv=None
+    ],
+    'IBDBDSCaseBDBehavior': [
+        'bdPlaintNumber',  # Textline - mv=None
+    ],
+    'IBDBDSCaseVGBGBehavior': [
+        'vgPlaintNumber',  # Textline - mv=None
+        'bgPlaintNumber',  # Textline - mv=None
+    ],
+    'IDIADACaseBehavior': [
+        'karcEventIdentifier',  # Textline - mv=None
+        'dmpfObjectIdentifier',  # Textline - mv=None
+    ],
 }
 
 
