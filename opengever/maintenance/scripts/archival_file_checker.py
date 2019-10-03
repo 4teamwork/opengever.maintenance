@@ -21,6 +21,8 @@ from BTrees.IOBTree import IOBTree
 from collections import Counter
 from collections import OrderedDict
 from ftw.bumblebee.interfaces import IBumblebeeDocument
+from opengever.document.archival_file import ArchivalFileConverter
+from opengever.document.archival_file import STATE_FAILED_TEMPORARILY
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
@@ -28,6 +30,7 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.nightly_archival_file_job import MISSING_ARCHIVAL_FILE_KEY
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
+from opengever.private.dossier import IPrivateDossier
 from plone import api
 from Products.CMFPlone.interfaces import IPloneSiteRoot
 from zope.annotation import IAnnotations
@@ -99,6 +102,7 @@ class ArchivalFileChecker(object):
         - is resolved
         - doesn't have any after-resolve jobs pending
         - isn't a subdossier (we'll check docs recursively)
+        - isn't in the private area
 
         For each dossier we'll gather some stats that allow us to cross-check
         that the script is operating correctly, even though in the end we
@@ -124,6 +128,11 @@ class ArchivalFileChecker(object):
 
         for brain in resolved_dossier_brains:
             dossier = brain.getObject()
+
+            if IPrivateDossier.providedBy(dossier):
+                # Documents in private dossiers don't need archival files
+                continue
+
             if self.after_resolve_jobs_pending(dossier):
                 # Nightly resolve job for this dossier hasn't run yet, so
                 # it's archival files *can't* exist yet
@@ -283,6 +292,13 @@ class ArchivalFileChecker(object):
 
         bdoc = IBumblebeeDocument(doc)
         if not bdoc.is_convertable():
+            return False
+
+        conversion_state = ArchivalFileConverter(doc).get_state()
+        if conversion_state == STATE_FAILED_TEMPORARILY:
+            # FAILED_TEMPORARILY really is quite permanent in most cases.
+            # Currently it rather means that Bumblebee did post back an
+            # explicit error.
             return False
 
         return True
