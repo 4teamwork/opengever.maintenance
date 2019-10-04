@@ -242,6 +242,11 @@ OPTIONAL_WITHOUT_DEFAULT = {
         'firstReading',   # Date - mv=None
         'secondReading',   # Date - mv=None
     ],
+    'ISKARRCaseBehavior': [
+        'leadingUnit',  # List - mv=None
+        'entryNumber',   # Textline - mv=None
+        'entryNumberYear',   # Textline - mv=None
+    ],
     'IKRContactAddition': [
         'community',  # Choice - mv=None
         'parties',  # Choice - mv=None
