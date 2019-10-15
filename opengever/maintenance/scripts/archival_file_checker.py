@@ -13,6 +13,9 @@ queue_missing
     Reports the documents, and additionally queues them for conversion by
     a nightly job (by adding them to a persistent queue on the site root).
 
+reset_queue
+    Reset the current persistent queue.
+
 The script will display some basic console output, and automatically log
 that ouput and some more detailed information to a logfile.
 """
@@ -85,8 +88,12 @@ class ArchivalFileChecker(object):
     def run(self):
         assert IPloneSiteRoot.providedBy(self.context)
 
-        missing_by_dossier = self.check()
+        if self.options.cmd == 'reset_queue':
+            self.reset_queue()
+            self.log("Queue reset")
+            return
 
+        missing_by_dossier = self.check()
         if self.options.cmd == 'queue_missing':
             self.queue_missing(missing_by_dossier)
 
@@ -394,6 +401,13 @@ class ArchivalFileChecker(object):
 
         self.log("Done. Queued %s documents for conversion" % total_missing)
 
+    def reset_queue(self):
+        assert IPloneSiteRoot.providedBy(self.context)
+
+        ann = IAnnotations(self.context)
+        if MISSING_ARCHIVAL_FILE_KEY in ann:
+            ann.pop(MISSING_ARCHIVAL_FILE_KEY)
+
 
 class Logger(LogFilePathFinder):
     """Quick & dirty logging facility that allows us to display and log
@@ -434,7 +448,7 @@ class Logger(LogFilePathFinder):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('cmd', choices=['report_missing', 'queue_missing'],
+    parser.add_argument('cmd', choices=['report_missing', 'queue_missing', 'reset_queue'],
                         help='Command')
     parser.add_argument('-s', dest='site_root', default=None,
                         help='Absolute path to the Plone site')
