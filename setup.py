@@ -4,6 +4,7 @@ import os
 version = '1.0.dev0'
 
 tests_require = [
+    'ftw.bumblebee[tests]',
     'ftw.testing',
     'plone.app.testing',
     'plone.testing',
