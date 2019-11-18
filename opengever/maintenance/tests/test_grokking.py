@@ -1,8 +1,8 @@
 from opengever.maintenance.testing import OG_MAINTENANCE_INTEGRATION
-import unittest2
+import unittest
 
 
-class TestZCML(unittest2.TestCase):
+class TestZCML(unittest.TestCase):
 
     layer = OG_MAINTENANCE_INTEGRATION
 
