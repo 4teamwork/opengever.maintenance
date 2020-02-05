@@ -80,13 +80,23 @@ def remove_catalog_indexes(portal):
             logger.info('Removed catalog index %s.', index)
 
     catalog.clearIndex('Title')
+    title_index = catalog._catalog.getIndex('Title')
+
+    if 'searchable_filing_no' in catalog._catalog.indexes:
+        searchable_filing_no_index = catalog._catalog.getIndex('searchable_filing_no')
+        catalog.clearIndex('searchable_filing_no')
+    else:
+        searchable_filing_no_index = None
+
     lexicon = catalog['plone_lexicon']
     lexicon.clear()
-    logger.info('plone_lexicon cleared. Reindexing Title...')
-    title_index = catalog._catalog.getIndex('Title')
+    logger.info('plone_lexicon cleared. Reindexing ZCTextIndices...')
+
     items = catalog.unrestrictedSearchResults()
     for item in items:
         title_index.index_object(item.getRID(), item)
+        if searchable_filing_no_index:
+            searchable_filing_no_index.index_object(item.getRID(), item)
 
 
 if __name__ == '__main__':
