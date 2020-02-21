@@ -1,20 +1,19 @@
-from openpyxl import Workbook
-from openpyxl.styles import Font
-from Products.Five.browser import BrowserView
-from opengever.setup.sections.xlssource import xlrd_xls2array
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.repository.interfaces import IRepositoryFolderRecords
+from opengever.setup.sections.xlssource import xlrd_xls2array
+from openpyxl import Workbook
+from openpyxl.styles import Font
+from plone import api
+from Products.Five.browser import BrowserView
 import argparse
 import sys
 
 
-class RepositoryExcelAnalyser(BrowserView):
+class RepositoryExcelAnalyser(object):
 
     def __init__(self, mapping_path, analyse_path):
         self.number_changes = {}
-
-        # self.diff_xlsx_path = '/Users/flipsi/Downloads/hba_os_migration.xlsx'
-        # self.analyse_xlsx_path = '/Users/flipsi/projects/opengever/sg/analyse.xlsx'
 
         self.diff_xlsx_path = mapping_path
         self.analyse_xlsx_path = analyse_path
