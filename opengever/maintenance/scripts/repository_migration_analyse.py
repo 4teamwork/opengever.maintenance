@@ -55,7 +55,9 @@ class RepositoryExcelAnalyser(object):
                 'need_number_change': need_number_change,
                 'need_move': need_move,
                 'old_item': old_item,
-                'new_item': new_item
+                'new_item': new_item,
+                'repository_depth_violated': self.is_repository_depth_violated(
+                    new_item, old_item)
             }
 
             analysed_rows.append(analyse)
@@ -97,6 +99,15 @@ class RepositoryExcelAnalyser(object):
 
         return need_number_change, need_move
 
+    def is_repository_depth_violated(self, new_item, old_item):
+        max_depth = api.portal.get_registry_record(
+            interface=IRepositoryFolderRecords, name='maximum_repository_depth')
+
+        if new_item['position'] and len(new_item['position']) > max_depth:
+            return True
+
+        return False
+
     def export_to_excel(self, rows):
         workbook = self.prepare_workbook(rows)
         # Save the Workbook-data in to a StringIO
@@ -117,7 +128,7 @@ class RepositoryExcelAnalyser(object):
         labels = [
             'Neu: Position', 'Neu: Titel', 'Neu: Description',
             'Alt: Position', 'Alt: Titel', 'Alt: Description',
-            'Umbenennung', 'Nummer Anpassung', 'Move',
+            'Umbenennung', 'Nummer Anpassung', 'Move', 'Verletzt Max. Tiefe'
         ]
 
         for i, label in enumerate(labels, 1):
@@ -137,6 +148,7 @@ class RepositoryExcelAnalyser(object):
                 'x' if data['need_rename'] else '',
                 'x' if data['need_number_change'] else '',
                 'x' if data['need_move'] else '',
+                'x' if data['repository_depth_violated'] else '',
             ]
 
             for column, attr in enumerate(values, 1):
