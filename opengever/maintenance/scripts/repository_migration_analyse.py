@@ -1,11 +1,12 @@
+from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.interfaces import IRepositoryFolderRecords
 from opengever.setup.sections.xlssource import xlrd_xls2array
 from openpyxl import Workbook
 from openpyxl.styles import Font
 from plone import api
-from Products.Five.browser import BrowserView
 import argparse
 import sys
 
@@ -17,6 +18,8 @@ class RepositoryExcelAnalyser(object):
 
         self.diff_xlsx_path = mapping_path
         self.analyse_xlsx_path = analyse_path
+        self._reference_repository_mapping = None
+        self.catalog = api.portal.get_tool('portal_catalog')
 
     def analyse(self):
         sheets = xlrd_xls2array(self.diff_xlsx_path)
@@ -57,6 +60,8 @@ class RepositoryExcelAnalyser(object):
                 'old_item': old_item,
                 'new_item': new_item,
                 'repository_depth_violated': self.is_repository_depth_violated(
+                    new_item, old_item),
+                'leaf_node_violated': need_move and self.is_leaf_node_principle_violated(
                     new_item, old_item)
             }
 
@@ -108,6 +113,26 @@ class RepositoryExcelAnalyser(object):
 
         return False
 
+    def is_leaf_node_principle_violated(self, new_item, old_item):
+        parent_number = new_item['position'][:-1]
+        parent_repo = self.get_repository_reference_mapping().get(parent_number)
+        if not parent_repo:
+            # Parent does not exist yet, so nothing to worry about it
+            return False
+
+        has_dossiers = any([IDossierMarker.providedBy(item) for item in
+                            parent_repo.objectValues()])
+        return has_dossiers
+
+    def get_repository_reference_mapping(self):
+        if not self._reference_repository_mapping:
+            repos = [brain.getObject() for brain in
+                     self.catalog(object_provides=IRepositoryFolder.__identifier__)]
+            self._reference_repository_mapping = {
+                repo.get_repository_number(): repo for repo in repos}
+
+        return self._reference_repository_mapping
+
     def export_to_excel(self, rows):
         workbook = self.prepare_workbook(rows)
         # Save the Workbook-data in to a StringIO
@@ -128,7 +153,8 @@ class RepositoryExcelAnalyser(object):
         labels = [
             'Neu: Position', 'Neu: Titel', 'Neu: Description',
             'Alt: Position', 'Alt: Titel', 'Alt: Description',
-            'Umbenennung', 'Nummer Anpassung', 'Move', 'Verletzt Max. Tiefe'
+            'Umbenennung', 'Nummer Anpassung', 'Move', 'Verletzt Max. Tiefe',
+            'Verletzt Leafnode Prinzip'
         ]
 
         for i, label in enumerate(labels, 1):
@@ -149,6 +175,7 @@ class RepositoryExcelAnalyser(object):
                 'x' if data['need_number_change'] else '',
                 'x' if data['need_move'] else '',
                 'x' if data['repository_depth_violated'] else '',
+                'x' if data['leaf_node_violated'] else '',
             ]
 
             for column, attr in enumerate(values, 1):
