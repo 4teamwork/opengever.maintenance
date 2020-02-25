@@ -78,20 +78,20 @@ def main():
     app = setup_app()
     setup_plone(app)
 
-    groupname = args[0]
-    group = api.group.get(groupname)
+    group_id = args[0]
+    group = api.group.get(group_id)
     if not group and not options.force:
         print "Group does not exist"
         print "Available groups"
         print map(lambda group: group.id, api.group.get_groups())
         sys.exit(1)
 
-    dossier_lister = DossierSharedWithGroupLister(groupname)
+    dossier_lister = DossierSharedWithGroupLister(group_id)
     dossier_lister.list_dossiers_shared_with_group()
     dossier_lister.print_table()
 
     log_filename = LogFilePathFinder().get_logfile_path(
-        'list_dossiers_shared_with_{}'.format(groupname), extension="csv")
+        'list_dossiers_shared_with_{}'.format(group_id), extension="csv")
     with open(log_filename, "w") as logfile:
         dossier_lister.table.write_csv(logfile)
 
