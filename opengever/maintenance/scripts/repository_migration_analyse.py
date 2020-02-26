@@ -51,12 +51,20 @@ class RepositoryExcelAnalyser(object):
             if new_item['position']:
                 new_item['position'] = new_item['position'].replace('.', '')
 
+            new_number = None
+            new_parent_position = None
+
             needs_create = not bool(old_item['position'])
             need_number_change, need_move = self.needs_number_change_or_move(new_item, old_item)
+            if need_number_change:
+                new_number = self.get_new_number(new_item)
+            if need_move:
+                new_parent_position = self.get_new_parent_position(new_item)
+
             analyse = {
-                'need_rename': new_item['title'] != old_item['title'],
-                'need_number_change': need_number_change,
-                'need_move': need_move,
+                'new_title': self.get_new_title(new_item, old_item),
+                'new_number': new_number,
+                'new_parent_position': new_parent_position,
                 'old_item': old_item,
                 'new_item': new_item,
                 'repository_depth_violated': self.is_repository_depth_violated(
@@ -68,6 +76,22 @@ class RepositoryExcelAnalyser(object):
             analysed_rows.append(analyse)
 
         self.export_to_excel(analysed_rows)
+
+    def get_new_title(self, new_item, old_item):
+        """Returns the new title or none if no rename is necessary."""
+        if new_item['title'] != old_item['title']:
+            return new_item['title']
+
+        return None
+
+    def get_new_number(self, new_item):
+        """Returns latest part of the position - the new referencenumber
+        prefix"""
+        return new_item['position'][-1]
+
+    def get_new_parent_position(self, new_item):
+        """Returns the new parent position"""
+        return new_item['position'][:-1]
 
     def needs_move(self, new_item, old_item):
         if not old_item['position'] or not new_item['position']:
@@ -153,7 +177,7 @@ class RepositoryExcelAnalyser(object):
         labels = [
             'Neu: Position', 'Neu: Titel', 'Neu: Description',
             'Alt: Position', 'Alt: Titel', 'Alt: Description',
-            'Umbenennung', 'Nummer Anpassung', 'Move', 'Verletzt Max. Tiefe',
+            'Umbenennung (Neuer Titel)', 'Nummer Anpassung (Neuer `Präfix`)', 'Verschiebung (Aktenzeichen neues Parent)', 'Verletzt Max. Tiefe',
             'Verletzt Leafnode Prinzip'
         ]
 
@@ -171,9 +195,9 @@ class RepositoryExcelAnalyser(object):
                 data['old_item']['position'],
                 data['old_item']['title'],
                 data['old_item']['description'],
-                'x' if data['need_rename'] else '',
-                'x' if data['need_number_change'] else '',
-                'x' if data['need_move'] else '',
+                data['new_title'],
+                data['new_number'],
+                data['new_parent_position'],
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
             ]
