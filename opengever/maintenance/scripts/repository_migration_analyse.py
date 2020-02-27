@@ -50,6 +50,10 @@ class RepositoryExcelAnalyser(object):
             if new_item['position']:
                 new_item['position'] = new_item['position'].replace('.', '')
 
+            # Ignore empty rows
+            if not old_item['position'] and  not new_item['position']:
+                continue
+
             new_number = None
             new_parent_position = None
 
