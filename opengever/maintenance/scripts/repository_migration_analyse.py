@@ -18,6 +18,7 @@ class RepositoryExcelAnalyser(object):
 
         self.diff_xlsx_path = mapping_path
         self.analyse_xlsx_path = analyse_path
+        self.analysed_rows = []
         self._reference_repository_mapping = None
         self.catalog = api.portal.get_tool('portal_catalog')
 
@@ -27,8 +28,6 @@ class RepositoryExcelAnalyser(object):
             raise Exception('multiple sheets')
 
         data = sheets[0]['sheet_data']
-
-        analysed_rows = []
 
         # Start on row 16 anything else is header
         for row in data[16:]:
@@ -73,9 +72,7 @@ class RepositoryExcelAnalyser(object):
                     new_item, old_item)
             }
 
-            analysed_rows.append(analyse)
-
-        self.export_to_excel(analysed_rows)
+            self.analysed_rows.append(analyse)
 
     def get_new_title(self, new_item, old_item):
         """Returns the new title or none if no rename is necessary."""
@@ -157,8 +154,8 @@ class RepositoryExcelAnalyser(object):
 
         return self._reference_repository_mapping
 
-    def export_to_excel(self, rows):
-        workbook = self.prepare_workbook(rows)
+    def export_to_excel(self):
+        workbook = self.prepare_workbook(self.analysed_rows)
         # Save the Workbook-data in to a StringIO
         return workbook.save(filename=self.analyse_xlsx_path)
 
@@ -222,6 +219,7 @@ def main():
 
     analyser = RepositoryExcelAnalyser(options.mapping, options.output)
     analyser.analyse()
+    analyser.export_to_excel()
 
 
 if __name__ == '__main__':
