@@ -1,3 +1,7 @@
+from collective.transmogrifier.transmogrifier import Transmogrifier
+from opengever.bundle.ldap import DisabledLDAP
+from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
+from opengever.bundle.sections.commit import INTERMEDIATE_COMMITS_KEY
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
@@ -7,8 +11,12 @@ from opengever.setup.sections.xlssource import xlrd_xls2array
 from openpyxl import Workbook
 from openpyxl.styles import Font
 from plone import api
+from zope.annotation import IAnnotations
 import argparse
+import json
+import shutil
 import sys
+import tempfile
 
 
 class RepositoryExcelAnalyser(object):
@@ -234,6 +242,52 @@ class RepositoryExcelAnalyser(object):
             for column, attr in enumerate(values, 1):
                 cell = sheet.cell(row=1 + row, column=column)
                 cell.value = attr
+
+
+class RepositoryMigrator(object):
+
+    def __init__(self, operations_list):
+        self.operations_list = operations_list
+
+    def run(self):
+        self.create_repository_folders(self.items_to_create())
+
+    def items_to_create(self):
+        return [item for item in self.operations_list if item['new_position']]
+
+    def create_repository_folders(self, items):
+        """Add repository folders - by using the ogg.bundle import. """
+
+        bundle_items = []
+        for item in items:
+            # Bundle expect the format [[repository], [dossier]]
+            parent_reference = [[int(x) for x in list(item['new_position'])]]
+            from uuid import uuid4
+            bundle_items.append(
+                {'guid': uuid4().hex[:8],
+                 'description': item['new_item']['description'],
+                 'parent_reference': parent_reference,
+                 'reference_number_prefix': item['new_item']['position'][-1],
+                 'review_state': 'repositoryfolder-state-active',
+                 'title_de': item['new_item']['title']})
+
+        tmpdirname = tempfile.mkdtemp()
+        with open('{}/repofolders.json'.format(tmpdirname), 'w') as _file:
+            json.dump(bundle_items, _file)
+
+        self.start_bundle_import(tmpdirname)
+
+        shutil.rmtree(tmpdirname)
+
+    def start_bundle_import(self, bundle_path):
+        portal = api.portal.get()
+        transmogrifier = Transmogrifier(portal)
+        ann = IAnnotations(transmogrifier)
+        ann[BUNDLE_PATH_KEY] = bundle_path
+        ann[INTERMEDIATE_COMMITS_KEY] = False
+
+        with DisabledLDAP(portal):
+            transmogrifier(u'opengever.bundle.oggbundle')
 
 
 def main():
