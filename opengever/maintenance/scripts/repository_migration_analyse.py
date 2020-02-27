@@ -56,15 +56,19 @@ class RepositoryExcelAnalyser(object):
 
             new_number = None
             new_parent_position = None
+            parent_of_new_position = None
 
-            needs_create = not bool(old_item['position'])
+            needs_creation = not bool(old_item['position'])
             need_number_change, need_move = self.needs_number_change_or_move(new_item, old_item)
             if need_number_change:
                 new_number = self.get_new_number(new_item)
             if need_move:
                 new_parent_position = self.get_new_parent_position(new_item)
+            if needs_creation:
+                parent_of_new_position = self.get_parent_of_new_position(new_item)
 
             analyse = {
+                'new_position': parent_of_new_position,
                 'new_title': self.get_new_title(new_item, old_item),
                 'new_number': new_number,
                 'new_parent_position': new_parent_position,
@@ -93,6 +97,20 @@ class RepositoryExcelAnalyser(object):
     def get_new_parent_position(self, new_item):
         """Returns the new parent position"""
         return new_item['position'][:-1]
+
+    def get_parent_of_new_position(self, new_item):
+        final_parent_number = new_item['position'][:-1]
+
+        parent_row = [item for item in self.analysed_rows
+                      if item['new_item']['position'] == final_parent_number]
+
+        if not parent_row:
+            return final_parent_number
+
+        # The parent will be moved to the right position so we need to add
+        # the subrepofolder on the "old position"
+        return parent_row[0]['old_item']['position']
+
 
     def needs_move(self, new_item, old_item):
         if not old_item['position'] or not new_item['position']:
@@ -176,9 +194,18 @@ class RepositoryExcelAnalyser(object):
     def insert_label_row(self, sheet):
         title_font = Font(bold=True)
         labels = [
+            # metadata
             'Neu: Position', 'Neu: Titel', 'Neu: Description',
             'Alt: Position', 'Alt: Titel', 'Alt: Description',
-            'Umbenennung (Neuer Titel)', 'Nummer Anpassung (Neuer `Präfix`)', 'Verschiebung (Aktenzeichen neues Parent)', 'Verletzt Max. Tiefe',
+
+            # operations
+            'Position Erstellen (Parent Aktenzeichen)',
+            'Umbenennung (Neuer Titel)',
+            'Nummer Anpassung (Neuer `Praefix`)',
+            'Verschiebung (Aktenzeichen neues Parent)',
+
+            # rule violations
+            'Verletzt Max. Tiefe',
             'Verletzt Leafnode Prinzip'
         ]
 
@@ -196,6 +223,7 @@ class RepositoryExcelAnalyser(object):
                 data['old_item']['position'],
                 data['old_item']['title'],
                 data['old_item']['description'],
+                data['new_position'],
                 data['new_title'],
                 data['new_number'],
                 data['new_parent_position'],
