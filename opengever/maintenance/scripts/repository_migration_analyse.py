@@ -9,6 +9,7 @@ from opengever.bundle.sections.commit import INTERMEDIATE_COMMITS_KEY
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.maintenance.scripts.update_object_ids import ObjectIDUpdater
 from opengever.repository.behaviors import referenceprefix
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.interfaces import IRepositoryFolderRecords
@@ -97,7 +98,7 @@ class RepositoryExcelAnalyser(object):
                 'uid': self.get_uuid_for_position(old_item['position']),
                 'new_position': parent_of_new_position,
                 'new_position_guid' : new_position_guid,
-                'new_title': self.get_new_title(new_item, old_item),
+                'new_title': self.get_new_title(new_item, old_item) if not needs_creation else None,
                 'new_number': new_number,
                 'new_parent_position': new_parent_position,
                 'new_parent_uid': new_parent_uid,
@@ -295,6 +296,7 @@ class RepositoryMigrator(object):
         self.create_repository_folders(self.items_to_create())
         self.move_branches(self.items_to_move())
         self.adjust_reference_number_prefix(self.items_to_adjust_number())
+        self.rename(self.items_to_rename())
 
     def items_to_create(self):
         return [item for item in self.operations_list if item['new_position']]
@@ -304,6 +306,9 @@ class RepositoryMigrator(object):
 
     def items_to_adjust_number(self):
         return [item for item in self.operations_list if item['new_number']]
+
+    def items_to_rename(self):
+        return [item for item in self.operations_list if item['new_title']]
 
     def create_repository_folders(self, items):
         """Add repository folders - by using the ogg.bundle import. """
@@ -385,6 +390,16 @@ class RepositoryMigrator(object):
                         'A parent of a repositoryfolder contains dossiers')
                 ref_adapter.set_number(
                     child, number=child.reference_number_prefix)
+
+    def rename(self, items):
+        for item in items:
+            repo = uuidToObject(item['uid'])
+
+            # Rename
+            repo.title_de = item['new_title']
+
+            # Adjust id if necessary
+            ObjectIDUpdater(repo, FakeOptions()).maybe_update_id()
 
 
 def main():
