@@ -1,4 +1,7 @@
+from Acquisition import aq_inner
+from Acquisition import aq_parent
 from collective.transmogrifier.transmogrifier import Transmogrifier
+from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
 from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
@@ -6,7 +9,7 @@ from opengever.bundle.sections.commit import INTERMEDIATE_COMMITS_KEY
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
-from opengever.repository.behaviors.referenceprefix import IReferenceNumberPrefix
+from opengever.repository.behaviors import referenceprefix
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.interfaces import IRepositoryFolderRecords
 from opengever.setup.sections.xlssource import xlrd_xls2array
@@ -360,9 +363,28 @@ class RepositoryMigrator(object):
         return self._reference_repository_mapping
 
     def adjust_reference_number_prefix(self, items):
+        parents = set()
         for item in items:
             repo = uuidToObject(item['uid'])
-            IReferenceNumberPrefix(repo).reference_number_prefix = item['new_number']
+            referenceprefix.IReferenceNumberPrefix(repo).reference_number_prefix = item['new_number']
+            parents.add(aq_parent(aq_inner(repo)))
+
+        self.regenerate_reference_number_mapping(list(parents))
+
+    def regenerate_reference_number_mapping(self, objs):
+        for obj in objs:
+            ref_adapter = IReferenceNumberPrefix(obj)
+            # This purges also the dossier mapping, but the parents does not
+            # contain any dossier otherwise something is wrong and an
+            # exception will be raised when looping over the childs.
+            ref_adapter.purge_mappings()
+
+            for child in obj.listFolderContents():
+                if not IRepositoryFolder.providedBy(child):
+                    raise Exception(
+                        'A parent of a repositoryfolder contains dossiers')
+                ref_adapter.set_number(
+                    child, number=child.reference_number_prefix)
 
 
 def main():
