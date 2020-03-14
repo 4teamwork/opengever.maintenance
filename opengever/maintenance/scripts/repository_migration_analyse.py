@@ -6,6 +6,7 @@ from opengever.bundle.sections.commit import INTERMEDIATE_COMMITS_KEY
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.repository.behaviors.referenceprefix import IReferenceNumberPrefix
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.interfaces import IRepositoryFolderRecords
 from opengever.setup.sections.xlssource import xlrd_xls2array
@@ -290,12 +291,16 @@ class RepositoryMigrator(object):
     def run(self):
         self.create_repository_folders(self.items_to_create())
         self.move_branches(self.items_to_move())
+        self.adjust_reference_number_prefix(self.items_to_adjust_number())
 
     def items_to_create(self):
         return [item for item in self.operations_list if item['new_position']]
 
     def items_to_move(self):
         return [item for item in self.operations_list if item['new_parent_position']]
+
+    def items_to_adjust_number(self):
+        return [item for item in self.operations_list if item['new_number']]
 
     def create_repository_folders(self, items):
         """Add repository folders - by using the ogg.bundle import. """
@@ -354,6 +359,10 @@ class RepositoryMigrator(object):
 
         return self._reference_repository_mapping
 
+    def adjust_reference_number_prefix(self, items):
+        for item in items:
+            repo = uuidToObject(item['uid'])
+            IReferenceNumberPrefix(repo).reference_number_prefix = item['new_number']
 
 
 def main():
