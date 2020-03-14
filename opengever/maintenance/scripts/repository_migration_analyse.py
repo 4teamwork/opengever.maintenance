@@ -1,4 +1,5 @@
 from collective.transmogrifier.transmogrifier import Transmogrifier
+from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
 from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
 from opengever.bundle.sections.commit import INTERMEDIATE_COMMITS_KEY
@@ -11,6 +12,9 @@ from opengever.setup.sections.xlssource import xlrd_xls2array
 from openpyxl import Workbook
 from openpyxl.styles import Font
 from plone import api
+from plone.app.uuid.utils import uuidToObject
+from plone.uuid.interfaces import IUUID
+from uuid import uuid4
 from zope.annotation import IAnnotations
 import argparse
 import json
@@ -30,6 +34,12 @@ class RepositoryExcelAnalyser(object):
         self._reference_repository_mapping = None
         self.catalog = api.portal.get_tool('portal_catalog')
 
+        # A mapping new_position_number:UID
+        self.position_uid_mapping = {}
+
+        # A mapping new_position_number:guid
+        self.position_guid_mapping = {}
+
     def analyse(self):
         sheets = xlrd_xls2array(self.diff_xlsx_path)
         if len(sheets) > 1:
@@ -37,8 +47,8 @@ class RepositoryExcelAnalyser(object):
 
         data = sheets[0]['sheet_data']
 
-        # Start on row 16 anything else is header
-        for row in data[16:]:
+        # Start on row 15 anything else is header
+        for row in data[15:]:
             new_item = {}
             if row[0] in ['', u'l\xf6schen']:
                 new_item['position'], new_item['title'], new_item['description'] = None, None, None
@@ -64,22 +74,29 @@ class RepositoryExcelAnalyser(object):
 
             new_number = None
             new_parent_position = None
+            new_parent_uid = None
+
             parent_of_new_position = None
+            new_position_guid = None
 
             needs_creation = not bool(old_item['position'])
             need_number_change, need_move = self.needs_number_change_or_move(new_item, old_item)
             if need_number_change:
                 new_number = self.get_new_number(new_item)
             if need_move:
-                new_parent_position = self.get_new_parent_position(new_item)
+                new_parent_position, new_parent_uid = self.get_new_parent_position_and_uid(new_item)
             if needs_creation:
                 parent_of_new_position = self.get_parent_of_new_position(new_item)
+                new_position_guid = uuid4().hex[:8]
 
             analyse = {
+                'uid': self.get_uuid_for_position(old_item['position']),
                 'new_position': parent_of_new_position,
+                'new_position_guid' : new_position_guid,
                 'new_title': self.get_new_title(new_item, old_item),
                 'new_number': new_number,
                 'new_parent_position': new_parent_position,
+                'new_parent_uid': new_parent_uid,
                 'old_item': old_item,
                 'new_item': new_item,
                 'repository_depth_violated': self.is_repository_depth_violated(
@@ -89,6 +106,10 @@ class RepositoryExcelAnalyser(object):
             }
 
             self.analysed_rows.append(analyse)
+            if not needs_creation:
+                self.position_uid_mapping[new_item['position']] = analyse['uid']
+            else:
+                self.position_guid_mapping[new_item['position']] = new_position_guid
 
     def get_new_title(self, new_item, old_item):
         """Returns the new title or none if no rename is necessary."""
@@ -102,9 +123,17 @@ class RepositoryExcelAnalyser(object):
         prefix"""
         return new_item['position'][-1]
 
-    def get_new_parent_position(self, new_item):
-        """Returns the new parent position"""
-        return new_item['position'][:-1]
+    def get_new_parent_position_and_uid(self, new_item):
+        """Returns the new parent position and the uid. If the object does not
+        yet exists it returns the guid."""
+
+        parent_position = new_item['position'][:-1]
+        if parent_position not in self.position_uid_mapping:
+            # Parent does not exist yet and will be created in the
+            # first step of the migration
+            return parent_position, self.position_guid_mapping[parent_position]
+
+        return parent_position, self.position_uid_mapping[parent_position]
 
     def get_parent_of_new_position(self, new_item):
         final_parent_number = new_item['position'][:-1]
@@ -118,7 +147,6 @@ class RepositoryExcelAnalyser(object):
         # The parent will be moved to the right position so we need to add
         # the subrepofolder on the "old position"
         return parent_row[0]['old_item']['position']
-
 
     def needs_move(self, new_item, old_item):
         if not old_item['position'] or not new_item['position']:
@@ -184,6 +212,14 @@ class RepositoryExcelAnalyser(object):
 
         return self._reference_repository_mapping
 
+    def get_uuid_for_position(self, position):
+        mapping = self.get_repository_reference_mapping()
+
+        if position and position in mapping:
+            return IUUID(mapping[position])
+
+        return None
+
     def export_to_excel(self):
         workbook = self.prepare_workbook(self.analysed_rows)
         # Save the Workbook-data in to a StringIO
@@ -248,12 +284,18 @@ class RepositoryMigrator(object):
 
     def __init__(self, operations_list):
         self.operations_list = operations_list
+        self._reference_repository_mapping = None
+        self.catalog = api.portal.get_tool('portal_catalog')
 
     def run(self):
         self.create_repository_folders(self.items_to_create())
+        self.move_branches(self.items_to_move())
 
     def items_to_create(self):
         return [item for item in self.operations_list if item['new_position']]
+
+    def items_to_move(self):
+        return [item for item in self.operations_list if item['new_parent_position']]
 
     def create_repository_folders(self, items):
         """Add repository folders - by using the ogg.bundle import. """
@@ -262,9 +304,8 @@ class RepositoryMigrator(object):
         for item in items:
             # Bundle expect the format [[repository], [dossier]]
             parent_reference = [[int(x) for x in list(item['new_position'])]]
-            from uuid import uuid4
             bundle_items.append(
-                {'guid': uuid4().hex[:8],
+                {'guid': item['new_position_guid'],
                  'description': item['new_item']['description'],
                  'parent_reference': parent_reference,
                  'reference_number_prefix': item['new_item']['position'][-1],
@@ -280,6 +321,8 @@ class RepositoryMigrator(object):
         shutil.rmtree(tmpdirname)
 
     def start_bundle_import(self, bundle_path):
+        add_guid_index()
+
         portal = api.portal.get()
         transmogrifier = Transmogrifier(portal)
         ann = IAnnotations(transmogrifier)
@@ -288,6 +331,29 @@ class RepositoryMigrator(object):
 
         with DisabledLDAP(portal):
             transmogrifier(u'opengever.bundle.oggbundle')
+
+    def move_branches(self, items):
+        mapping = self.get_repository_reference_mapping()
+        for item in items:
+            parent = uuidToObject(item['new_parent_uid'])
+            if not parent:
+                parent = self.catalog(guid=item['new_parent_uid'])[0].getObject()
+
+            repo = uuidToObject(item['uid'])
+            if not parent or not repo:
+                raise Exception('No parent or repo found for {}'.format(item))
+
+            api.content.move(source=repo, target=parent, safe_id=True)
+
+    def get_repository_reference_mapping(self):
+        if not self._reference_repository_mapping:
+            repos = [brain.getObject() for brain in
+                     self.catalog(object_provides=IRepositoryFolder.__identifier__)]
+            self._reference_repository_mapping = {
+                repo.get_repository_number(): repo for repo in repos}
+
+        return self._reference_repository_mapping
+
 
 
 def main():
