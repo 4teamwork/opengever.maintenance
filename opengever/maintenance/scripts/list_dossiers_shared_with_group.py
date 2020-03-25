@@ -8,6 +8,7 @@ mandatory arguments:
   group_name : name of the group for which we will search dossiers.
 
 """
+from ftw.upgrade.utils import SavepointIterator
 from opengever.base.role_assignments import ASSIGNMENT_VIA_SHARING
 from opengever.base.role_assignments import RoleAssignmentManager
 from opengever.maintenance.debughelpers import setup_app
@@ -38,19 +39,27 @@ class DossierSharedWithGroupLister(object):
         print("There are {} dossiers shared with {}".format(self.table.nrows,
                                                             self.group_id))
 
+    def dossier_iterator(self):
+        """We use the SavepointIterator to better control memory consumption
+        """
+        dossier_brains = api.content.find(allowedRolesAndUsers=u'user:{}'.format(self.group_id))
+
+        ndossiers = len(dossier_brains)
+        print("found {} dossiers".format(ndossiers))
+
+        dossier_generator = (brain.getObject() for brain in dossier_brains)
+        for i, dossier in enumerate(SavepointIterator(dossier_generator, 500)):
+            if i % 5000 == 0:
+                print("done with {}/{}; {:.2}%".format(i, ndossiers,
+                                                       100. * i / ndossiers))
+            yield dossier
+
     def get_dossiers_shared_with_group(self):
         """ Searches for all dossier shared with a given group.
         We make the assumption that the group has at least view permissions
         on such dossiers.
         """
-        dossier_brains = api.content.find(allowedRolesAndUsers=u'user:{}'.format(self.group_id))
-        ndossiers = len(dossier_brains)
-        print("found {} dossiers".format(ndossiers))
-        for i, dossier_brain in enumerate(dossier_brains):
-            if i % 5000 == 0:
-                print("done with {}/{}; {:.2}%".format(i, ndossiers,
-                                                       100. * i / ndossiers))
-            dossier = dossier_brain.getObject()
+        for dossier in self.dossier_iterator():
             assignments = RoleAssignmentManager(dossier).get_assignments_by_principal_id(self.group_id)
             sharing_assignment = self._find_sharing_assignment(assignments)
             if sharing_assignment:
