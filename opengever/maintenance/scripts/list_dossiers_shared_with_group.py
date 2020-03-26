@@ -16,12 +16,18 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
 from plone import api
+from zope.component.hooks import getSite
+from zope.component.hooks import setSite
+import gc
+import os
+import subprocess
 import sys
 
 
 class DossierSharedWithGroupLister(object):
 
-    def __init__(self, group_id):
+    def __init__(self, context, group_id):
+        self.context = context
         self.table = TextTable(col_max_width=60)
         self.table.add_row(["dossier path", "dossier title", "roles"])
         self.group_id = group_id
@@ -37,6 +43,35 @@ class DossierSharedWithGroupLister(object):
         print("\nSummary:")
         print("There are {} dossiers shared with {}".format(self.table.nrows,
                                                             self.group_id))
+    def get_rss(self):
+        """Get current memory usage (RSS) of this process.
+        """
+        out = subprocess.check_output(
+            ["ps", "-p", "%s" % os.getpid(), "-o", "rss"])
+        try:
+            return int(out.splitlines()[-1].strip())
+        except ValueError:
+            return 0
+
+    def collect_garbage(self, site):
+        # In order to get rid of leaking references, the Plone site needs to be
+        # re-set in regular intervals using the setSite() hook. This reassigns
+        # it to the SiteInfo() module global in zope.component.hooks, and
+        # therefore allows the Python garbage collector to cut loose references
+        # it was previously holding on to.
+        setSite(getSite())
+
+        # Trigger garbage collection for the cPickleCache
+        site._p_jar.cacheGC()
+
+        # Also trigger Python garbage collection.
+        gc.collect()
+
+        # (These two don't seem to affect the memory high-water-mark a lot,
+        # but result in a more stable / predictable growth over time.
+        #
+        # But should this cause problems at some point, it's safe
+        # to remove these without affecting the max memory consumed too much.)
 
     def get_dossiers_shared_with_group(self):
         """ Searches for all dossier shared with a given group.
@@ -48,8 +83,10 @@ class DossierSharedWithGroupLister(object):
         print("found {} dossiers".format(ndossiers))
         for i, dossier_brain in enumerate(dossier_brains):
             if i % 5000 == 0:
-                print("done with {}/{}; {:.2}%".format(i, ndossiers,
-                                                       100. * i / ndossiers))
+                self.collect_garbage(self.context)
+                rss = self.get_rss() / 1024.0
+                print("done with {}/{}; {:.1f}%; Memory: {}".format(
+                    i, ndossiers, 100. * i / ndossiers, rss))
             dossier = dossier_brain.getObject()
             assignments = RoleAssignmentManager(dossier).get_assignments_by_principal_id(self.group_id)
             sharing_assignment = self._find_sharing_assignment(assignments)
@@ -76,7 +113,10 @@ def main():
         sys.exit(1)
 
     app = setup_app()
-    setup_plone(app)
+    portal = setup_plone(app)
+
+    # Set pickle cache size to zero to avoid unbounded memory growth
+    portal._p_jar._cache.cache_size = 0
 
     group_id = args[0]
     group = api.group.get(group_id)
@@ -86,7 +126,7 @@ def main():
         print map(lambda group: group.id, api.group.get_groups())
         sys.exit(1)
 
-    dossier_lister = DossierSharedWithGroupLister(group_id)
+    dossier_lister = DossierSharedWithGroupLister(portal, group_id)
     dossier_lister.list_dossiers_shared_with_group()
     dossier_lister.print_table()
 
