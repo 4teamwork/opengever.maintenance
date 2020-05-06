@@ -31,6 +31,9 @@ For help-information type in the following:
     bin/instance run ./scripts/bumblebee_installation.py -h
 
 """
+# Avoid import error for Products.Archetypes.BaseBTreeFolder
+from Products.Archetypes import atapi  # noqa
+from collective.indexing.monkey import unpatch as unpatch_collective_indexing
 from ftw.bumblebee.document import DOCUMENT_CHECKSUM_ANNOTATION_KEY
 from ftw.bumblebee.interfaces import IBumblebeeConverter
 from ftw.bumblebee.interfaces import IBumblebeeDocument
@@ -45,6 +48,7 @@ from zope.annotation.interfaces import IAnnotations
 from zope.component import getUtility
 import logging
 import sys
+import time
 import transaction
 from opengever.mail.mail import IOGMailMarker
 
@@ -66,7 +70,7 @@ parser = OptionParser()
 
 parser.add_option("-m", "--mode", dest="mode", type="choice",
                   help="REQUIRED: Specify the upgrade-mode.",
-                  choices=['reindex', 'history', 'store', 'activate'],
+                  choices=['reindex', 'index-checksums', 'history', 'store', 'activate'],
                   metavar="reindex|history|store|activate")
 
 parser.add_option("-r", "--reset-timestamp", dest="reset", default=False,
@@ -127,6 +131,24 @@ def main(app, argv=sys.argv[1:]):
             converter.reindex()
 
         return transaction.commit()
+
+    elif mode == 'index-checksums':
+        LOG.info("Start indexing bumblebee checksums...")
+
+        solr_enabled = api.portal.get_registry_record(
+            'opengever.base.interfaces.ISearchSettings.use_solr',
+            default=False)
+        if not solr_enabled:
+            unpatch_collective_indexing()
+            LOG.info("Disabled collective.indexing")
+
+        start = time.time()
+        converter.index_checksums(intermediate_commit=options.intermediate_commit)
+        transaction.commit()
+        end = time.time()
+        LOG.info("Finished indexing bumblebee checksums. Duration: %ss" % (
+            end - start))
+        return
 
     elif mode == 'history':
         LOG.info("Start creating checksums for portal repository ...")
