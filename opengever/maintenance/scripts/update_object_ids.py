@@ -18,6 +18,7 @@ Notes:
 """
 
 from opengever.base.interfaces import IReferenceNumber
+from opengever.globalindex.handlers import task as task_handlers
 from opengever.journal import handlers as journal_handlers
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
@@ -31,17 +32,50 @@ import sys
 import transaction
 
 
-class DisabledJournaling(object):
-    """Context manager that temporarily disables creation of journal entries.
+class DeferredOrDisabledEventHandlers(object):
+    """Context manager that temporarily disables or defers events.
+
+     - Prevent creation of journal entries
+     - Defer syncing tasks to prevent issues with traversal to paths being
+       renamed
     """
 
     def __enter__(self):
+        self.disable_jounral_factory()
+        self.defer_task_syncing()
+
+    def disable_jounral_factory(self):
         self._orig_journal_factory = journal_handlers.journal_entry_factory
         journal_handlers.journal_entry_factory = self.dummy_journal_factory
 
+    def defer_task_syncing(self):
+        self.deferred_sync_task_call_arguments = []
+        self._orig_sync_task = task_handlers.sync_task
+
+        # this has to be an inner function so that we can use the reference to
+        # `self` to defer calls to sync_task
+        def deferred_sync_task(obj, event):
+            self.deferred_sync_task_call_arguments.append((obj, event))
+
+        task_handlers.sync_task = deferred_sync_task
+
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.enable_journal_factory()
+        self.perform_deferred_task_syncing()
+        self.enable_task_syncing()
+
+    def enable_journal_factory(self):
         journal_handlers.journal_entry_factory = self._orig_journal_factory
         self._orig_journal_factory = None
+
+    def perform_deferred_task_syncing(self):
+        for obj, event in self.deferred_sync_task_call_arguments:
+            self._orig_sync_task(obj, event)
+
+    def enable_task_syncing(self):
+        task_handlers.sync_task = self._orig_sync_task
+        self._orig_sync_task = None
+        self.deferred_sync_task_call_arguments = None
 
     @staticmethod
     def dummy_journal_factory(*args, **kwargs):
@@ -82,7 +116,7 @@ class ObjectIDUpdater(object):
             # wouldn't prevent reindexes during dry-run from ending up in Solr
             return
 
-        with DisabledJournaling():
+        with DeferredOrDisabledEventHandlers():
             obj = api.content.rename(self.obj, new_id)
 
         # Ensure that reference number didn't change
