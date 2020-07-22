@@ -19,6 +19,7 @@ Notes:
 
 from opengever.base.interfaces import IReferenceNumber
 from opengever.globalindex.handlers import task as task_handlers
+from opengever.globalindex.handlers.task import TaskSqlSyncer
 from opengever.journal import handlers as journal_handlers
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
@@ -27,9 +28,25 @@ from plone import api
 from plone.app.content.interfaces import INameFromTitle
 from plone.i18n.normalizer.interfaces import IURLNormalizer
 from zope.component import queryUtility
+from zope.container.interfaces import IContainerModifiedEvent
 import argparse
+import inspect
 import sys
 import transaction
+
+
+def marmoset_patch(old, new, extra_globals={}):
+    g = old.func_globals
+    g.update(extra_globals)
+    c = inspect.getsource(new)
+    exec c in g
+
+    old.func_code = g[new.__name__].func_code
+
+
+# deferred arguments will be injected via globals while patching
+def deferred_sync_task(obj, event):
+    deferred_arguments.append((obj, event))
 
 
 class DeferredOrDisabledEventHandlers(object):
@@ -52,17 +69,15 @@ class DeferredOrDisabledEventHandlers(object):
         self.deferred_sync_task_call_arguments = []
         self._orig_sync_task = task_handlers.sync_task
 
-        # this has to be an inner function so that we can use the reference to
-        # `self` to defer calls to sync_task
-        def deferred_sync_task(obj, event):
-            self.deferred_sync_task_call_arguments.append((obj, event))
-
-        task_handlers.sync_task = deferred_sync_task
+        extra_globals = {
+            'deferred_arguments': self.deferred_sync_task_call_arguments
+        }
+        marmoset_patch(task_handlers.sync_task, deferred_sync_task,
+                       extra_globals=extra_globals)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.enable_journal_factory()
         self.perform_deferred_task_syncing()
-        self.enable_task_syncing()
 
     def enable_journal_factory(self):
         journal_handlers.journal_entry_factory = self._orig_journal_factory
@@ -70,11 +85,11 @@ class DeferredOrDisabledEventHandlers(object):
 
     def perform_deferred_task_syncing(self):
         for obj, event in self.deferred_sync_task_call_arguments:
-            self._orig_sync_task(obj, event)
+            # this is the code that would be run by `sync_task`.
+            if IContainerModifiedEvent.providedBy(event):
+                return
+            TaskSqlSyncer(obj, event).sync()
 
-    def enable_task_syncing(self):
-        task_handlers.sync_task = self._orig_sync_task
-        self._orig_sync_task = None
         self.deferred_sync_task_call_arguments = None
 
     @staticmethod
