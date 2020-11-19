@@ -47,25 +47,22 @@ class RepositoryExcelAnalyser(object):
 
     def analyse(self):
         sheets = xlrd_xls2array(self.diff_xlsx_path)
-        if len(sheets) > 1:
-            raise Exception('multiple sheets')
-
         data = sheets[0]['sheet_data']
 
-        # Start on row 15 anything else is header
-        for row in data[15:]:
+        # Start on row 6 anything else is header
+        for row in data[6:]:
             new_item = {}
-            if row[0] in ['', u'l\xf6schen']:
+            if row[3] in ['', u'l\xf6schen']:
                 new_item['position'], new_item['title'], new_item['description'] = None, None, None
             else:
-                new_item['position'], new_item['title'] = row[0].split(' ', 1)
-                new_item['description'] = row[1]
+                new_item['position'] = row[5]
+                new_item['title'] = row[6]
+                new_item['description'] = row[7]
 
-            if row[2] == '':
+            if row[0] == '':
                 old_item = {'position': None, 'title': None,'description': None}
             else:
-                old_item = {'position': str(row[2]), 'title': row[4],
-                            'description': row[5]}
+                old_item = {'position': str(row[0]), 'title': row[1], 'description': row[2]}
 
             # Remove splitting dots - they're not usefull for comparing etc.
             if old_item['position']:
