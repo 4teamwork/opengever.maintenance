@@ -5,6 +5,8 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Add script to cleanup notifications for ToDo activities. [njohner]
+
 - Add option to index bumblebee checksums. [buchi]
 
 - Add script to export the dossier structure of a repofolder to an excel file. [njohner]
