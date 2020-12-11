@@ -294,6 +294,7 @@ class RepositoryMigrator(object):
         self.move_branches(self.items_to_move())
         self.adjust_reference_number_prefix(self.items_to_adjust_number())
         self.rename(self.items_to_rename())
+        self.update_description(self.operations_list)
         self.reindex()
         self.validate()
 
@@ -400,6 +401,16 @@ class RepositoryMigrator(object):
             # Adjust id if necessary
             ObjectIDUpdater(repo, FakeOptions()).maybe_update_id()
 
+    def update_description(self, items):
+        for item in items:
+            repo = uuidToObject(item['uid'])
+            if not repo:
+                continue
+
+            new_description = item['new_item']['description']
+            if repo.description != new_description:
+                repo.description = new_description
+
     def reindex(self):
         for item in self.operations_list:
             obj = uuidToObject(item['uid'])
@@ -407,7 +418,8 @@ class RepositoryMigrator(object):
                 # New created objects can be ignored
                 break
 
-            obj.reindexObject(idxs=['Title', 'sortable_title', 'path', 'reference'])
+            obj.reindexObject(idxs=['Title', 'sortable_title', 'path',
+                                    'reference', 'Description'])
 
 class FakeOptions(object):
     dry_run = False
