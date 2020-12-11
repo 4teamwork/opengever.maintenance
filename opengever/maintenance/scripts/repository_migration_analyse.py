@@ -17,6 +17,7 @@ from opengever.setup.sections.xlssource import xlrd_xls2array
 from openpyxl import Workbook
 from openpyxl.styles import Font
 from plone import api
+from plone.app.uuid.utils import uuidToCatalogBrain
 from plone.app.uuid.utils import uuidToObject
 from plone.uuid.interfaces import IUUID
 from uuid import uuid4
@@ -420,6 +421,25 @@ class RepositoryMigrator(object):
 
             obj.reindexObject(idxs=['Title', 'sortable_title', 'path',
                                     'reference', 'Description'])
+
+    def validate(self):
+        """This steps make sure that the repository system has
+        been correctly migrated."""
+
+        for item in self.operations_list:
+            obj = uuidToObject(item['uid'])
+
+            # Assert reference number, title and description on the object
+            assert item['new_item']['position'] == obj.get_repository_number()
+            assert item['new_item']['title'] == obj.title_de
+            assert item['new_item']['description'] == obj.description
+
+            # Assert catalog
+            brain = uuidToCatalogBrain(item['uid'])
+            expected_title = u'{} {}'.format(
+                item['new_item']['position'], item['new_item']['title'])
+            assert expected_title == brain.title_de
+
 
 class FakeOptions(object):
     dry_run = False
