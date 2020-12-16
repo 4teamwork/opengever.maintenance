@@ -2,10 +2,12 @@
 Allows to rename various aspects of a deployment.
 
 Example Usage:
-    bin/instance run rename_deployment.py --new-deployment-title="DI AGG" --new-au-title="DI AGG" --new-ou-title="DI AGG" --new-au-abbr="DI AGG"
+    bin/instance run rename_deployment.py --new-deployment-title="DI AGG" --new-au-title="DI AGG" --new-ou-title="DI AGG" --new-au-abbr="DI AGG"  --migrate-filing-numbers
 """
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
+from opengever.dossier.behaviors.filing import IFilingNumber
+from opengever.dossier.behaviors.filing import IFilingNumberMarker
 from opengever.dossier.dossiertemplate.behaviors import IDossierTemplateMarker
 from opengever.globalindex.handlers.task import sync_task
 from opengever.maintenance.debughelpers import setup_app
@@ -14,6 +16,7 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.ogds.base.utils import get_current_admin_unit
 from opengever.task.task import ITask
 from plone import api
+from zope.annotation import IAnnotations
 import logging
 import sys
 import transaction
@@ -28,6 +31,8 @@ for handler in logging.getLogger().handlers:
 def rename_deployment(plone, options):
     print '\n' * 4
     logger.info('Renaming deployment %r' % plone.id)
+    admin_unit = get_current_admin_unit()
+    old_au_title = admin_unit.title
 
     reindexing_needed = False
 
@@ -48,7 +53,7 @@ def rename_deployment(plone, options):
         reindexing_needed = True
 
     if reindexing_needed:
-        reindex_objects(plone, options)
+        reindex_objects(plone, options, old_au_title)
 
 
 def set_new_deployment_title(plone, options):
@@ -110,8 +115,7 @@ def set_new_admin_unit_abbreviation(plone, options):
         admin_unit.abbreviation = new_au_abbr
 
 
-def reindex_objects(plone, options):
-
+def reindex_objects(plone, options, old_au_title):
     catalog = api.portal.get_tool('portal_catalog')
     brains = catalog.unrestrictedSearchResults()
 
@@ -151,7 +155,36 @@ def reindex_objects(plone, options):
                 # full text searches. Only IBaseDocument has an indexer for it.
                 attrs_to_index.append('metadata')
 
+        if options.new_au_title and options.migrate_filing_numbers:
+            # Filing numbers are dependent on AU title:
+            # Rewrite them using using string replacement
+
+            if IFilingNumberMarker.providedBy(obj):
+                old_fn = IFilingNumber(obj).filing_no
+
+                if old_fn and old_fn.startswith(old_au_title):
+                    new_au_title = options.new_au_title.decode('utf-8')
+                    new_fn = old_fn.replace(old_au_title, new_au_title, 1)
+
+                    logger.info('Migrating filing number %r to %r for %r' % (
+                        old_fn, new_fn, obj))
+
+                    if not options.dryrun:
+                        IFilingNumber(obj).filing_no = new_fn
+
+                        # December 2020. Not taking any chances.
+                        IAnnotations(obj)['filing_no_before_rename'] = old_fn
+
+                # Reindex all objects with FN behavior (dossiers), even if
+                # no FN was found and changed. They might already have been
+                # issued a prefix, but not be closed yet. Then they have a
+                # ...-Amt-? number which still needs to be reindexed.
+                if not options.dryrun:
+                    attrs_to_index.extend(['filing_no', 'searchable_filing_no', 'SearchableText'])
+
         if attrs_to_index:
+            attrs_to_index.append('UID')
+            attrs_to_index = list(set(attrs_to_index))
             logger.info('Reindexing %r for %r' % (attrs_to_index, obj))
             if not options.dryrun:
                 obj.reindexObject(idxs=attrs_to_index)
@@ -166,6 +199,8 @@ def parse_options():
     parser.add_option("--new-au-title")
     parser.add_option("--new-ou-title")
     parser.add_option("--new-au-abbr")
+    parser.add_option("--migrate-filing-numbers", action="store_true",
+                      default=False)
     (options, args) = parser.parse_args()
     return options, args
 
