@@ -2,11 +2,12 @@
 Allows to rename various aspects of a deployment.
 
 Example Usage:
-    bin/instance run rename_deployment.py --new-deployment-title="DI AGG"
+    bin/instance run rename_deployment.py --new-deployment-title="DI AGG" --new-au-title="DI AGG"
 """
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.ogds.base.utils import get_current_admin_unit
 import logging
 import transaction
 
@@ -27,6 +28,9 @@ def rename_deployment(plone, options):
     if options.new_deployment_title:
         set_new_deployment_title(plone, options)
 
+    if options.new_au_title:
+        set_new_admin_unit_title(plone, options)
+
 
 def set_new_deployment_title(plone, options):
     new_title = options.new_deployment_title.decode('utf-8')
@@ -43,12 +47,25 @@ def set_new_deployment_title(plone, options):
              'email_from_name': new_title})
 
 
+def set_new_admin_unit_title(plone, options):
+    new_au_title = options.new_au_title.decode('utf-8')
+
+    admin_unit = get_current_admin_unit()
+
+    logger.info('Existing AdminUnit title: %s' % admin_unit.title)
+    logger.info('Setting AdminUnit title: %s\n' % new_au_title)
+
+    if not options.dryrun:
+        admin_unit.title = new_au_title
+
+
 def parse_options():
     parser = setup_option_parser()
     parser.add_option("-n", "--dry-run", action="store_true",
                       dest="dryrun", default=False)
 
     parser.add_option("--new-deployment-title")
+    parser.add_option("--new-au-title")
     (options, args) = parser.parse_args()
     return options, args
 
