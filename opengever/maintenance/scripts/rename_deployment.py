@@ -2,13 +2,14 @@
 Allows to rename various aspects of a deployment.
 
 Example Usage:
-    bin/instance run rename_deployment.py --new-deployment-title="DI AGG" --new-au-title="DI AGG"
+    bin/instance run rename_deployment.py --new-deployment-title="DI AGG" --new-au-title="DI AGG" --new-ou-title="DI AGG"
 """
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.ogds.base.utils import get_current_admin_unit
 import logging
+import sys
 import transaction
 
 
@@ -30,6 +31,9 @@ def rename_deployment(plone, options):
 
     if options.new_au_title:
         set_new_admin_unit_title(plone, options)
+
+    if options.new_ou_title:
+        set_new_org_unit_title(plone, options)
 
 
 def set_new_deployment_title(plone, options):
@@ -59,6 +63,26 @@ def set_new_admin_unit_title(plone, options):
         admin_unit.title = new_au_title
 
 
+def set_new_org_unit_title(plone, options):
+    new_ou_title = options.new_ou_title.decode('utf-8')
+
+    admin_unit = get_current_admin_unit()
+
+    if not len(admin_unit.org_units) == 1:
+        logger.error(
+            'Use of --new-ou-title is only supported for deployments with '
+            'exactly one OrgUnit, aborting.')
+        sys.exit(1)
+
+    org_unit = admin_unit.org_units[0]
+
+    logger.info('Existing OrgUnit title: %s' % org_unit.title)
+    logger.info('Setting OrgUnit title: %s\n' % new_ou_title)
+
+    if not options.dryrun:
+        org_unit.title = new_ou_title
+
+
 def parse_options():
     parser = setup_option_parser()
     parser.add_option("-n", "--dry-run", action="store_true",
@@ -66,6 +90,7 @@ def parse_options():
 
     parser.add_option("--new-deployment-title")
     parser.add_option("--new-au-title")
+    parser.add_option("--new-ou-title")
     (options, args) = parser.parse_args()
     return options, args
 
