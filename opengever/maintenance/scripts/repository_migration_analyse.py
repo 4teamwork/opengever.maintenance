@@ -56,7 +56,7 @@ class RepositoryExcelAnalyser(object):
             if row[3] in ['', u'l\xf6schen']:
                 new_item['position'], new_item['title'], new_item['description'] = None, None, None
             else:
-                new_item['position'] = row[5]
+                new_item['position'] = str(row[5]) if row[5] else ''
                 new_item['title'] = row[6]
                 new_item['description'] = row[7]
 
