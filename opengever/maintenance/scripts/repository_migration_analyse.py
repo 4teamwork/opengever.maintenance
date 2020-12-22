@@ -94,7 +94,7 @@ class ExcelDataExtractor(object):
         'old_description': {'index': 2, 'header': u'Beschreibung (optional)'},
         'new_position': {'index': 5, 'header': u'Ordnungs-\npositions-\nnummer'},
         'new_title': {'index': 6, 'header': u'Titel der Ordnungsposition'},
-        'new_description': {'index': 7, 'header': u'Beschreibung (optional)'},
+        'new_description': {'index': 8, 'header': u'Beschreibung (optional)'},
     }
 
     def __init__(self, diff_xlsx_path):
