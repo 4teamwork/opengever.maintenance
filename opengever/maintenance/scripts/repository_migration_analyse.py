@@ -100,7 +100,7 @@ class RepositoryExcelAnalyser(object):
         # Start on row 6 anything else is header
         for row in data[6:]:
             new_item = {}
-            if row[3] in ['', u'l\xf6schen']:
+            if row[5] in ['', u'l\xf6schen', '-']:
                 new_item = OperationItem()
             else:
                 new_item = OperationItem(row[5], row[6], row[7])
