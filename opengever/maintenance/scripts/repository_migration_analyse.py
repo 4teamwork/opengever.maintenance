@@ -20,6 +20,7 @@ from plone import api
 from plone.app.uuid.utils import uuidToCatalogBrain
 from plone.app.uuid.utils import uuidToObject
 from plone.uuid.interfaces import IUUID
+from Products.CMFPlone.utils import safe_unicode
 from uuid import uuid4
 from zope.annotation import IAnnotations
 import argparse
@@ -27,6 +28,41 @@ import json
 import shutil
 import sys
 import tempfile
+
+
+class OperationItem(object):
+
+    def __init__(self, position=None, title=None, description=None):
+        self.position = self.cleanup_position(position)
+        self.title = self.to_safe_unicode(title)
+        self.description = self.to_safe_unicode(description)
+
+    @staticmethod
+    def to_safe_unicode(maybe_none):
+        if maybe_none is None:
+            return None
+        maybe_none = safe_unicode(maybe_none)
+        if maybe_none:
+            return maybe_none
+
+    @staticmethod
+    def cleanup_position(position):
+        """Remove splitting dots - they're not usefull for comparison.
+        This only works for grouped_by_three formatter.
+        """
+        if position is None:
+            return None
+        position = str(position)
+        if position:
+            return position.replace('.', '')
+
+    def __repr__(self):
+        return u"OperationItem({}, {}, {})".format(self.position, self.title, self.description).encode('utf-8')
+
+    def __eq__(self, other):
+        return all((self.position == other.position,
+                    self.title == other.title,
+                    self.description == other.description))
 
 
 class RepositoryExcelAnalyser(object):
@@ -54,25 +90,16 @@ class RepositoryExcelAnalyser(object):
         for row in data[6:]:
             new_item = {}
             if row[3] in ['', u'l\xf6schen']:
-                new_item['position'], new_item['title'], new_item['description'] = None, None, None
+                new_item = OperationItem()
             else:
-                new_item['position'] = str(row[5]) if row[5] else ''
-                new_item['title'] = row[6]
-                new_item['description'] = row[7]
-
+                new_item = OperationItem(row[5], row[6], row[7])
             if row[0] == '':
-                old_item = {'position': None, 'title': None,'description': None}
+                old_item = OperationItem()
             else:
-                old_item = {'position': str(row[0]), 'title': row[1], 'description': row[2]}
-
-            # Remove splitting dots - they're not usefull for comparing etc.
-            if old_item['position']:
-                old_item['position'] = old_item['position'].replace('.', '')
-            if new_item['position']:
-                new_item['position'] = new_item['position'].replace('.', '')
+                old_item = OperationItem(str(row[0]), row[1], row[2])
 
             # Ignore empty rows
-            if not old_item['position'] and  not new_item['position']:
+            if not old_item.position and not new_item.position:
                 continue
 
             new_number = None
@@ -82,7 +109,7 @@ class RepositoryExcelAnalyser(object):
             parent_of_new_position = None
             new_position_guid = None
 
-            needs_creation = not bool(old_item['position'])
+            needs_creation = not bool(old_item.position)
             need_number_change, need_move = self.needs_number_change_or_move(new_item, old_item)
             if need_number_change:
                 new_number = self.get_new_number(new_item)
@@ -93,9 +120,9 @@ class RepositoryExcelAnalyser(object):
                 new_position_guid = uuid4().hex[:8]
 
             analyse = {
-                'uid': self.get_uuid_for_position(old_item['position']),
+                'uid': self.get_uuid_for_position(old_item.position),
                 'new_position': parent_of_new_position,
-                'new_position_guid' : new_position_guid,
+                'new_position_guid': new_position_guid,
                 'new_title': self.get_new_title(new_item, old_item) if not needs_creation else None,
                 'new_number': new_number,
                 'new_parent_position': new_parent_position,
@@ -110,27 +137,27 @@ class RepositoryExcelAnalyser(object):
 
             self.analysed_rows.append(analyse)
             if not needs_creation:
-                self.position_uid_mapping[new_item['position']] = analyse['uid']
+                self.position_uid_mapping[new_item.position] = analyse['uid']
             else:
-                self.position_guid_mapping[new_item['position']] = new_position_guid
+                self.position_guid_mapping[new_item.position] = new_position_guid
 
     def get_new_title(self, new_item, old_item):
         """Returns the new title or none if no rename is necessary."""
-        if new_item['title'] != old_item['title']:
-            return new_item['title']
+        if new_item.title != old_item.title:
+            return new_item.title
 
         return None
 
     def get_new_number(self, new_item):
         """Returns latest part of the position - the new referencenumber
         prefix"""
-        return new_item['position'][-1]
+        return new_item.position[-1]
 
     def get_new_parent_position_and_uid(self, new_item):
         """Returns the new parent position and the uid. If the object does not
         yet exists it returns the guid."""
 
-        parent_position = new_item['position'][:-1]
+        parent_position = new_item.position[:-1]
         if parent_position not in self.position_uid_mapping:
             # Parent does not exist yet and will be created in the
             # first step of the migration
@@ -139,23 +166,23 @@ class RepositoryExcelAnalyser(object):
         return parent_position, self.position_uid_mapping[parent_position]
 
     def get_parent_of_new_position(self, new_item):
-        final_parent_number = new_item['position'][:-1]
+        final_parent_number = new_item.position[:-1]
 
         parent_row = [item for item in self.analysed_rows
-                      if item['new_item']['position'] == final_parent_number]
+                      if item['new_item'].position == final_parent_number]
 
         if not parent_row:
             return final_parent_number
 
         # The parent will be moved to the right position so we need to add
         # the subrepofolder on the "old position"
-        return parent_row[0]['old_item']['position']
+        return parent_row[0]['old_item'].position
 
     def needs_move(self, new_item, old_item):
-        if not old_item['position'] or not new_item['position']:
+        if not old_item.position or not new_item.position:
             return False
-        parent_old = old_item['position'][:-1]
-        parent_new = new_item['position'][:-1]
+        parent_old = old_item.position[:-1]
+        parent_new = new_item.position[:-1]
 
         if parent_new != parent_old:
             return True
@@ -168,20 +195,20 @@ class RepositoryExcelAnalyser(object):
         need_number_change = False
         need_move = False
 
-        if new_item['position'] and old_item['position']:
-            if new_item['position'] != old_item['position']:
+        if new_item.position and old_item.position:
+            if new_item.position != old_item.position:
                 need_number_change = True
-                self.number_changes[new_item['position']] = old_item['position']
+                self.number_changes[new_item.position] = old_item.position
 
                 # check if parent is already changed - so no need to change
-                parent_position = new_item['position'][:-1]
+                parent_position = new_item.position[:-1]
                 if parent_position in self.number_changes:
-                    if self.number_changes[parent_position] == old_item['position'][:-1]:
+                    if self.number_changes[parent_position] == old_item.position[:-1]:
                         need_number_change = False
 
                 if need_number_change:
                     # check if move is necessary
-                    if new_item['position'][:-1] != old_item['position'][:-1]:
+                    if new_item.position[:-1] != old_item.position[:-1]:
                         need_move = True
 
         return need_number_change, need_move
@@ -190,13 +217,13 @@ class RepositoryExcelAnalyser(object):
         max_depth = api.portal.get_registry_record(
             interface=IRepositoryFolderRecords, name='maximum_repository_depth')
 
-        if new_item['position'] and len(new_item['position']) > max_depth:
+        if new_item.position and len(new_item.position) > max_depth:
             return True
 
         return False
 
     def is_leaf_node_principle_violated(self, new_item, old_item):
-        parent_number = new_item['position'][:-1]
+        parent_number = new_item.position[:-1]
         parent_repo = self.get_repository_reference_mapping().get(parent_number)
         if not parent_repo:
             # Parent does not exist yet, so nothing to worry about it
@@ -264,12 +291,12 @@ class RepositoryExcelAnalyser(object):
     def insert_value_rows(self, sheet, rows):
         for row, data in enumerate(rows, 2):
             values = [
-                data['new_item']['position'],
-                data['new_item']['title'],
-                data['new_item']['description'],
-                data['old_item']['position'],
-                data['old_item']['title'],
-                data['old_item']['description'],
+                data['new_item'].position,
+                data['new_item'].title,
+                data['new_item'].description,
+                data['old_item'].position,
+                data['old_item'].title,
+                data['old_item'].description,
                 data['new_position'],
                 data['new_title'],
                 data['new_number'],
@@ -320,11 +347,11 @@ class RepositoryMigrator(object):
             parent_reference = [[int(x) for x in list(item['new_position'])]]
             bundle_items.append(
                 {'guid': item['new_position_guid'],
-                 'description': item['new_item']['description'],
+                 'description': item['new_item'].description,
                  'parent_reference': parent_reference,
-                 'reference_number_prefix': item['new_item']['position'][-1],
+                 'reference_number_prefix': item['new_item'].position[-1],
                  'review_state': 'repositoryfolder-state-active',
-                 'title_de': item['new_item']['title']})
+                 'title_de': item['new_item'].title})
 
         tmpdirname = tempfile.mkdtemp()
         with open('{}/repofolders.json'.format(tmpdirname), 'w') as _file:
@@ -408,7 +435,7 @@ class RepositoryMigrator(object):
             if not repo:
                 continue
 
-            new_description = item['new_item']['description']
+            new_description = item['new_item'].description
             if repo.description != new_description:
                 repo.description = new_description
 
@@ -430,20 +457,19 @@ class RepositoryMigrator(object):
             obj = uuidToObject(item['uid'])
 
             # Assert reference number, title and description on the object
-            assert item['new_item']['position'] == obj.get_repository_number()
-            assert item['new_item']['title'] == obj.title_de
-            assert item['new_item']['description'] == obj.description
+            assert item['new_item'].position == obj.get_repository_number()
+            assert item['new_item'].title == obj.title_de
+            assert item['new_item'].description == obj.description
 
             # Assert catalog
             brain = uuidToCatalogBrain(item['uid'])
             expected_title = u'{} {}'.format(
-                item['new_item']['position'], item['new_item']['title'])
+                item['new_item'].position, item['new_item'].title)
             assert expected_title == brain.title_de
 
 
 class FakeOptions(object):
     dry_run = False
-
 
 
 def main():
