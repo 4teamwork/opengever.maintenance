@@ -297,7 +297,7 @@ class RepositoryMigrator(object):
         self.rename(self.items_to_rename())
         self.update_description(self.operations_list)
         self.reindex()
-        self.validate()
+        # self.validate()
 
     def items_to_create(self):
         return [item for item in self.operations_list if item['new_position']]
