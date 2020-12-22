@@ -76,6 +76,44 @@ class OperationItem(object):
                     self.description == other.description))
 
 
+class Row(object):
+
+    def __init__(self, row, column_mapping):
+        for key, column in column_mapping.items():
+            col = column['index']
+            setattr(self, key, row[col])
+
+
+class ExcelDataExtractor(object):
+
+    header_row = 2
+    first_data_row = 6
+    column_mapping = {
+        'old_position': {'index': 0, 'header': u'Ordnungs-\npositions-\nnummer'},
+        'old_title': {'index': 1, 'header': u'Titel der Ordnungsposition'},
+        'old_description': {'index': 2, 'header': u'Beschreibung (optional)'},
+        'new_position': {'index': 5, 'header': u'Ordnungs-\npositions-\nnummer'},
+        'new_title': {'index': 6, 'header': u'Titel der Ordnungsposition'},
+        'new_description': {'index': 7, 'header': u'Beschreibung (optional)'},
+    }
+
+    def __init__(self, diff_xlsx_path):
+        sheets = xlrd_xls2array(diff_xlsx_path)
+        self.data = sheets[0]['sheet_data']
+        self.validate_format()
+
+    def validate_format(self):
+        headers = self.data[self.header_row]
+        for column in self.column_mapping.values():
+            assert headers[column['index']] == column['header'], \
+                u"Column header mismatch: {} != {}".format(
+                    headers[column['index']], column['header'])
+
+    def get_data(self):
+        for row in self.data[self.first_data_row:]:
+            yield Row(row, self.column_mapping)
+
+
 class RepositoryExcelAnalyser(object):
 
     def __init__(self, mapping_path, analyse_path):
@@ -94,20 +132,20 @@ class RepositoryExcelAnalyser(object):
         self.position_guid_mapping = {}
 
     def analyse(self):
-        sheets = xlrd_xls2array(self.diff_xlsx_path)
-        data = sheets[0]['sheet_data']
+        data_extractor = ExcelDataExtractor(self.diff_xlsx_path)
 
-        # Start on row 6 anything else is header
-        for row in data[6:]:
+        for row in data_extractor.get_data():
             new_item = {}
-            if row[5] in ['', u'l\xf6schen', '-']:
+            if row.new_position in ['', u'l\xf6schen', '-']:
+                # Position should be deleted
                 new_item = OperationItem()
             else:
-                new_item = OperationItem(row[5], row[6], row[7])
-            if row[0] == '':
+                new_item = OperationItem(row.new_position, row.new_title, row.new_description)
+            if row.old_position == '':
+                # Position did not exist
                 old_item = OperationItem()
             else:
-                old_item = OperationItem(str(row[0]), row[1], row[2])
+                old_item = OperationItem(row.old_position, row.old_title, row.old_description)
 
             # Ignore empty rows
             if not old_item.position and not new_item.position:
