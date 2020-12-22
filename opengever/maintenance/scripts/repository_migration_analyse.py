@@ -56,6 +56,17 @@ class OperationItem(object):
         if position:
             return position.replace('.', '')
 
+    @property
+    def reference_number_prefix(self):
+        """Returns last part of the position - the referencenumber prefix"""
+        return self.position[-1]
+
+    @property
+    def parent_position(self):
+        """Returns the position without the last part of the position, i.e.
+        the parent position"""
+        return self.position[:-1]
+
     def __repr__(self):
         return u"OperationItem({}, {}, {})".format(self.position, self.title, self.description).encode('utf-8')
 
@@ -151,13 +162,13 @@ class RepositoryExcelAnalyser(object):
     def get_new_number(self, new_item):
         """Returns latest part of the position - the new referencenumber
         prefix"""
-        return new_item.position[-1]
+        return new_item.reference_number_prefix
 
     def get_new_parent_position_and_uid(self, new_item):
         """Returns the new parent position and the uid. If the object does not
         yet exists it returns the guid."""
 
-        parent_position = new_item.position[:-1]
+        parent_position = new_item.parent_position
         if parent_position not in self.position_uid_mapping:
             # Parent does not exist yet and will be created in the
             # first step of the migration
@@ -166,13 +177,13 @@ class RepositoryExcelAnalyser(object):
         return parent_position, self.position_uid_mapping[parent_position]
 
     def get_parent_of_new_position(self, new_item):
-        final_parent_number = new_item.position[:-1]
+        final_parent_position = new_item.parent_position
 
         parent_row = [item for item in self.analysed_rows
-                      if item['new_item'].position == final_parent_number]
+                      if item['new_item'].position == final_parent_position]
 
         if not parent_row:
-            return final_parent_number
+            return final_parent_position
 
         # The parent will be moved to the right position so we need to add
         # the subrepofolder on the "old position"
@@ -181,10 +192,8 @@ class RepositoryExcelAnalyser(object):
     def needs_move(self, new_item, old_item):
         if not old_item.position or not new_item.position:
             return False
-        parent_old = old_item.position[:-1]
-        parent_new = new_item.position[:-1]
 
-        if parent_new != parent_old:
+        if new_item.parent_position != old_item.parent_position:
             return True
 
         return False
@@ -201,14 +210,14 @@ class RepositoryExcelAnalyser(object):
                 self.number_changes[new_item.position] = old_item.position
 
                 # check if parent is already changed - so no need to change
-                parent_position = new_item.position[:-1]
+                parent_position = new_item.parent_position
                 if parent_position in self.number_changes:
-                    if self.number_changes[parent_position] == old_item.position[:-1]:
+                    if self.number_changes[parent_position] == old_item.parent_position:
                         need_number_change = False
 
                 if need_number_change:
                     # check if move is necessary
-                    if new_item.position[:-1] != old_item.position[:-1]:
+                    if new_item.parent_position != old_item.parent_position:
                         need_move = True
 
         return need_number_change, need_move
@@ -223,7 +232,7 @@ class RepositoryExcelAnalyser(object):
         return False
 
     def is_leaf_node_principle_violated(self, new_item, old_item):
-        parent_number = new_item.position[:-1]
+        parent_number = new_item.parent_position
         parent_repo = self.get_repository_reference_mapping().get(parent_number)
         if not parent_repo:
             # Parent does not exist yet, so nothing to worry about it
@@ -349,7 +358,7 @@ class RepositoryMigrator(object):
                 {'guid': item['new_position_guid'],
                  'description': item['new_item'].description,
                  'parent_reference': parent_reference,
-                 'reference_number_prefix': item['new_item'].position[-1],
+                 'reference_number_prefix': item['new_item'].reference_number_prefix,
                  'review_state': 'repositoryfolder-state-active',
                  'title_de': item['new_item'].title})
 
