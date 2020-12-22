@@ -491,7 +491,7 @@ class RepositoryMigrator(object):
             obj = uuidToObject(item['uid'])
             if not obj:
                 # New created objects can be ignored
-                break
+                continue
 
             obj.reindexObject(idxs=['Title', 'sortable_title', 'path',
                                     'reference', 'Description'])
