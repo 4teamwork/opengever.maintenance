@@ -132,6 +132,21 @@ class RepositoryExcelAnalyser(object):
         # A mapping new_position_number:guid
         self.position_guid_mapping = {}
 
+        self.check_preconditions()
+
+    def check_preconditions(self):
+        # current implementation only works with grouped_by_three reference
+        # formatter, notably because we remove splitting dots during the analysis.
+        formatter = api.portal.get_registry_record(
+            "opengever.base.interfaces.IReferenceNumberSettings.formatter")
+        assert formatter == "grouped_by_three", "Migration is only supported with grouped_by_three"
+
+        # Creation of new repository folders in the repository root will only
+        # work if their is a single repository root.
+        results = self.catalog.unrestrictedSearchResults(
+            portal_type='opengever.repository.repositoryroot')
+        assert len(results) == 1, "Migration is only supported with a single repository root"
+
     def analyse(self):
         data_extractor = ExcelDataExtractor(self.diff_xlsx_path)
 
