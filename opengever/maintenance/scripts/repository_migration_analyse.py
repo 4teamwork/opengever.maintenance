@@ -260,11 +260,18 @@ class RepositoryExcelAnalyser(object):
                       if item['new_item'].position == final_parent_position]
 
         if not parent_row:
+            # bundle import (ConstructorSection) will find parent from
+            # the reference number
             return final_parent_position, None
 
-        # The parent will be moved to the right position so we need to add
-        # the subrepofolder on the "old position"
-        return parent_row[0]['old_item'].position, None
+        # Two possibilities, the new parent is being created or moved.
+        if parent_row[0]['old_item'].position:
+            # The parent will be moved to the right position so we need to add
+            # the subrepofolder on the "old position"
+            return parent_row[0]['old_item'].position, None
+        else:
+            # The parent is being created, so we will identify it through its guid.
+            return None, parent_row[0]['new_position_guid']
 
     def needs_move(self, new_item, old_item):
         if not old_item.position or not new_item.position:
