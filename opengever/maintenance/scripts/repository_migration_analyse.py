@@ -1,5 +1,6 @@
 from Acquisition import aq_inner
 from Acquisition import aq_parent
+from collections import defaultdict
 from collective.transmogrifier.transmogrifier import Transmogrifier
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.bundle.console import add_guid_index
@@ -362,6 +363,7 @@ class RepositoryMigrator(object):
     def __init__(self, operations_list):
         self.operations_list = operations_list
         self._reference_repository_mapping = None
+        self.to_reindex = defaultdict(set)
         self.catalog = api.portal.get_tool('portal_catalog')
 
     def run(self):
@@ -384,6 +386,17 @@ class RepositoryMigrator(object):
 
     def items_to_rename(self):
         return [item for item in self.operations_list if item['new_title']]
+
+    def add_to_reindexing_queue(self, uid, idxs, with_children=False):
+        self.to_reindex[uid].update(idxs)
+        obj = uuidToObject(uid)
+        if not with_children:
+            return
+
+        contained_brains = self.catalog.unrestrictedSearchResults(
+            path=obj.absolute_url_path())
+        for brain in contained_brains:
+            self.to_reindex[brain.UID].update(idxs)
 
     def create_repository_folders(self, items):
         """Add repository folders - by using the ogg.bundle import. """
@@ -448,6 +461,9 @@ class RepositoryMigrator(object):
             repo = uuidToObject(item['uid'])
             referenceprefix.IReferenceNumberPrefix(repo).reference_number_prefix = item['new_number']
             parents.add(aq_parent(aq_inner(repo)))
+            self.add_to_reindexing_queue(
+                item['uid'], ('Title', 'sortable_title', 'reference'),
+                with_children=True)
 
         self.regenerate_reference_number_mapping(list(parents))
 
@@ -476,6 +492,11 @@ class RepositoryMigrator(object):
             # Adjust id if necessary
             ObjectIDUpdater(repo, FakeOptions()).maybe_update_id()
 
+            # We do not need to reindex path as this seems to already happen
+            # recursively
+            self.add_to_reindexing_queue(
+                item['uid'], ('Title', 'sortable_title'))
+
     def update_description(self, items):
         for item in items:
             repo = uuidToObject(item['uid'])
@@ -485,16 +506,12 @@ class RepositoryMigrator(object):
             new_description = item['new_item'].description
             if repo.description != new_description:
                 repo.description = new_description
+                self.add_to_reindexing_queue(item['uid'], ('Description',))
 
     def reindex(self):
-        for item in self.operations_list:
-            obj = uuidToObject(item['uid'])
-            if not obj:
-                # New created objects can be ignored
-                continue
-
-            obj.reindexObject(idxs=['Title', 'sortable_title', 'path',
-                                    'reference', 'Description'])
+        for uid, idxs in self.to_reindex.items():
+            obj = uuidToObject(uid)
+            obj.reindexObject(idxs=idxs)
 
     def validate(self):
         """This steps make sure that the repository system has
