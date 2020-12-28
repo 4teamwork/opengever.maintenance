@@ -7,6 +7,7 @@ from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
 from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
 from opengever.bundle.sections.commit import INTERMEDIATE_COMMITS_KEY
+from opengever.bundle.sections.constructor import BUNDLE_GUID_KEY
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
@@ -133,6 +134,7 @@ class RepositoryExcelAnalyser(object):
         self.position_guid_mapping = {}
 
         self.check_preconditions()
+        self.reporoot_guid = self.prepare_guids()
 
     def check_preconditions(self):
         # current implementation only works with grouped_by_three reference
@@ -146,6 +148,22 @@ class RepositoryExcelAnalyser(object):
         results = self.catalog.unrestrictedSearchResults(
             portal_type='opengever.repository.repositoryroot')
         assert len(results) == 1, "Migration is only supported with a single repository root"
+
+    def prepare_guids(self):
+        """ The GUID index is needed by the bundle transmogrifier.
+        Moreover the repository root needs to have a GUID, as it does not
+        have a reference number allowing to find the parent when creating
+        a new repository folder in the repository root.
+        """
+        add_guid_index()
+        brain = self.catalog.unrestrictedSearchResults(
+            portal_type='opengever.repository.repositoryroot')[0]
+        reporoot = brain.getObject()
+
+        if not IAnnotations(reporoot).get(BUNDLE_GUID_KEY):
+            IAnnotations(reporoot)[BUNDLE_GUID_KEY] = uuid4().hex[:8]
+        reporoot.reindexObject(idxs=['bundle_guid'])
+        return IAnnotations(reporoot).get(BUNDLE_GUID_KEY)
 
     def analyse(self):
         data_extractor = ExcelDataExtractor(self.diff_xlsx_path)
@@ -171,7 +189,8 @@ class RepositoryExcelAnalyser(object):
             new_parent_position = None
             new_parent_uid = None
 
-            parent_of_new_position = None
+            new_position_parent_position = None
+            new_position_parent_guid = None
             new_position_guid = None
 
             needs_creation = not bool(old_item.position)
@@ -181,12 +200,13 @@ class RepositoryExcelAnalyser(object):
             if need_move:
                 new_parent_position, new_parent_uid = self.get_new_parent_position_and_uid(new_item)
             if needs_creation:
-                parent_of_new_position = self.get_parent_of_new_position(new_item)
+                new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_item)
                 new_position_guid = uuid4().hex[:8]
 
             analyse = {
                 'uid': self.get_uuid_for_position(old_item.position),
-                'new_position': parent_of_new_position,
+                'new_position_parent_position': new_position_parent_position,
+                'new_position_parent_guid': new_position_parent_guid,
                 'new_position_guid': new_position_guid,
                 'new_title': self.get_new_title(new_item, old_item) if not needs_creation else None,
                 'new_number': new_number,
@@ -232,16 +252,19 @@ class RepositoryExcelAnalyser(object):
 
     def get_parent_of_new_position(self, new_item):
         final_parent_position = new_item.parent_position
+        if not final_parent_position:
+            # We are creating a new position in the reporoot
+            return final_parent_position, self.reporoot_guid
 
         parent_row = [item for item in self.analysed_rows
                       if item['new_item'].position == final_parent_position]
 
         if not parent_row:
-            return final_parent_position
+            return final_parent_position, None
 
         # The parent will be moved to the right position so we need to add
         # the subrepofolder on the "old position"
-        return parent_row[0]['old_item'].position
+        return parent_row[0]['old_item'].position, None
 
     def needs_move(self, new_item, old_item):
         if not old_item.position or not new_item.position:
@@ -336,7 +359,7 @@ class RepositoryExcelAnalyser(object):
             'Alt: Position', 'Alt: Titel', 'Alt: Description',
 
             # operations
-            'Position Erstellen (Parent Aktenzeichen)',
+            'Position Erstellen (Parent Aktenzeichen oder GUID)',
             'Umbenennung (Neuer Titel)',
             'Nummer Anpassung (Neuer `Praefix`)',
             'Verschiebung (Aktenzeichen neues Parent)',
@@ -360,7 +383,7 @@ class RepositoryExcelAnalyser(object):
                 data['old_item'].position,
                 data['old_item'].title,
                 data['old_item'].description,
-                data['new_position'],
+                data['new_position_parent_position'] or data['new_position_parent_guid'],
                 data['new_title'],
                 data['new_number'],
                 data['new_parent_position'],
@@ -391,7 +414,7 @@ class RepositoryMigrator(object):
         # self.validate()
 
     def items_to_create(self):
-        return [item for item in self.operations_list if item['new_position']]
+        return [item for item in self.operations_list if item['new_position_guid']]
 
     def items_to_move(self):
         return [item for item in self.operations_list if item['new_parent_position']]
@@ -415,15 +438,18 @@ class RepositoryMigrator(object):
 
     def create_repository_folders(self, items):
         """Add repository folders - by using the ogg.bundle import. """
-
         bundle_items = []
         for item in items:
             # Bundle expect the format [[repository], [dossier]]
-            parent_reference = [[int(x) for x in list(item['new_position'])]]
+            parent_reference = None
+            if item['new_position_parent_position']:
+                parent_reference = [[int(x) for x in list(item['new_position_parent_position'])]]
+
             bundle_items.append(
                 {'guid': item['new_position_guid'],
                  'description': item['new_item'].description,
                  'parent_reference': parent_reference,
+                 'parent_guid': item['new_position_parent_guid'],
                  'reference_number_prefix': item['new_item'].reference_number_prefix,
                  'review_state': 'repositoryfolder-state-active',
                  'title_de': item['new_item'].title})
@@ -437,8 +463,6 @@ class RepositoryMigrator(object):
         shutil.rmtree(tmpdirname)
 
     def start_bundle_import(self, bundle_path):
-        add_guid_index()
-
         portal = api.portal.get()
         transmogrifier = Transmogrifier(portal)
         ann = IAnnotations(transmogrifier)
@@ -453,7 +477,7 @@ class RepositoryMigrator(object):
         for item in items:
             parent = uuidToObject(item['new_parent_uid'])
             if not parent:
-                parent = self.catalog(guid=item['new_parent_uid'])[0].getObject()
+                parent = self.catalog(bundle_guid=item['new_parent_uid'])[0].getObject()
 
             repo = uuidToObject(item['uid'])
             if not parent or not repo:
