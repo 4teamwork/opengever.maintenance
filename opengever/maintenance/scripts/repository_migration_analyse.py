@@ -4,6 +4,7 @@ from collections import defaultdict
 from collective.transmogrifier.transmogrifier import Transmogrifier
 from opengever.base.indexes import sortable_title
 from opengever.base.interfaces import IReferenceNumber
+from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
@@ -27,6 +28,7 @@ from plone.uuid.interfaces import IUUID
 from Products.CMFPlone.utils import safe_unicode
 from uuid import uuid4
 from zope.annotation import IAnnotations
+from zope.component import queryAdapter
 import argparse
 import json
 import logging
@@ -150,9 +152,11 @@ class RepositoryExcelAnalyser(object):
     def check_preconditions(self):
         # current implementation only works with grouped_by_three reference
         # formatter, notably because we remove splitting dots during the analysis.
-        formatter = api.portal.get_registry_record(
+        formatter_name = api.portal.get_registry_record(
             "opengever.base.interfaces.IReferenceNumberSettings.formatter")
-        assert formatter == "grouped_by_three", "Migration is only supported with grouped_by_three"
+        assert formatter_name == "grouped_by_three", "Migration is only supported with grouped_by_three"
+        self.formatter = queryAdapter(
+                api.portal.get(), IReferenceNumberFormatter, name=formatter_name)
 
         # Creation of new repository folders in the repository root will only
         # work if their is a single repository root.
@@ -214,7 +218,7 @@ class RepositoryExcelAnalyser(object):
                 new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_item)
                 new_position_guid = uuid4().hex[:8]
 
-            analyse = {
+            operation = {
                 'uid': self.get_uuid_for_position(old_item.position),
                 'new_position_parent_position': new_position_parent_position,
                 'new_position_parent_guid': new_position_parent_guid,
@@ -224,18 +228,54 @@ class RepositoryExcelAnalyser(object):
                 'new_parent_position': new_parent_position,
                 'new_parent_uid': new_parent_uid,
                 'old_item': old_item,
-                'new_item': new_item,
-                'repository_depth_violated': self.is_repository_depth_violated(
-                    new_item, old_item),
-                'leaf_node_violated': need_move and self.is_leaf_node_principle_violated(
-                    new_item, old_item)
+                'new_item': new_item
             }
+            self.validate_operation(operation)
 
-            self.analysed_rows.append(analyse)
+            self.analysed_rows.append(operation)
             if not needs_creation:
-                self.position_uid_mapping[new_item.position] = analyse['uid']
+                self.position_uid_mapping[new_item.position] = operation['uid']
             else:
                 self.position_guid_mapping[new_item.position] = new_position_guid
+
+    def validate_operation(self, operation):
+        """Make sure that operation satisfies all necessary conditions and add
+        is_valid, repository_depth_violated and leaf_node_violated to it.
+        """
+        operation['is_valid'] = True
+
+        # Each operation should either have a uid or a new_position_guid
+        if not any((operation['new_position_guid'], operation['uid'])):
+            logger.warning("Invalid operation: needs new_position_guid "
+                           "or uid. {}".format(operation))
+            operation['is_valid'] = False
+
+        if all((operation['new_position_guid'], operation['uid'])):
+            logger.warning("Invalid operation: can define only one of "
+                           "new_position_guid or uid. {}".format(operation))
+            operation['is_valid'] = False
+
+        # A move operation should have a new_parent_uid
+        if operation['new_parent_position'] or operation['new_parent_uid']:
+            if not operation['new_parent_uid']:
+                logger.warning(
+                    "Invalid operation: move operation must define "
+                    "new_parent_uid. {}".format(operation))
+                operation['is_valid'] = False
+
+        # Make sure that if a position is being created, its parent will be found
+        if not bool(operation['old_item'].position) and not operation['new_position_parent_guid']:
+            parent = self.get_object_for_position(
+                operation['new_position_parent_position'])
+
+            if not parent:
+                logger.warning(
+                    "Invalid operation: could not find new parent for create "
+                    "operation. {}".format(operation))
+                operation['is_valid'] = False
+
+        self.check_repository_depth_violation(operation)
+        self.check_leaf_node_principle_violation(operation)
 
     def get_new_title(self, new_item, old_item):
         """Returns the new title or none if no rename is necessary."""
@@ -261,7 +301,7 @@ class RepositoryExcelAnalyser(object):
         if parent_position not in self.position_uid_mapping:
             # Parent does not exist yet and will be created in the
             # first step of the migration
-            return parent_position, self.position_guid_mapping[parent_position]
+            return parent_position, self.position_guid_mapping.get(parent_position)
 
         return parent_position, self.position_uid_mapping[parent_position]
 
@@ -321,25 +361,32 @@ class RepositoryExcelAnalyser(object):
 
         return need_number_change, need_move
 
-    def is_repository_depth_violated(self, new_item, old_item):
+    def check_repository_depth_violation(self, operation):
         max_depth = api.portal.get_registry_record(
             interface=IRepositoryFolderRecords, name='maximum_repository_depth')
 
+        new_item = operation['new_item']
         if new_item.position and len(new_item.position) > max_depth:
-            return True
+            logger.warning(
+                "Invalid operation: repository depth violated. {}".format(operation))
+            operation['is_valid'] = False
+            operation['repository_depth_violated'] = True
+        else:
+            operation['repository_depth_violated'] = False
 
-        return False
+    def check_leaf_node_principle_violation(self, operation):
+        operation['leaf_node_violated'] = False
+        if not bool(operation['new_parent_uid']):
+            # object is not being moved, nothing to worry about
+            return
 
-    def is_leaf_node_principle_violated(self, new_item, old_item):
-        parent_number = new_item.parent_position
-        parent_repo = self.get_repository_reference_mapping().get(parent_number)
-        if not parent_repo:
-            # Parent does not exist yet, so nothing to worry about it
-            return False
-
-        has_dossiers = any([IDossierMarker.providedBy(item) for item in
-                            parent_repo.objectValues()])
-        return has_dossiers
+        parent_number = operation['new_item'].parent_position
+        parent_repo = self.get_object_for_position(parent_number)
+        if parent_repo and any([IDossierMarker.providedBy(item) for item in
+                                parent_repo.objectValues()]):
+            operation['is_valid'] = False
+            operation['leaf_node_violated'] = True
+            logger.warning("Invalid operation: leaf node principle violated. {}".format(operation))
 
     def get_repository_reference_mapping(self):
         if not self._reference_repository_mapping:
@@ -357,6 +404,10 @@ class RepositoryExcelAnalyser(object):
             return IUUID(mapping[position])
 
         return None
+
+    def get_object_for_position(self, position):
+        mapping = self.get_repository_reference_mapping()
+        return mapping.get(position)
 
     def export_to_excel(self):
         workbook = self.prepare_workbook(self.analysed_rows)
@@ -388,7 +439,8 @@ class RepositoryExcelAnalyser(object):
 
             # rule violations
             'Verletzt Max. Tiefe',
-            'Verletzt Leafnode Prinzip'
+            'Verletzt Leafnode Prinzip',
+            'Ist ungultig'
         ]
 
         for i, label in enumerate(labels, 1):
@@ -411,6 +463,7 @@ class RepositoryExcelAnalyser(object):
                 data['new_parent_position'],
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
+                'x' if not data['is_valid'] else '',
             ]
 
             for column, attr in enumerate(values, 1):
