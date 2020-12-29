@@ -134,7 +134,7 @@ class RepositoryExcelAnalyser(object):
         self.position_guid_mapping = {}
 
         self.check_preconditions()
-        self.reporoot_guid = self.prepare_guids()
+        self.reporoot, self.reporoot_guid = self.prepare_guids()
 
     def check_preconditions(self):
         # current implementation only works with grouped_by_three reference
@@ -163,7 +163,7 @@ class RepositoryExcelAnalyser(object):
         if not IAnnotations(reporoot).get(BUNDLE_GUID_KEY):
             IAnnotations(reporoot)[BUNDLE_GUID_KEY] = uuid4().hex[:8]
         reporoot.reindexObject(idxs=['bundle_guid'])
-        return IAnnotations(reporoot).get(BUNDLE_GUID_KEY)
+        return reporoot, IAnnotations(reporoot).get(BUNDLE_GUID_KEY)
 
     def analyse(self):
         data_extractor = ExcelDataExtractor(self.diff_xlsx_path)
@@ -243,6 +243,10 @@ class RepositoryExcelAnalyser(object):
         yet exists it returns the guid."""
 
         parent_position = new_item.parent_position
+        if not parent_position:
+            # We are moving into the reporoot
+            return parent_position, self.reporoot.UID()
+
         if parent_position not in self.position_uid_mapping:
             # Parent does not exist yet and will be created in the
             # first step of the migration
@@ -424,7 +428,7 @@ class RepositoryMigrator(object):
         return [item for item in self.operations_list if item['new_position_guid']]
 
     def items_to_move(self):
-        return [item for item in self.operations_list if item['new_parent_position']]
+        return [item for item in self.operations_list if item['new_parent_uid']]
 
     def items_to_adjust_number(self):
         return [item for item in self.operations_list if item['new_number']]
