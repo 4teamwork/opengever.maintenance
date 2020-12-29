@@ -2,6 +2,8 @@ from Acquisition import aq_inner
 from Acquisition import aq_parent
 from collections import defaultdict
 from collective.transmogrifier.transmogrifier import Transmogrifier
+from opengever.base.indexes import sortable_title
+from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
@@ -27,9 +29,18 @@ from uuid import uuid4
 from zope.annotation import IAnnotations
 import argparse
 import json
+import logging
 import shutil
 import sys
 import tempfile
+
+
+logger = logging.getLogger('migration')
+logger.setLevel(logging.INFO)
+
+
+class MigrationValidationError(Exception):
+    """Raised when errors are found during migration validation"""
 
 
 class OperationItem(object):
@@ -422,7 +433,7 @@ class RepositoryMigrator(object):
         self.rename(self.items_to_rename())
         self.update_description(self.operations_list)
         self.reindex()
-        # self.validate()
+        self.validate()
 
     def items_to_create(self):
         return [item for item in self.operations_list if item['new_position_guid']]
@@ -563,23 +574,104 @@ class RepositoryMigrator(object):
             obj = uuidToObject(uid)
             obj.reindexObject(idxs=idxs)
 
+    def guid_to_object(self, guid):
+        results = self.catalog.unrestrictedSearchResults(bundle_guid=guid)
+        if len(results) == 0:
+            # This should never happen. Object with a guid should have been created.
+            logger.warning(
+                u"Couldn't find object with GUID %s in catalog" % guid)
+            return
+
+        if len(results) > 1:
+            # Ambiguous GUID - this should never happen
+            logger.warning(
+                u"Ambiguous GUID! Found more than one result in catalog "
+                u"for GUID %s " % guid)
+            return
+
+        return results[0].getObject()
+
     def validate(self):
         """This steps make sure that the repository system has
         been correctly migrated."""
+        self.validation_errors = defaultdict(list)
+        self.validation_failed = False
 
-        for item in self.operations_list:
-            obj = uuidToObject(item['uid'])
+        for operation in self.operations_list:
+            # Three possibilities here: position was created, deleted or modified
+            if operation['new_position_guid']:
+                # new position was created
+                obj = self.guid_to_object(operation['new_position_guid'])
+            elif operation['uid']:
+                if operation['new_item'] == OperationItem():
+                    # position was deleted
+                    continue
+                else:
+                    # position was modified
+                    obj = uuidToObject(operation['uid'])
+            else:
+                logger.error(u"Invalid operation {}".format(operation))
+                self.validation_failed = True
+                continue
+
+            if not obj:
+                uid = operation['new_position_guid'] or operation['uid']
+                logger.error(u"Could not resolve object {}. Skipping validation.".format(uid))
+                self.validation_failed = True
+                continue
 
             # Assert reference number, title and description on the object
-            assert item['new_item'].position == obj.get_repository_number()
-            assert item['new_item'].title == obj.title_de
-            assert item['new_item'].description == obj.description
+            uid = obj.UID()
+            new = operation['new_item']
+            self.assertEqual(uid, new.position, obj.get_repository_number(), 'incorrect number')
+            self.assertEqual(uid, new.title, obj.title_de, 'incorrect title')
+            self.assertEqual(uid, new.description, obj.description, 'incorrect description')
 
-            # Assert catalog
-            brain = uuidToCatalogBrain(item['uid'])
-            expected_title = u'{} {}'.format(
-                item['new_item'].position, item['new_item'].title)
-            assert expected_title == brain.title_de
+            # Assert that data in the catalog is consistent with data on the object
+            self.assertObjectConsistency(obj)
+
+        if self.validation_failed:
+            raise MigrationValidationError("See log for details")
+
+    def assertObjectConsistency(self, obj):
+        err_msg = "data inconsistency"
+        uid = obj.UID()
+        brain = uuidToCatalogBrain(uid)
+        catalog_data = self.get_catalog_indexdata(obj)
+
+        # reference number obtained through the adapter is generated
+        # dynamically, hence it should always be correct.
+        # reference number in the catalog and in the metadata should match it.
+        refnum = IReferenceNumber(obj).get_number()
+        self.assertEqual(uid, refnum, brain.reference, err_msg)
+        self.assertEqual(uid, refnum, catalog_data['reference'], err_msg)
+
+        self.assertEqual(uid, brain.Description, obj.Description(), err_msg)
+
+        self.assertEqual(uid, brain.getPath(), obj.absolute_url_path(), err_msg)
+        self.assertEqual(uid, catalog_data['path'], obj.absolute_url_path(), err_msg)
+
+        if not obj.portal_type == 'opengever.repository.repositoryfolder':
+            return
+        self.assertEqual(uid, brain.title_de, obj.get_prefixed_title_de(), err_msg)
+        self.assertEqual(uid, brain.title_fr, obj.get_prefixed_title_fr(), err_msg)
+        self.assertEqual(uid, catalog_data['sortable_title'], sortable_title(obj)(), err_msg)
+
+    def assertEqual(self, uid, first, second, msg='not equal'):
+        """Tests whether first and second are equal as determined by the '=='
+        operator. If not, adds error to self.validation_errors, set
+        self.validation_failed to true and log the error.
+        """
+        if not first == second:
+            self.validation_errors[uid].append((first, second, msg))
+            self.validation_failed = True
+            logger.error(u"{}: {} ({}, {})".format(uid, msg, first, second))
+
+    def get_catalog_indexdata(self, obj):
+        """Return the catalog index data for an object as dict.
+        """
+        rid = self.catalog.getrid('/'.join(obj.getPhysicalPath()))
+        return self.catalog.getIndexDataForRID(rid)
 
 
 class FakeOptions(object):
