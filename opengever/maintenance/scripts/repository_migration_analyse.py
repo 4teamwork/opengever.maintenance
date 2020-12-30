@@ -376,8 +376,8 @@ class RepositoryExcelAnalyser(object):
 
     def check_leaf_node_principle_violation(self, operation):
         operation['leaf_node_violated'] = False
-        if not bool(operation['new_parent_uid']):
-            # object is not being moved, nothing to worry about
+        if not (operation['new_parent_uid'] or operation['new_position_guid']):
+            # object is neither moved nor created, nothing to worry about
             return
 
         parent_number = operation['new_item'].parent_position
