@@ -41,6 +41,10 @@ logger = logging.getLogger('migration')
 logger.setLevel(logging.INFO)
 
 
+class MigrationPreconditionsError(Exception):
+    """Raised when errors are found during migration validation"""
+
+
 class MigrationValidationError(Exception):
     """Raised when errors are found during migration validation"""
 
@@ -478,6 +482,11 @@ class RepositoryMigrator(object):
         self._reference_repository_mapping = None
         self.to_reindex = defaultdict(set)
         self.catalog = api.portal.get_tool('portal_catalog')
+        self.check_preconditions()
+
+    def check_preconditions(self):
+        if any(not operation['is_valid'] for operation in self.operations_list):
+            raise MigrationPreconditionsError("Some operations are invalid.")
 
     def run(self):
         self.create_repository_folders(self.items_to_create())
