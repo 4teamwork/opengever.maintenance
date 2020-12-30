@@ -12,6 +12,7 @@ from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
 from opengever.bundle.sections.commit import INTERMEDIATE_COMMITS_KEY
 from opengever.bundle.sections.constructor import BUNDLE_GUID_KEY
 from opengever.dossier.behaviors.dossier import IDossierMarker
+from opengever.globalindex.handlers.task import TaskSqlSyncer
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.scripts.update_object_ids import ObjectIDUpdater
@@ -635,6 +636,9 @@ class RepositoryMigrator(object):
         for uid, idxs in self.to_reindex.items():
             obj = uuidToObject(uid)
             obj.reindexObject(idxs=idxs)
+            if obj.portal_type == 'opengever.task.task':
+                # make sure that the model is up to date.
+                TaskSqlSyncer(obj, None).sync()
 
     def guid_to_object(self, guid):
         results = self.catalog.unrestrictedSearchResults(bundle_guid=guid)
