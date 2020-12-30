@@ -393,7 +393,7 @@ class RepositoryExcelAnalyser(object):
             repos = [brain.getObject() for brain in
                      self.catalog(object_provides=IRepositoryFolder.__identifier__)]
             self._reference_repository_mapping = {
-                repo.get_repository_number(): repo for repo in repos}
+                repo.get_repository_number().replace('.', ''): repo for repo in repos}
 
         return self._reference_repository_mapping
 
