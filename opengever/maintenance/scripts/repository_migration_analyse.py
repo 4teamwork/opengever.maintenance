@@ -121,6 +121,13 @@ class ExcelDataExtractor(object):
         'new_position': Column(5, 'reference_number', u'Ordnungs-\npositions-\nnummer'),
         'new_title': Column(6, 'effective_title', u'Titel der Ordnungsposition'),
         'new_description': Column(8, 'description', u'Beschreibung (optional)'),
+        'block_inheritance': Column(19, 'block_inheritance', ''),
+        'read': Column(20, 'read_dossiers_access', ''),
+        'add': Column(21, 'add_dossiers_access', ''),
+        'edit': Column(22, 'edit_dossiers_access', ''),
+        'close': Column(23, 'close_dossiers_access', ''),
+        'reactivate': Column(24, 'reactivate_dossiers_access', ''),
+        'manage_dossiers': Column(25, 'manage_dossiers_access', ''),
     }
 
     def __init__(self, diff_xlsx_path):
@@ -227,6 +234,8 @@ class RepositoryExcelAnalyser(object):
             new_position_parent_guid = None
             new_position_guid = None
 
+            permissions = None
+
             needs_creation = not bool(old_item.position)
             need_number_change, need_move = self.needs_number_change_or_move(new_item, old_item)
             if need_number_change:
@@ -236,6 +245,7 @@ class RepositoryExcelAnalyser(object):
             if needs_creation:
                 new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_item)
                 new_position_guid = uuid4().hex[:8]
+                permissions = self.extract_permissions(row)
 
             operation = {
                 'uid': self.get_uuid_for_position(old_item.position),
@@ -247,7 +257,8 @@ class RepositoryExcelAnalyser(object):
                 'new_parent_position': new_parent_position,
                 'new_parent_uid': new_parent_uid,
                 'old_item': old_item,
-                'new_item': new_item
+                'new_item': new_item,
+                'permissions': permissions
             }
             self.validate_operation(operation)
 
@@ -428,6 +439,23 @@ class RepositoryExcelAnalyser(object):
         mapping = self.get_repository_reference_mapping()
         return mapping.get(position)
 
+    def extract_permissions(self, row):
+        permissions = {'block_inheritance': False}
+
+        if row.block_inheritance:
+            block = row.block_inheritance.strip()
+            assert block in ['ja', 'nein']
+            if block == 'ja':
+                permissions['block_inheritance'] = True
+
+        for key in ['read', 'add', 'edit', 'close', 'reactivate', 'manage_dossiers']:
+            groups = [group.strip() for group in getattr(row, key).split(',')]
+            groups = [group for group in groups if group]
+
+            permissions[key] = groups
+
+        return permissions
+
     def export_to_excel(self):
         workbook = self.prepare_workbook(self.analysed_rows)
         # Save the Workbook-data in to a StringIO
@@ -459,7 +487,10 @@ class RepositoryExcelAnalyser(object):
             # rule violations
             'Verletzt Max. Tiefe',
             'Verletzt Leafnode Prinzip',
-            'Ist ungultig'
+            'Ist ungultig',
+
+            # permission
+            'Bewilligungen',
         ]
 
         for i, label in enumerate(labels, 1):
@@ -483,6 +514,7 @@ class RepositoryExcelAnalyser(object):
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
                 'x' if not data['is_valid'] else '',
+                data['permissions'],
             ]
 
             for column, attr in enumerate(values, 1):
@@ -551,7 +583,9 @@ class RepositoryMigrator(object):
                  'parent_guid': item['new_position_parent_guid'],
                  'reference_number_prefix': item['new_item'].reference_number_prefix,
                  'review_state': 'repositoryfolder-state-active',
-                 'title_de': item['new_item'].title})
+                 'title_de': item['new_item'].title,
+                 '_permissions': item['permissions']
+                 })
 
         tmpdirname = tempfile.mkdtemp()
         with open('{}/repofolders.json'.format(tmpdirname), 'w') as _file:
