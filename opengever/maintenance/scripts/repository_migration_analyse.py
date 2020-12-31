@@ -616,7 +616,6 @@ class RepositoryMigrator(object):
             transmogrifier(u'opengever.bundle.oggbundle')
 
     def move_branches(self, items):
-        mapping = self.get_repository_reference_mapping()
         for item in items:
             parent = uuidToObject(item['new_parent_uid'])
             if not parent:
@@ -627,15 +626,6 @@ class RepositoryMigrator(object):
                 raise Exception('No parent or repo found for {}'.format(item))
 
             api.content.move(source=repo, target=parent, safe_id=True)
-
-    def get_repository_reference_mapping(self):
-        if not self._reference_repository_mapping:
-            repos = [brain.getObject() for brain in
-                     self.catalog(object_provides=IRepositoryFolder.__identifier__)]
-            self._reference_repository_mapping = {
-                repo.get_repository_number(): repo for repo in repos}
-
-        return self._reference_repository_mapping
 
     def adjust_reference_number_prefix(self, items):
         parents = set()
