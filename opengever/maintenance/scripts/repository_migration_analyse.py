@@ -164,6 +164,7 @@ class RepositoryExcelAnalyser(object):
         self.analyse_xlsx_path = analyse_path
         self.analysed_rows = []
         self._reference_repository_mapping = None
+        self.final_positions = []
         self.catalog = api.portal.get_tool('portal_catalog')
 
         # A mapping new_position_number:UID
@@ -226,6 +227,11 @@ class RepositoryExcelAnalyser(object):
             if not old_item.position and not new_item.position:
                 continue
 
+            # Skip positions that should be deleted
+            if not new_item.position:
+                logger.info("Skipping, we do not support deletion", row)
+                continue
+
             new_number = None
             new_parent_position = None
             new_parent_uid = None
@@ -238,6 +244,7 @@ class RepositoryExcelAnalyser(object):
 
             needs_creation = not bool(old_item.position)
             need_number_change, need_move = self.needs_number_change_or_move(new_item, old_item)
+
             if need_number_change:
                 new_number = self.get_new_number(new_item)
             if need_move:
@@ -278,6 +285,12 @@ class RepositoryExcelAnalyser(object):
         if not any((operation['new_position_guid'], operation['uid'])):
             logger.warning("Invalid operation: needs new_position_guid "
                            "or uid. {}".format(operation))
+            operation['is_valid'] = False
+
+        # Each operation should have new position
+        if not operation['new_item'].position:
+            logger.warning("Invalid operation: needs new position. {}".format(
+                operation))
             operation['is_valid'] = False
 
         if all((operation['new_position_guid'], operation['uid'])):
