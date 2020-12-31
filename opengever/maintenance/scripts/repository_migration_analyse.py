@@ -371,36 +371,33 @@ class RepositoryExcelAnalyser(object):
             # The parent is being created, so we will identify it through its guid.
             return None, parent_row[0]['new_position_guid']
 
-    def needs_move(self, new_item, old_item):
-        if not old_item.position or not new_item.position:
-            return False
-
-        if new_item.parent_position != old_item.parent_position:
-            return True
-
-        return False
-
     def needs_number_change_or_move(self, new_item, old_item):
         """Check if a number change or even a move is necessary
         """
         need_number_change = False
         need_move = False
 
-        if new_item.position and old_item.position:
-            if new_item.position != old_item.position:
+        if new_item.position and old_item.position and new_item.position != old_item.position:
+            self.number_changes[new_item.position] = old_item.position
+
+            # check if move is necessary
+            new_parent = new_item.parent_position
+            old_parent = old_item.parent_position
+            if new_parent != old_parent:
+                need_move = True
+                # check whether the parent is being moved
+                if new_parent in self.number_changes:
+                    if self.number_changes[new_parent] == old_parent:
+                        need_move = False
+
+            # a position that really needs to get moved will need its reference
+            # number reindexed
+            if need_move:
                 need_number_change = True
-                self.number_changes[new_item.position] = old_item.position
 
-                # check if parent is already changed - so no need to change
-                parent_position = new_item.parent_position
-                if parent_position in self.number_changes:
-                    if self.number_changes[parent_position] == old_item.parent_position:
-                        need_number_change = False
-
-                if need_number_change:
-                    # check if move is necessary
-                    if new_item.parent_position != old_item.parent_position:
-                        need_move = True
+            # check if number change is necessary
+            if new_item.reference_number_prefix != old_item.reference_number_prefix:
+                need_number_change = True
 
         return need_number_change, need_move
 
