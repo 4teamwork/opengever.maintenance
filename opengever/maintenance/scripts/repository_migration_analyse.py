@@ -1,6 +1,7 @@
 from Acquisition import aq_inner
 from Acquisition import aq_parent
 from collections import defaultdict
+from collections import namedtuple
 from collective.transmogrifier.transmogrifier import Transmogrifier
 from opengever.base.indexes import sortable_title
 from opengever.base.interfaces import IReferenceNumber
@@ -100,21 +101,26 @@ class Row(object):
 
     def __init__(self, row, column_mapping):
         for key, column in column_mapping.items():
-            col = column['index']
+            col = column.index
             setattr(self, key, row[col])
+
+
+Column = namedtuple('Column', ('index', 'technical_header', 'header'))
 
 
 class ExcelDataExtractor(object):
 
     header_row = 2
+    technical_header_row = 4
     first_data_row = 6
+
     column_mapping = {
-        'old_position': {'index': 0, 'header': u'Ordnungs-\npositions-\nnummer'},
-        'old_title': {'index': 1, 'header': u'Titel der Ordnungsposition'},
-        'old_description': {'index': 2, 'header': u'Beschreibung (optional)'},
-        'new_position': {'index': 5, 'header': u'Ordnungs-\npositions-\nnummer'},
-        'new_title': {'index': 6, 'header': u'Titel der Ordnungsposition'},
-        'new_description': {'index': 8, 'header': u'Beschreibung (optional)'},
+        'old_position': Column(0, '', u'Ordnungs-\npositions-\nnummer'),
+        'old_title': Column(1, '', u'Titel der Ordnungsposition'),
+        'old_description': Column(2, '', u'Beschreibung (optional)'),
+        'new_position': Column(5, 'reference_number', u'Ordnungs-\npositions-\nnummer'),
+        'new_title': Column(6, 'effective_title', u'Titel der Ordnungsposition'),
+        'new_description': Column(8, 'description', u'Beschreibung (optional)'),
     }
 
     def __init__(self, diff_xlsx_path):
@@ -124,10 +130,18 @@ class ExcelDataExtractor(object):
 
     def validate_format(self):
         headers = self.data[self.header_row]
+        technical_headers = self.data[self.technical_header_row]
         for column in self.column_mapping.values():
-            assert headers[column['index']] == column['header'], \
+            assert technical_headers[column.index] == column.technical_header, \
+                u"Column technical header mismatch: {} != {}".format(
+                    technical_headers[column.index], column.technical_header)
+
+            if not column.header:
+                continue
+
+            assert headers[column.index] == column.header, \
                 u"Column header mismatch: {} != {}".format(
-                    headers[column['index']], column['header'])
+                    headers[column.index], column.header)
 
     def get_data(self):
         for row in self.data[self.first_data_row:]:
