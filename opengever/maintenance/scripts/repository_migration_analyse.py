@@ -235,6 +235,7 @@ class RepositoryExcelAnalyser(object):
             new_number = None
             new_parent_position = None
             new_parent_uid = None
+            merge_into = None
 
             new_position_parent_position = None
             new_position_parent_guid = None
@@ -243,12 +244,14 @@ class RepositoryExcelAnalyser(object):
             permissions = None
 
             needs_creation = not bool(old_item.position)
-            need_number_change, need_move = self.needs_number_change_or_move(new_item, old_item)
+            need_number_change, need_move, need_merge = self.needs_number_change_move_or_merge(new_item, old_item)
 
             if need_number_change:
                 new_number = self.get_new_number(new_item)
             if need_move:
                 new_parent_position, new_parent_uid = self.get_new_parent_position_and_uid(new_item)
+            if need_merge:
+                merge_into = self.get_position_and_uid_to_merge_into(new_item)
             if needs_creation:
                 new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_item)
                 new_position_guid = uuid4().hex[:8]
@@ -263,6 +266,7 @@ class RepositoryExcelAnalyser(object):
                 'new_number': new_number,
                 'new_parent_position': new_parent_position,
                 'new_parent_uid': new_parent_uid,
+                'merge_into': merge_into,
                 'old_item': old_item,
                 'new_item': new_item,
                 'permissions': permissions
@@ -270,7 +274,9 @@ class RepositoryExcelAnalyser(object):
             self.validate_operation(operation)
 
             self.analysed_rows.append(operation)
-            if not needs_creation:
+            if need_merge:
+                pass
+            elif not needs_creation:
                 self.position_uid_mapping[new_item.position] = operation['uid']
             else:
                 self.position_guid_mapping[new_item.position] = new_position_guid
@@ -348,6 +354,19 @@ class RepositoryExcelAnalyser(object):
 
         return parent_position, self.position_uid_mapping[parent_position]
 
+    def get_position_and_uid_to_merge_into(self, new_item):
+        """Returns the position and the uid this should be merged into.
+        If the object does not yet exists it returns the guid."""
+
+        position = new_item.position
+
+        if position not in self.position_uid_mapping:
+            # Parent does not exist yet and will be created in the
+            # first step of the migration
+            return self.position_guid_mapping.get(position)
+
+        return self.position_uid_mapping[position]
+
     def get_parent_of_new_position(self, new_item):
         final_parent_position = new_item.parent_position
         if not final_parent_position:
@@ -371,14 +390,24 @@ class RepositoryExcelAnalyser(object):
             # The parent is being created, so we will identify it through its guid.
             return None, parent_row[0]['new_position_guid']
 
-    def needs_number_change_or_move(self, new_item, old_item):
-        """Check if a number change or even a move is necessary
+    def needs_number_change_move_or_merge(self, new_item, old_item):
+        """Check if a number change, a move or a merge is necessary
         """
         need_number_change = False
         need_move = False
+        need_merge = False
 
         if new_item.position and old_item.position and new_item.position != old_item.position:
             self.number_changes[new_item.position] = old_item.position
+
+            # If the new position is already in position_uid_mapping or
+            # position_guid_mapping, it means that a previous operation will
+            # move or create a repository_folder to that position. This means
+            # this operation is a merge into an existing position.
+            if (new_item.position in self.position_uid_mapping or
+                    new_item.position in self.position_guid_mapping):
+                need_merge = True
+                return need_number_change, need_move, need_merge
 
             # check if move is necessary
             new_parent = new_item.parent_position
@@ -399,7 +428,7 @@ class RepositoryExcelAnalyser(object):
             if new_item.reference_number_prefix != old_item.reference_number_prefix:
                 need_number_change = True
 
-        return need_number_change, need_move
+        return need_number_change, need_move, need_merge
 
     def check_repository_depth_violation(self, operation):
         max_depth = api.portal.get_registry_record(
@@ -493,6 +522,7 @@ class RepositoryExcelAnalyser(object):
             'Umbenennung (Neuer Titel)',
             'Nummer Anpassung (Neuer `Praefix`)',
             'Verschiebung (Aktenzeichen neues Parent)',
+            'Merge mit (UID oder GUID)',
 
             # rule violations
             'Verletzt Max. Tiefe',
@@ -521,6 +551,7 @@ class RepositoryExcelAnalyser(object):
                 data['new_title'],
                 data['new_number'],
                 data['new_parent_position'],
+                data['merge_into'],
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
                 'x' if not data['is_valid'] else '',
