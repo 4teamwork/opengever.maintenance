@@ -42,6 +42,9 @@ import transaction
 
 
 logger = logging.getLogger('opengever.maintenance')
+handler = logging.StreamHandler(stream=sys.stdout)
+logging.root.addHandler(handler)
+logging.root.setLevel(logging.INFO)
 
 
 class MigrationPreconditionsError(Exception):
