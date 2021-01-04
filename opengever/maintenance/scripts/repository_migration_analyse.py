@@ -18,6 +18,7 @@ from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.scripts.update_object_ids import ObjectIDUpdater
 from opengever.repository.behaviors import referenceprefix
+from opengever.repository.deleter import RepositoryDeleter
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.interfaces import IRepositoryFolderRecords
 from opengever.setup.sections.xlssource import xlrd_xls2array
@@ -579,6 +580,7 @@ class RepositoryMigrator(object):
     def run(self):
         self.create_repository_folders(self.items_to_create())
         self.move_branches(self.items_to_move())
+        self.merge_branches(self.items_to_merge())
         self.adjust_reference_number_prefix(self.items_to_adjust_number())
         self.rename(self.items_to_rename())
         self.update_description(self.operations_list)
@@ -590,6 +592,9 @@ class RepositoryMigrator(object):
 
     def items_to_move(self):
         return [item for item in self.operations_list if item['new_parent_uid']]
+
+    def items_to_merge(self):
+        return [item for item in self.operations_list if item['merge_into']]
 
     def items_to_adjust_number(self):
         return [item for item in self.operations_list if item['new_number']]
@@ -646,17 +651,38 @@ class RepositoryMigrator(object):
         with DisabledLDAP(portal):
             transmogrifier(u'opengever.bundle.oggbundle')
 
+    def uid_or_guid_to_object(self, uid_or_guid):
+        obj = uuidToObject(uid_or_guid)
+        if not obj:
+            obj = self.catalog(bundle_guid=uid_or_guid)[0].getObject()
+        return obj
+
     def move_branches(self, items):
         for item in items:
-            parent = uuidToObject(item['new_parent_uid'])
-            if not parent:
-                parent = self.catalog(bundle_guid=item['new_parent_uid'])[0].getObject()
-
+            parent = self.uid_or_guid_to_object(item['new_parent_uid'])
             repo = uuidToObject(item['uid'])
             if not parent or not repo:
                 raise Exception('No parent or repo found for {}'.format(item))
 
             api.content.move(source=repo, target=parent, safe_id=True)
+
+    def merge_branches(self, items):
+        for item in items:
+            target = self.uid_or_guid_to_object(item['merge_into'])
+            repo = uuidToObject(item['uid'])
+            if not target or not repo:
+                raise Exception('No target or repo found for {}'.format(item))
+
+            for obj in repo.contentValues():
+                api.content.move(source=obj, target=target, safe_id=True)
+                self.add_to_reindexing_queue(
+                    obj.UID(), ('Title', 'sortable_title', 'reference'),
+                    with_children=True)
+
+            deleter = RepositoryDeleter(repo)
+            if not deleter.is_deletion_allowed():
+                raise Exception('Trying to delete not empty object {}'.format(item))
+            deleter.delete()
 
     def adjust_reference_number_prefix(self, items):
         parents = set()
@@ -748,12 +774,13 @@ class RepositoryMigrator(object):
                 # new position was created
                 obj = self.guid_to_object(operation['new_position_guid'])
             elif operation['uid']:
-                if operation['new_item'] == OperationItem():
+                obj = uuidToObject(operation['uid'])
+                if operation['merge_into']:
                     # position was deleted
+                    if obj:
+                        logger.error(u"Positions wasn't deleted correctly {}.".format(operation['uid']))
+                        self.validation_failed = True
                     continue
-                else:
-                    # position was modified
-                    obj = uuidToObject(operation['uid'])
             else:
                 logger.error(u"Invalid operation {}".format(operation))
                 self.validation_failed = True
