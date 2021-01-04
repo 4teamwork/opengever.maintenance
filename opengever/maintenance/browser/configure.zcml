@@ -104,11 +104,4 @@
       permission="cmf.ManagePortal"
       />
 
-  <browser:page
-      for="*"
-      name="repository_analyse"
-      class=".repository_analyser.RepositoryAnalyser"
-      permission="cmf.ManagePortal"
-      />
-
 </configure>
