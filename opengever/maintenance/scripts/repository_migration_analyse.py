@@ -180,6 +180,9 @@ class RepositoryExcelAnalyser(object):
         self.check_preconditions()
         self.reporoot, self.reporoot_guid = self.prepare_guids()
 
+        self.positions = set()
+        self.new_positions = set()
+
     def check_preconditions(self):
         # current implementation only works with grouped_by_three reference
         # formatter, notably because we remove splitting dots during the analysis.
@@ -297,6 +300,12 @@ class RepositoryExcelAnalyser(object):
                            "or uid. {}".format(operation))
             operation['is_valid'] = False
 
+        # Make sure that all UIDs are valid
+        if operation['uid'] and not uuidToObject(operation['uid']):
+            logger.warning("Invalid operation: uid is not valid."
+                           "or uid. {}".format(operation))
+            operation['is_valid'] = False
+
         # Each operation should have new position
         if not operation['new_item'].position:
             logger.warning("Invalid operation: needs new position. {}".format(
@@ -329,6 +338,26 @@ class RepositoryExcelAnalyser(object):
 
         self.check_repository_depth_violation(operation)
         self.check_leaf_node_principle_violation(operation)
+
+        # Each existing position can only have one row in the excel
+        old_position = operation['old_item'].position
+        if old_position:
+            if old_position in self.positions:
+                logger.warning(
+                    "Invalid operation: position appears twice in excel."
+                    " {}".format(operation))
+                operation['is_valid'] = False
+            self.positions.add(old_position)
+
+        # Each new position can only have one row in the excel except for merge operations
+        new_position = operation['new_item'].position
+        if new_position and not operation['merge_into']:
+            if new_position in self.new_positions:
+                logger.warning(
+                    "Invalid operation: new position appears twice in excel."
+                    " {}".format(operation))
+                operation['is_valid'] = False
+            self.new_positions.add(new_position)
 
     def get_new_title(self, new_item, old_item):
         """Returns the new title or none if no rename is necessary."""
@@ -535,6 +564,7 @@ class RepositoryExcelAnalyser(object):
         title_font = Font(bold=True)
         labels = [
             # metadata
+            'UID',
             'Neu: Position', 'Neu: Titel', 'Neu: Description',
             'Alt: Position', 'Alt: Titel', 'Alt: Description',
 
@@ -562,6 +592,7 @@ class RepositoryExcelAnalyser(object):
     def insert_value_rows(self, sheet, rows):
         for row, data in enumerate(rows, 2):
             values = [
+                data['uid'],
                 data['new_item'].position,
                 data['new_item'].title,
                 data['new_item'].description,
