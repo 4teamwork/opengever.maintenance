@@ -734,6 +734,9 @@ class RepositoryMigrator(object):
                 raise Exception('Trying to delete not empty object {}'.format(item))
             deleter.delete()
 
+            if item['uid'] in self.to_reindex:
+                self.to_reindex.pop(item['uid'])
+
     def adjust_reference_number_prefix(self, items):
         logger.info("Adjusting reference number prefix... ")
         parents = set()
