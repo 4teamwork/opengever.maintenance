@@ -556,7 +556,7 @@ class RepositoryExcelAnalyser(object):
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
                 'x' if not data['is_valid'] else '',
-                data['permissions'],
+                json.dumps(data['permissions']),
             ]
 
             for column, attr in enumerate(values, 1):
