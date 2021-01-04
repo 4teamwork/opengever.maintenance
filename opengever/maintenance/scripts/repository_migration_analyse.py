@@ -51,10 +51,6 @@ class MigrationPreconditionsError(Exception):
     """Raised when errors are found during migration validation"""
 
 
-class MigrationValidationError(Exception):
-    """Raised when errors are found during migration validation"""
-
-
 class OperationItem(object):
 
     def __init__(self, position=None, title=None, description=None):
@@ -861,7 +857,7 @@ class RepositoryMigrator(object):
             self.assertObjectConsistency(obj)
 
         if self.validation_failed:
-            raise MigrationValidationError("See log for details")
+            logger.error("Validation failed, see log for details")
 
     def assertObjectConsistency(self, obj):
         err_msg = "data inconsistency"
