@@ -855,7 +855,7 @@ class RepositoryMigrator(object):
             # Assert reference number, title and description on the object
             uid = obj.UID()
             new = operation['new_item']
-            self.assertEqual(uid, new.position, obj.get_repository_number(), 'incorrect number')
+            self.assertEqual(uid, new.position, obj.get_repository_number().replace('.', ''), 'incorrect number')
             self.assertEqual(uid, new.title, obj.title_de, 'incorrect title')
             self.assertEqual(uid, new.description, obj.description, 'incorrect description')
 
