@@ -666,6 +666,7 @@ class RepositoryMigrator(object):
 
     def create_repository_folders(self, items):
         """Add repository folders - by using the ogg.bundle import. """
+        logger.info("Creating... ")
         bundle_items = []
         for item in items:
             # Bundle expect the format [[repository], [dossier]]
@@ -709,6 +710,7 @@ class RepositoryMigrator(object):
         return obj
 
     def move_branches(self, items):
+        logger.info("Moving... ")
         for item in items:
             parent = self.uid_or_guid_to_object(item['new_parent_uid'])
             repo = uuidToObject(item['uid'])
@@ -718,6 +720,7 @@ class RepositoryMigrator(object):
             api.content.move(source=repo, target=parent, safe_id=True)
 
     def merge_branches(self, items):
+        logger.info("Merging... ")
         for item in items:
             target = self.uid_or_guid_to_object(item['merge_into'])
             repo = uuidToObject(item['uid'])
@@ -736,6 +739,7 @@ class RepositoryMigrator(object):
             deleter.delete()
 
     def adjust_reference_number_prefix(self, items):
+        logger.info("Adjusting reference number prefix... ")
         parents = set()
         for item in items:
             repo = uuidToObject(item['uid'])
@@ -763,6 +767,7 @@ class RepositoryMigrator(object):
                     child, number=child.reference_number_prefix)
 
     def rename(self, items):
+        logger.info("Renaming... ")
         for item in items:
             repo = uuidToObject(item['uid'])
 
@@ -778,6 +783,7 @@ class RepositoryMigrator(object):
                 item['uid'], ('Title', 'sortable_title'))
 
     def update_description(self, items):
+        logger.info("Updating descriptions... ")
         for item in items:
             repo = uuidToObject(item['uid'])
             if not repo:
@@ -789,6 +795,7 @@ class RepositoryMigrator(object):
                 self.add_to_reindexing_queue(item['uid'], ('Description',))
 
     def reindex(self):
+        logger.info("Reindexing... ")
         for uid, idxs in self.to_reindex.items():
             obj = uuidToObject(uid)
             obj.reindexObject(idxs=idxs)
