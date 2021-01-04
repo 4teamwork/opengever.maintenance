@@ -450,10 +450,27 @@ class RepositoryExcelAnalyser(object):
             # object is neither moved nor created, nothing to worry about
             return
 
-        parent_number = operation['new_item'].parent_position
-        parent_repo = self.get_object_for_position(parent_number)
-        if parent_repo and any([IDossierMarker.providedBy(item) for item in
-                                parent_repo.objectValues()]):
+        if operation['new_parent_uid']:
+            # object is being moved
+            if operation['new_parent_uid'] in self.position_guid_mapping.values():
+                # parent is being created, hard to check leaf node principle
+                return
+            parent_repo = uuidToObject(operation['new_parent_uid'])
+        else:
+            # object is being created, parent is identified either by
+            # new_position_parent_position or new_position_parent_guid
+            if operation['new_position_parent_position']:
+                # this corresponds to the old position, as creation happens before move
+                parent_repo = self.get_object_for_position(operation['new_position_parent_position'])
+            else:
+                # parent is being created, hard to check leaf node principle
+                return
+        if not parent_repo:
+            # Something is fishy, parent should either exist or be created
+            operation['is_valid'] = False
+            logger.warning("Invalid operation: parent not found. {}".format(operation))
+            return
+        if any([IDossierMarker.providedBy(item) for item in parent_repo.objectValues()]):
             operation['is_valid'] = False
             operation['leaf_node_violated'] = True
             logger.warning("Invalid operation: leaf node principle violated. {}".format(operation))
