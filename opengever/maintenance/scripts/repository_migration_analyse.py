@@ -797,6 +797,9 @@ class RepositoryMigrator(object):
         logger.info("Reindexing... ")
         for uid, idxs in self.to_reindex.items():
             obj = uuidToObject(uid)
+            if not obj:
+                logger.error("Could not find {} to reindex. Skipping".format(uid))
+                continue
             obj.reindexObject(idxs=idxs)
             if obj.portal_type == 'opengever.task.task':
                 # make sure that the model is up to date.
