@@ -265,7 +265,7 @@ class RepositoryExcelAnalyser(object):
                 'new_position_parent_position': new_position_parent_position,
                 'new_position_parent_guid': new_position_parent_guid,
                 'new_position_guid': new_position_guid,
-                'new_title': self.get_new_title(new_item, old_item) if not needs_creation else None,
+                'new_title': self.get_new_title(new_item, old_item) if not (needs_creation or need_merge) else None,
                 'new_number': new_number,
                 'new_parent_position': new_parent_position,
                 'new_parent_uid': new_parent_uid,
