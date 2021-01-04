@@ -15,6 +15,7 @@ from opengever.bundle.sections.constructor import BUNDLE_GUID_KEY
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.globalindex.handlers.task import TaskSqlSyncer
 from opengever.maintenance.debughelpers import setup_app
+from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.scripts.update_object_ids import ObjectIDUpdater
 from opengever.repository.behaviors import referenceprefix
@@ -32,16 +33,15 @@ from Products.CMFPlone.utils import safe_unicode
 from uuid import uuid4
 from zope.annotation import IAnnotations
 from zope.component import queryAdapter
-import argparse
 import json
 import logging
 import shutil
 import sys
 import tempfile
+import transaction
 
 
-logger = logging.getLogger('migration')
-logger.setLevel(logging.INFO)
+logger = logging.getLogger('opengever.maintenance')
 
 
 class MigrationPreconditionsError(Exception):
@@ -868,21 +868,41 @@ class FakeOptions(object):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-s', dest='site_root', default=None,
-                        help='Absolute path to the Plone site')
-    parser.add_argument('-m', dest='mapping', default=None,
-                        help='Path to the mapping xlsx')
-    parser.add_argument('-o', dest='output', default=None,
-                        help='Path to the output xlsx')
-    options = parser.parse_args(sys.argv[3:])
-    app = setup_app()
+    parser = setup_option_parser()
+    parser.add_option('-o', dest='output', default=None,
+                      help='Path to the output xlsx')
+    parser.add_option("-n", "--dry-run", action="store_true",
+                      dest="dryrun", default=False)
+    (options, args) = parser.parse_args()
 
+    if not len(args) == 1:
+        logger.info("Missing argument, a path to the mapping xlsx")
+        sys.exit(1)
+    mapping_path = args[0]
+
+    if options.dryrun:
+        logger.info("Dry run, dooming transaction")
+        transaction.doom()
+
+    app = setup_app()
     setup_plone(app, options)
 
-    analyser = RepositoryExcelAnalyser(options.mapping, options.output)
+    logger.info('starting analysis')
+    analyser = RepositoryExcelAnalyser(mapping_path, options.output)
     analyser.analyse()
-    analyser.export_to_excel()
+
+    if options.output:
+        logger.info('writing analysis excel')
+        analyser.export_to_excel()
+
+    migrator = RepositoryMigrator(analyser.analysed_rows)
+    if not options.dryrun:
+        logger.info('starting migration')
+        migrator.run()
+
+        logger.info('Committing transaction...')
+        transaction.commit()
+        logger.info('Done.')
 
 
 if __name__ == '__main__':
