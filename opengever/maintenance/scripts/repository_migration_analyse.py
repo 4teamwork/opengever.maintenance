@@ -123,6 +123,7 @@ class PatchReportSection(MonkeyPatch):
     def __call__(self):
         from opengever.bundle.sections.report import ReportSection
         from opengever.bundle.report import DataCollector
+        from datetime import datetime
 
         def __iter__(self):
             for item in self.previous:
