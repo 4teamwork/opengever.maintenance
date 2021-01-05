@@ -48,6 +48,9 @@ logging.root.addHandler(handler)
 logging.root.setLevel(logging.INFO)
 
 
+MIGRATION_KEY = 'opengever.maintenance.repository_migration'
+
+
 class MigrationPreconditionsError(Exception):
     """Raised when errors are found during migration validation"""
 
@@ -953,6 +956,21 @@ class RepositoryMigrator(object):
 
             # Assert that data in the catalog is consistent with data on the object
             self.assertObjectConsistency(obj)
+
+            # Store some migration information on the object
+            IAnnotations(obj)[MIGRATION_KEY] = {
+                'old_position': operation['old_item'].position,
+                'new_position': operation['new_item'].position,
+                'old_title': operation['old_item'].title,
+                'new_title': operation['new_item'].title,
+                'old_description': operation['old_item'].title,
+                'new_description': operation['new_item'].title,
+                'new_parent_uid': operation['new_parent_uid'],
+                'merge_into': operation['merge_into'],
+                'new_position_parent_guid': operation['new_position_parent_guid'],
+                'new_position_parent_position': operation['new_position_parent_position'],
+                'permissions': operation['permissions']
+            }
 
         if self.validation_failed:
             raise MigrationValidationError("See log for details")
