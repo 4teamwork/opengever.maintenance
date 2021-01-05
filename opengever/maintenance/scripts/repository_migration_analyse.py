@@ -7,6 +7,7 @@ from opengever.base.indexes import sortable_title
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberPrefix
+from opengever.base.monkey.patching import MonkeyPatch
 from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
 from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
@@ -53,6 +54,93 @@ class MigrationPreconditionsError(Exception):
 
 class MigrationValidationError(Exception):
     """Raised when errors are found during migration validation"""
+
+
+class PatchCommitSection(MonkeyPatch):
+    """In read-only mode, allow login of existing users without updating
+    their last login times (which would cause a write).
+
+    The return value of False signals that this is not the user's very
+    first login.
+    """
+
+    def __call__(self):
+        from opengever.bundle.sections.commit import CommitSection
+        # original_iter = CommitSection.__iter__
+
+        def __iter__(self):
+            print "patched section"
+            for count, item in enumerate(self.previous, start=1):
+                if count % self.every == 0 and self.intermediate_commits:
+                    logger.info("skipping intermediate commit after %s items..." % count)
+
+                yield item
+
+            logger.info("Skipping commit after bundle import...")
+
+        self.patch_refs(CommitSection, '__iter__', __iter__)
+
+
+class PatchReindexContainersSection(MonkeyPatch):
+    """In read-only mode, allow login of existing users without updating
+    their last login times (which would cause a write).
+
+    The return value of False signals that this is not the user's very
+    first login.
+    """
+
+    def __call__(self):
+        from opengever.bundle.sections.reindex_containers import ReindexContainersSection
+        from collective.transmogrifier.utils import traverse
+
+        def __iter__(self):
+            for item in self.previous:
+                yield item
+
+            n_containers = len(self.bundle.containers_to_reindex)
+            logger.info("Reindexing {} containers after bundle import...".format(n_containers))
+
+            for container_path in self.bundle.containers_to_reindex:
+                obj = traverse(self.site, container_path, None)
+                obj.reindexObject(idxs=self.indexes)
+
+            logger.info("Skipping commit...")
+
+        self.patch_refs(ReindexContainersSection, '__iter__', __iter__)
+
+
+class PatchReportSection(MonkeyPatch):
+    """In read-only mode, allow login of existing users without updating
+    their last login times (which would cause a write).
+
+    The return value of False signals that this is not the user's very
+    first login.
+    """
+
+    def __call__(self):
+        from opengever.bundle.sections.report import ReportSection
+        from opengever.bundle.report import DataCollector
+
+        def __iter__(self):
+            for item in self.previous:
+                yield item
+
+            self.bundle.stats['timings']['migration_finished'] = datetime.now()
+
+            logger.info("Creating import reports...")
+            self.report_dir = self.create_report_dir()
+
+            self.store_as_json(self.bundle.errors, 'errors.json')
+            self.store_as_json(self.bundle.stats, 'stats.json')
+
+            report_data = DataCollector(self.bundle)()
+            self.bundle.report_data = report_data
+
+            self.build_ascii_summary(self.bundle)
+            self.build_xlsx_main_report(self.bundle)
+            self.build_xlsx_validation_report(self.bundle)
+
+        self.patch_refs(ReportSection, '__iter__', __iter__)
 
 
 class OperationItem(object):
@@ -933,6 +1021,11 @@ def main():
 
     app = setup_app()
     setup_plone(app, options)
+
+    logger.info('patching bundle sections')
+    PatchCommitSection()()
+    PatchReindexContainersSection()()
+    PatchReportSection()()
 
     logger.info('starting analysis')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output)
