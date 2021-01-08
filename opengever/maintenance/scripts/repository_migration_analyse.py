@@ -107,32 +107,16 @@ class PatchReindexContainersSection(MonkeyPatch):
 
 class PatchReportSection(MonkeyPatch):
     """To maintain transactionality we need to avoid that the bundle import
-    commits changes made. Here we patch out commits from the ReportSection.
+    commits changes made. As we also do not need the reports for a migration,
+    we patch out the whole ReportSection.
     """
 
     def __call__(self):
         from opengever.bundle.sections.report import ReportSection
-        from opengever.bundle.report import DataCollector
-        from datetime import datetime
 
         def __iter__(self):
             for item in self.previous:
                 yield item
-
-            self.bundle.stats['timings']['migration_finished'] = datetime.now()
-
-            logger.info("Creating import reports...")
-            self.report_dir = self.create_report_dir()
-
-            self.store_as_json(self.bundle.errors, 'errors.json')
-            self.store_as_json(self.bundle.stats, 'stats.json')
-
-            report_data = DataCollector(self.bundle)()
-            self.bundle.report_data = report_data
-
-            self.build_ascii_summary(self.bundle)
-            self.build_xlsx_main_report(self.bundle)
-            self.build_xlsx_validation_report(self.bundle)
 
         self.patch_refs(ReportSection, '__iter__', __iter__)
 
