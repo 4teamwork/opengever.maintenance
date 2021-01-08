@@ -60,16 +60,12 @@ class MigrationValidationError(Exception):
 
 
 class PatchCommitSection(MonkeyPatch):
-    """In read-only mode, allow login of existing users without updating
-    their last login times (which would cause a write).
-
-    The return value of False signals that this is not the user's very
-    first login.
+    """To maintain transactionality we need to avoid that the bundle import
+    commits changes made. Here we patch out commits from the CommitSection.
     """
 
     def __call__(self):
         from opengever.bundle.sections.commit import CommitSection
-        # original_iter = CommitSection.__iter__
 
         def __iter__(self):
             print "patched section"
@@ -85,11 +81,8 @@ class PatchCommitSection(MonkeyPatch):
 
 
 class PatchReindexContainersSection(MonkeyPatch):
-    """In read-only mode, allow login of existing users without updating
-    their last login times (which would cause a write).
-
-    The return value of False signals that this is not the user's very
-    first login.
+    """To maintain transactionality we need to avoid that the bundle import
+    commits changes made. Here we patch out commits from the ReindexContainersSection.
     """
 
     def __call__(self):
@@ -113,11 +106,8 @@ class PatchReindexContainersSection(MonkeyPatch):
 
 
 class PatchReportSection(MonkeyPatch):
-    """In read-only mode, allow login of existing users without updating
-    their last login times (which would cause a write).
-
-    The return value of False signals that this is not the user's very
-    first login.
+    """To maintain transactionality we need to avoid that the bundle import
+    commits changes made. Here we patch out commits from the ReportSection.
     """
 
     def __call__(self):
