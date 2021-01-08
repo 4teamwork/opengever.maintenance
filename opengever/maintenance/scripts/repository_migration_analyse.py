@@ -328,7 +328,7 @@ class RepositoryExcelAnalyser(object):
 
             # Skip positions that should be deleted
             if not new_item.position:
-                logger.info("Skipping, we do not support deletion", row)
+                logger.info("Skipping, we do not support deletion: {}".format(row))
                 continue
 
             new_number = None
