@@ -121,6 +121,66 @@ class PatchReportSection(MonkeyPatch):
         self.patch_refs(ReportSection, '__iter__', __iter__)
 
 
+class PatchTaskSyncWith(MonkeyPatch):
+    """ We skip syncing the predecessor as this uses IntIds to resolve it,
+    which fails in the HBA migration as IntIds rely on path and also get
+    updated in an event handler. It is fine to not update the predecessor
+    as it anyway does not change during a move operation.
+    """
+
+    def __call__(self):
+        from opengever.globalindex.model.task import Task
+
+        def sync_with(self, plone_task):
+            """Sync this task instace with its corresponding plone taks."""
+            self.title = plone_task.safe_title
+            self.text = plone_task.text
+
+            self.breadcrumb_title = plone_task.get_breadcrumb_title(
+                self.MAX_BREADCRUMB_LENGTH,
+                )
+
+            self.physical_path = plone_task.get_physical_path()
+            self.review_state = plone_task.get_review_state()
+            self.icon = plone_task.getIcon()
+            self.responsible = plone_task.responsible
+            self.is_private = plone_task.is_private
+            self.issuer = plone_task.issuer
+            self.deadline = plone_task.deadline
+            self.completed = plone_task.date_of_completion
+
+            # we need to have python datetime objects for make it work with sqlite
+            self.modified = plone_task.modified().asdatetime().replace(tzinfo=None)
+            self.task_type = plone_task.task_type
+            self.is_subtask = plone_task.get_is_subtask()
+            self.sequence_number = plone_task.get_sequence_number()
+            self.reference_number = plone_task.get_reference_number()
+
+            self.containing_dossier = safe_unicode(
+                plone_task.get_containing_dossier_title(),
+                )
+
+            self.dossier_sequence_number = plone_task.get_dossier_sequence_number()
+            self.assigned_org_unit = plone_task.responsible_client
+            self.principals = plone_task.get_principals()
+
+            self.predecessor = self.query_predecessor(
+                *plone_task.get_predecessor_ids()
+                )
+
+            self.containing_subdossier = safe_unicode(
+                plone_task.get_containing_subdossier(),
+                )
+
+            # predecessor = plone_task.get_tasktemplate_predecessor()
+            # if predecessor:
+            #     self.tasktemplate_predecessor = predecessor.get_sql_object()
+
+            self.sync_reminders(plone_task)
+
+        self.patch_refs(Task, 'sync_with', sync_with)
+
+
 class RepositoryPosition(object):
 
     def __init__(self, position=None, title=None, description=None):
@@ -1018,6 +1078,7 @@ def main():
     PatchCommitSection()()
     PatchReindexContainersSection()()
     PatchReportSection()()
+    PatchTaskSyncWith()()
 
     logger.info('starting analysis')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output)
