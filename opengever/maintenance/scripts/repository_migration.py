@@ -128,6 +128,30 @@ class PatchReportSection(MonkeyPatch):
         self.patch_refs(ReportSection, '__iter__', __iter__)
 
 
+class PatchDisableLDAP(MonkeyPatch):
+    """To maintain transactionality we need to avoid that the bundle import
+    commits changes made. Here we patch out commits from the DisableLDAP
+    context manager.
+    """
+
+    def __call__(self):
+        from opengever.bundle.ldap import DisabledLDAP
+        from opengever.bundle.ldap import enable_ldap
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if exc_val is not None:
+                # Exception happened, make sure transaction is rolled back
+                transaction.abort()
+                transaction.begin()
+
+            enable_ldap(self.portal)
+
+            # Make sure persistent changes that re-enable LDAP are committed
+            # transaction.commit()
+
+        self.patch_refs(DisabledLDAP, '__exit__', __exit__)
+
+
 class PatchTaskSyncWith(MonkeyPatch):
     """ We skip syncing the predecessor as this uses IntIds to resolve it,
     which fails in the HBA migration as IntIds rely on path and also get
@@ -1126,6 +1150,7 @@ def main():
     PatchReindexContainersSection()()
     PatchReportSection()()
     PatchTaskSyncWith()()
+    PatchDisableLDAP()()
 
     logger.info('\n\nstarting analysis...\n')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output)
