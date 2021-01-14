@@ -425,11 +425,29 @@ class RepositoryExcelAnalyser(object):
                            "or uid. {}".format(operation))
             operation['is_valid'] = False
 
-        # Make sure that all UIDs are valid
-        if operation['uid'] and not uuidToObject(operation['uid']):
-            logger.warning("Invalid operation: uid is not valid."
-                           "or uid. {}".format(operation))
-            operation['is_valid'] = False
+        # Make sure that all UIDs are valid and that for existing UIDs,
+        # the title, position and description match the ones in the Excel
+        if operation['uid']:
+            obj = uuidToObject(operation['uid'])
+            if not obj:
+                logger.warning("Invalid operation: uid is not valid."
+                               "or uid. {}".format(operation))
+                operation['is_valid'] = False
+
+            else:
+                old_repo_pos = operation['old_repo_pos']
+                if obj.title_de != old_repo_pos.title:
+                    logger.warning("Invalid operation: incorrect title."
+                                   "{}".format(operation))
+                    operation['is_valid'] = False
+                if obj.get_repository_number().replace('.', '') != old_repo_pos.position:
+                    logger.warning("Invalid operation: incorrect position."
+                                   "{}".format(operation))
+                    operation['is_valid'] = False
+                if (obj.description or old_repo_pos.description) and obj.description != old_repo_pos.description:
+                    logger.warning("Invalid operation: incorrect description."
+                                   "{}".format(operation))
+                    operation['is_valid'] = False
 
         # Each operation should have new position
         if not operation['new_repo_pos'].position:
