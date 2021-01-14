@@ -39,6 +39,7 @@ import logging
 import shutil
 import sys
 import tempfile
+import time
 import transaction
 
 
@@ -49,6 +50,12 @@ logging.root.setLevel(logging.INFO)
 
 
 MIGRATION_KEY = 'opengever.maintenance.repository_migration'
+
+
+def log_progress(i, tot, step=100):
+    if i % step == 0:
+        logger.info(u'{}: Done {} / {}'.format(
+            time.strftime('%d.%m.%Y %H:%M:%S'), i, tot))
 
 
 class MigrationPreconditionsError(Exception):
@@ -263,6 +270,7 @@ class ExcelDataExtractor(object):
     def __init__(self, diff_xlsx_path):
         sheets = xlrd_xls2array(diff_xlsx_path)
         self.data = sheets[0]['sheet_data']
+        self.n_data = len(self.data) - self.first_data_row
         self.validate_format()
 
     def validate_format(self):
@@ -310,6 +318,7 @@ class RepositoryExcelAnalyser(object):
         self.new_positions = set()
 
     def check_preconditions(self):
+        logger.info(u"\n\nChecking preconditions...\n")
         # current implementation only works with grouped_by_three reference
         # formatter, notably because we remove splitting dots during the analysis.
         formatter_name = api.portal.get_registry_record(
@@ -330,6 +339,7 @@ class RepositoryExcelAnalyser(object):
         have a reference number allowing to find the parent when creating
         a new repository folder in the repository root.
         """
+        logger.info(u"\n\nPreparing GUIDs...\n")
         add_guid_index()
         brain = self.catalog.unrestrictedSearchResults(
             portal_type='opengever.repository.repositoryroot')[0]
@@ -341,9 +351,11 @@ class RepositoryExcelAnalyser(object):
         return reporoot, IAnnotations(reporoot).get(BUNDLE_GUID_KEY)
 
     def analyse(self):
+        logger.info(u"\n\nStarting analysis...\n")
         data_extractor = ExcelDataExtractor(self.diff_xlsx_path)
 
-        for row in data_extractor.get_data():
+        for i, row in enumerate(data_extractor.get_data()):
+            log_progress(i, data_extractor.n_data)
             if row.new_position in ['', u'l\xf6schen', '-']:
                 # Position should be deleted
                 new_repo_pos = RepositoryPosition()
@@ -809,7 +821,7 @@ class RepositoryMigrator(object):
 
     def create_repository_folders(self, items):
         """Add repository folders - by using the ogg.bundle import. """
-        logger.info("Creating... ")
+        logger.info("\n\nCreating bundle...\n")
         bundle_items = []
         for item in items:
             # Bundle expect the format [[repository], [dossier]]
@@ -837,6 +849,7 @@ class RepositoryMigrator(object):
         shutil.rmtree(tmpdirname)
 
     def start_bundle_import(self, bundle_path):
+        logger.info("\n\nStarting bundle import...\n")
         portal = api.portal.get()
         transmogrifier = Transmogrifier(portal)
         ann = IAnnotations(transmogrifier)
@@ -853,8 +866,10 @@ class RepositoryMigrator(object):
         return obj
 
     def move_branches(self, items):
-        logger.info("Moving... ")
-        for item in items:
+        logger.info("\n\nMoving...\n")
+        n_tot = len(items)
+        for i, item in enumerate(items):
+            log_progress(i, n_tot, 1)
             parent = self.uid_or_guid_to_object(item['new_parent_uid'])
             repo = uuidToObject(item['uid'])
             if not parent or not repo:
@@ -863,8 +878,10 @@ class RepositoryMigrator(object):
             api.content.move(source=repo, target=parent, safe_id=True)
 
     def merge_branches(self, items):
-        logger.info("Merging... ")
-        for item in items:
+        logger.info("\n\nMerging...\n")
+        n_tot = len(items)
+        for i, item in enumerate(items):
+            log_progress(i, n_tot, 1)
             target = self.uid_or_guid_to_object(item['merge_into'])
             repo = uuidToObject(item['uid'])
             if not target or not repo:
@@ -885,9 +902,11 @@ class RepositoryMigrator(object):
                 self.to_reindex.pop(item['uid'])
 
     def adjust_reference_number_prefix(self, items):
-        logger.info("Adjusting reference number prefix... ")
+        logger.info("\n\nAdjusting reference number prefix...\n")
         parents = set()
-        for item in items:
+        n_tot = len(items)
+        for i, item in enumerate(items):
+            log_progress(i, n_tot, 5)
             repo = uuidToObject(item['uid'])
             referenceprefix.IReferenceNumberPrefix(repo).reference_number_prefix = item['new_number']
             parents.add(aq_parent(aq_inner(repo)))
@@ -898,6 +917,7 @@ class RepositoryMigrator(object):
         self.regenerate_reference_number_mapping(list(parents))
 
     def regenerate_reference_number_mapping(self, objs):
+        logger.info("\n\nRegenerating number mappings...\n")
         for obj in objs:
             ref_adapter = IReferenceNumberPrefix(obj)
             # This purges also the dossier mapping, but the parents does not
@@ -913,8 +933,10 @@ class RepositoryMigrator(object):
                     child, number=child.reference_number_prefix)
 
     def rename(self, items):
-        logger.info("Renaming... ")
-        for item in items:
+        logger.info("\n\nRenaming...\n")
+        n_tot = len(items)
+        for i, item in enumerate(items):
+            log_progress(i, n_tot, 1)
             repo = uuidToObject(item['uid'])
 
             # Rename
@@ -929,8 +951,10 @@ class RepositoryMigrator(object):
                 item['uid'], ('Title', 'sortable_title'))
 
     def update_description(self, items):
-        logger.info("Updating descriptions... ")
-        for item in items:
+        logger.info("\n\nUpdating descriptions...\n")
+        n_tot = len(items)
+        for i, item in enumerate(items):
+            log_progress(i, n_tot, 5)
             repo = uuidToObject(item['uid'])
             if not repo:
                 continue
@@ -941,8 +965,10 @@ class RepositoryMigrator(object):
                 self.add_to_reindexing_queue(item['uid'], ('Description',))
 
     def reindex(self):
-        logger.info("Reindexing... ")
-        for uid, idxs in self.to_reindex.items():
+        logger.info("\n\nReindexing...\n")
+        n_tot = len(self.to_reindex)
+        for i, (uid, idxs) in enumerate(self.to_reindex.items()):
+            log_progress(i, n_tot)
             obj = uuidToObject(uid)
             if not obj:
                 logger.error("Could not find {} to reindex. Skipping".format(uid))
@@ -972,10 +998,13 @@ class RepositoryMigrator(object):
     def validate(self):
         """This steps make sure that the repository system has
         been correctly migrated."""
+        logger.info("\n\nValidating...\n")
         self.validation_errors = defaultdict(list)
         self.validation_failed = False
 
-        for operation in self.operations_list:
+        n_tot = len(self.operations_list)
+        for i, operation in enumerate(self.operations_list):
+            log_progress(i, n_tot)
             # Three possibilities here: position was created, deleted or modified
             if operation['new_position_guid']:
                 # new position was created
@@ -1092,28 +1121,28 @@ def main():
     app = setup_app()
     setup_plone(app, options)
 
-    logger.info('patching bundle sections')
+    logger.info('\n\npatching bundle sections...\n')
     PatchCommitSection()()
     PatchReindexContainersSection()()
     PatchReportSection()()
     PatchTaskSyncWith()()
 
-    logger.info('starting analysis')
+    logger.info('\n\nstarting analysis...\n')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output)
     analyser.analyse()
 
     if options.output:
-        logger.info('writing analysis excel')
+        logger.info('\n\nwriting analysis excel...\n')
         analyser.export_to_excel()
 
     migrator = RepositoryMigrator(analyser.analysed_rows)
     if not options.dryrun:
-        logger.info('starting migration')
+        logger.info('\n\nstarting migration...\n')
         migrator.run()
 
-        logger.info('Committing transaction...')
+        logger.info('\n\nCommitting transaction...\n')
         transaction.commit()
-        logger.info('Done.')
+        logger.info('Finished migration.')
 
 
 if __name__ == '__main__':
