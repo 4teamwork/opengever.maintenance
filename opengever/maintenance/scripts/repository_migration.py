@@ -75,7 +75,6 @@ class PatchCommitSection(MonkeyPatch):
         from opengever.bundle.sections.commit import CommitSection
 
         def __iter__(self):
-            print "patched section"
             for count, item in enumerate(self.previous, start=1):
                 if count % self.every == 0 and self.intermediate_commits:
                     logger.info("skipping intermediate commit after %s items..." % count)
