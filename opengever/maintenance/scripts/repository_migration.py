@@ -1060,7 +1060,7 @@ class RepositoryMigrator(object):
             self.assertEqual(uid, new.description, obj.description, 'incorrect description')
 
             # Assert that data in the catalog is consistent with data on the object
-            self.assertObjectConsistency(obj)
+            self.checkObjectConsistency(obj)
 
             # Store some migration information on the object
             IAnnotations(obj)[MIGRATION_KEY] = {
@@ -1080,7 +1080,7 @@ class RepositoryMigrator(object):
         if self.validation_failed:
             raise MigrationValidationError("See log for details")
 
-    def assertObjectConsistency(self, obj):
+    def checkObjectConsistency(self, obj):
         err_msg = "data inconsistency"
         uid = obj.UID()
         brain = uuidToCatalogBrain(uid)
@@ -1090,19 +1090,19 @@ class RepositoryMigrator(object):
         # dynamically, hence it should always be correct.
         # reference number in the catalog and in the metadata should match it.
         refnum = IReferenceNumber(obj).get_number()
-        self.assertEqual(uid, refnum, brain.reference, err_msg)
-        self.assertEqual(uid, refnum, catalog_data['reference'], err_msg)
+        self.checkEqual(uid, refnum, brain.reference, err_msg)
+        self.checkEqual(uid, refnum, catalog_data['reference'], err_msg)
 
-        self.assertEqual(uid, brain.Description, obj.Description(), err_msg)
+        self.checkEqual(uid, brain.Description, obj.Description(), err_msg)
 
-        self.assertEqual(uid, brain.getPath(), obj.absolute_url_path(), err_msg)
-        self.assertEqual(uid, catalog_data['path'], obj.absolute_url_path(), err_msg)
+        self.checkEqual(uid, brain.getPath(), obj.absolute_url_path(), err_msg)
+        self.checkEqual(uid, catalog_data['path'], obj.absolute_url_path(), err_msg)
 
         if not obj.portal_type == 'opengever.repository.repositoryfolder':
             return
-        self.assertEqual(uid, brain.title_de, obj.get_prefixed_title_de(), err_msg)
-        self.assertEqual(uid, brain.title_fr, obj.get_prefixed_title_fr(), err_msg)
-        self.assertEqual(uid, catalog_data['sortable_title'], sortable_title(obj)(), err_msg)
+        self.checkEqual(uid, brain.title_de, obj.get_prefixed_title_de(), err_msg)
+        self.checkEqual(uid, brain.title_fr, obj.get_prefixed_title_fr(), err_msg)
+        self.checkEqual(uid, catalog_data['sortable_title'], sortable_title(obj)(), err_msg)
 
     def assertEqual(self, uid, first, second, msg='not equal'):
         """Tests whether first and second are equal as determined by the '=='
@@ -1112,6 +1112,15 @@ class RepositoryMigrator(object):
         if not first == second:
             self.validation_errors[uid].append((first, second, msg))
             self.validation_failed = True
+            logger.error(u"{}: {} ({}, {})".format(uid, msg, first, second))
+
+    def checkEqual(self, uid, first, second, msg='not equal'):
+        """Tests whether first and second are equal as determined by the '=='
+        operator. If not, adds error to self.validation_errors, set
+        self.validation_failed to true and log the error.
+        """
+        if not first == second:
+            self.validation_errors[uid].append((first, second, msg))
             logger.error(u"{}: {} ({}, {})".format(uid, msg, first, second))
 
     def get_catalog_indexdata(self, obj):
