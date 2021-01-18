@@ -211,10 +211,21 @@ class PatchTaskSyncWith(MonkeyPatch):
         self.patch_refs(Task, 'sync_with', sync_with)
 
 
+def cleanup_position(position):
+    """Remove splitting dots - they're not usefull for comparison.
+    This only works for grouped_by_three formatter.
+    """
+    if position is None:
+        return None
+    position = str(position)
+    if position:
+        return position.replace('.', '')
+
+
 class RepositoryPosition(object):
 
     def __init__(self, position=None, title=None, description=None):
-        self.position = self.cleanup_position(position)
+        self.position = cleanup_position(position)
         self.title = self.to_safe_unicode(title)
         self.description = self.to_safe_unicode(description)
 
@@ -225,17 +236,6 @@ class RepositoryPosition(object):
         maybe_none = safe_unicode(maybe_none)
         if maybe_none:
             return maybe_none
-
-    @staticmethod
-    def cleanup_position(position):
-        """Remove splitting dots - they're not usefull for comparison.
-        This only works for grouped_by_three formatter.
-        """
-        if position is None:
-            return None
-        position = str(position)
-        if position:
-            return position.replace('.', '')
 
     @property
     def reference_number_prefix(self):
@@ -295,6 +295,7 @@ class ExcelDataExtractor(object):
         self.data = sheets[0]['sheet_data']
         self.n_data = len(self.data) - self.first_data_row
         self.validate_format()
+        self.is_valid = True
 
     def validate_format(self):
         headers = self.data[self.header_row]
@@ -447,6 +448,27 @@ class RepositoryExcelAnalyser(object):
                 self.position_uid_mapping[new_repo_pos.position] = operation['uid']
             else:
                 self.position_guid_mapping[new_repo_pos.position] = new_position_guid
+
+        # Now we make sure that the excel was complete, i.e. there is a row for each
+        # existing repository folder
+        for brain in self.catalog.unrestrictedSearchResults(
+                portal_type='opengever.repository.repositoryfolder'):
+            refnum = IReferenceNumber(brain.getObject()).get_repository_number()
+            if not self.operation_by_old_refnum(refnum):
+                logger.warning("Excel is incomplete. No operation defined for "
+                               "position {}".format(brain.reference))
+                self.is_valid = False
+
+        # Make sure that analysis is invalid if any operation was invalid
+        if any([not op['is_valid'] for op in self.analysed_rows]):
+            self.is_valid = False
+
+    def operation_by_old_refnum(self, reference_number):
+        refnum = cleanup_position(reference_number)
+        for op in self.analysed_rows:
+            if op['old_repo_pos'].position == refnum:
+                return op
+        return None
 
     def validate_operation(self, operation):
         """Make sure that operation satisfies all necessary conditions and add
@@ -1167,6 +1189,10 @@ def main():
     if options.output:
         logger.info('\n\nwriting analysis excel...\n')
         analyser.export_to_excel()
+
+    if not analyser.is_valid:
+        logger.info('\n\nInvalid migration excel, aborting...\n')
+        return
 
     migrator = RepositoryMigrator(analyser.analysed_rows)
     if not options.dryrun:
