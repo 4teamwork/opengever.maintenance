@@ -211,10 +211,21 @@ class PatchTaskSyncWith(MonkeyPatch):
         self.patch_refs(Task, 'sync_with', sync_with)
 
 
+def cleanup_position(position):
+    """Remove splitting dots - they're not usefull for comparison.
+    This only works for grouped_by_three formatter.
+    """
+    if position is None:
+        return None
+    position = str(position)
+    if position:
+        return position.replace('.', '')
+
+
 class RepositoryPosition(object):
 
     def __init__(self, position=None, title=None, description=None):
-        self.position = self.cleanup_position(position)
+        self.position = cleanup_position(position)
         self.title = self.to_safe_unicode(title)
         self.description = self.to_safe_unicode(description)
 
@@ -225,17 +236,6 @@ class RepositoryPosition(object):
         maybe_none = safe_unicode(maybe_none)
         if maybe_none:
             return maybe_none
-
-    @staticmethod
-    def cleanup_position(position):
-        """Remove splitting dots - they're not usefull for comparison.
-        This only works for grouped_by_three formatter.
-        """
-        if position is None:
-            return None
-        position = str(position)
-        if position:
-            return position.replace('.', '')
 
     @property
     def reference_number_prefix(self):
