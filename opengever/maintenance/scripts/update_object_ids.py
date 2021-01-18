@@ -17,6 +17,8 @@ Notes:
    any journal entries for this operation.
 """
 
+from Acquisition import aq_inner
+from Acquisition import aq_parent
 from opengever.base.interfaces import IReferenceNumber
 from opengever.globalindex.handlers import task as task_handlers
 from opengever.globalindex.handlers.task import TaskSqlSyncer
@@ -29,6 +31,7 @@ from plone.app.content.interfaces import INameFromTitle
 from plone.i18n.normalizer.interfaces import IURLNormalizer
 from zope.component import queryUtility
 from zope.container.interfaces import IContainerModifiedEvent
+from zope.container.interfaces import INameChooser
 import argparse
 import inspect
 import sys
@@ -122,7 +125,8 @@ class ObjectIDUpdater(object):
 
     def update_object_id(self):
         refnum_before = IReferenceNumber(self.obj).get_number()
-        new_id = self.get_expected_id_for_obj()
+        parent = aq_parent(aq_inner(self.obj))
+        new_id = INameChooser(parent).chooseName(None, self.obj)
 
         print "Renaming %r to %r" % (self.obj, new_id)
 
