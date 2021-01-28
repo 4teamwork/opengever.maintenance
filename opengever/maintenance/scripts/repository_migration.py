@@ -36,12 +36,12 @@ from zope.annotation import IAnnotations
 from zope.component import queryAdapter
 import json
 import logging
+import os
 import shutil
 import sys
 import tempfile
 import time
 import transaction
-
 
 logger = logging.getLogger('opengever.maintenance')
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -50,6 +50,7 @@ logging.root.setLevel(logging.INFO)
 
 
 MIGRATION_KEY = 'opengever.maintenance.repository_migration'
+MIGRATIOM_TIMESTAMP = time.strftime('%d%m%Y-%H%M%S')
 
 
 def log_progress(i, tot, step=100):
@@ -319,11 +320,11 @@ class ExcelDataExtractor(object):
 
 class RepositoryExcelAnalyser(object):
 
-    def __init__(self, mapping_path, analyse_path):
+    def __init__(self, mapping_path, output_directory):
         self.number_changes = {}
 
         self.diff_xlsx_path = mapping_path
-        self.analyse_xlsx_path = analyse_path
+        self.output_directory = output_directory
         self.analysed_rows = []
         self._reference_repository_mapping = None
         self.final_positions = []
@@ -746,9 +747,10 @@ class RepositoryExcelAnalyser(object):
         return permissions
 
     def export_to_excel(self):
+        analyse_xlsx_path = os.path.join(self.output_directory, 'analysis.xlsx')
         workbook = self.prepare_workbook(self.analysed_rows)
         # Save the Workbook-data in to a StringIO
-        return workbook.save(filename=self.analyse_xlsx_path)
+        return workbook.save(filename=analyse_xlsx_path)
 
     def prepare_workbook(self, rows):
         workbook = Workbook()
@@ -1157,8 +1159,10 @@ class FakeOptions(object):
 
 def main():
     parser = setup_option_parser()
-    parser.add_option('-o', dest='output', default=None,
-                      help='Path to the output xlsx')
+    parser.add_option(
+        '-o', dest='output_directory',
+        default='var/migration-{}'.format(MIGRATIOM_TIMESTAMP),
+        help='Path to the output directory')
     parser.add_option("-n", "--dry-run", action="store_true",
                       dest="dryrun", default=False)
     (options, args) = parser.parse_args()
@@ -1167,6 +1171,16 @@ def main():
         logger.info("Missing argument, a path to the mapping xlsx")
         sys.exit(1)
     mapping_path = args[0]
+
+    if os.path.isdir(options.output_directory):
+        logger.info("Output directory already exists")
+        sys.exit(1)
+
+    if not options.output_directory:
+        logger.info("Invalid output directory")
+        sys.exit(1)
+
+    os.mkdir(options.output_directory)
 
     if options.dryrun:
         logger.info("Dry run, dooming transaction")
@@ -1183,12 +1197,11 @@ def main():
     PatchDisableLDAP()()
 
     logger.info('\n\nstarting analysis...\n')
-    analyser = RepositoryExcelAnalyser(mapping_path, options.output)
+    analyser = RepositoryExcelAnalyser(mapping_path, options.output_directory)
     analyser.analyse()
 
-    if options.output:
-        logger.info('\n\nwriting analysis excel...\n')
-        analyser.export_to_excel()
+    logger.info('\n\nwriting analysis excel...\n')
+    analyser.export_to_excel()
 
     if not analyser.is_valid:
         logger.info('\n\nInvalid migration excel, aborting...\n')
