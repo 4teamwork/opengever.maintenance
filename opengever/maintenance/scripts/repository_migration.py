@@ -218,7 +218,7 @@ def cleanup_position(position):
     """
     if position is None:
         return None
-    position = str(position)
+    position = str(position).strip()
     if position:
         return position.replace('.', '')
 
