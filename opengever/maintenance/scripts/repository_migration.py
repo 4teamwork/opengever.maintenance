@@ -282,13 +282,13 @@ class ExcelDataExtractor(object):
         'new_position': Column(5, 'reference_number', u'Ordnungs-\npositions-\nnummer'),
         'new_title': Column(6, 'effective_title', u'Titel der Ordnungsposition'),
         'new_description': Column(8, 'description', u'Beschreibung (optional)'),
-        'block_inheritance': Column(19, 'block_inheritance', ''),
-        'read': Column(20, 'read_dossiers_access', ''),
-        'add': Column(21, 'add_dossiers_access', ''),
-        'edit': Column(22, 'edit_dossiers_access', ''),
-        'close': Column(23, 'close_dossiers_access', ''),
-        'reactivate': Column(24, 'reactivate_dossiers_access', ''),
-        'manage_dossiers': Column(25, 'manage_dossiers_access', ''),
+        'block_inheritance': Column(22, 'block_inheritance', ''),
+        'read': Column(23, 'read_dossiers_access', ''),
+        'add': Column(24, 'add_dossiers_access', ''),
+        'edit': Column(25, 'edit_dossiers_access', ''),
+        'close': Column(26, 'close_dossiers_access', ''),
+        'reactivate': Column(27, 'reactivate_dossiers_access', ''),
+        'manage_dossiers': Column(28, 'manage_dossiers_access', ''),
     }
 
     def __init__(self, diff_xlsx_path):
