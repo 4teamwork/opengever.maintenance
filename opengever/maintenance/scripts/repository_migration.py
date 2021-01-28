@@ -296,7 +296,6 @@ class ExcelDataExtractor(object):
         self.data = sheets[0]['sheet_data']
         self.n_data = len(self.data) - self.first_data_row
         self.validate_format()
-        self.is_valid = True
 
     def validate_format(self):
         headers = self.data[self.header_row]
@@ -329,6 +328,7 @@ class RepositoryExcelAnalyser(object):
         self._reference_repository_mapping = None
         self.final_positions = []
         self.catalog = api.portal.get_tool('portal_catalog')
+        self.is_valid = True
 
         # A mapping new_position_number:UID
         self.position_uid_mapping = {}
