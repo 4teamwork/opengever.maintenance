@@ -326,7 +326,6 @@ class RepositoryExcelAnalyser(object):
         self.output_directory = output_directory
         self.analysed_rows = []
         self._reference_repository_mapping = None
-        self.final_positions = []
         self.catalog = api.portal.get_tool('portal_catalog')
         self.is_valid = True
 
