@@ -1263,6 +1263,15 @@ def main():
     logger.info('\n\nwriting analysis excel...\n')
     analyser.export_to_excel()
 
+    analyser_path = os.path.join(options.output_directory, "analyser.json")
+    with open(analyser_path, "w") as outfile:
+        analyser_data = {
+            'position_guid_mapping': analyser.position_guid_mapping,
+            'position_uid_mapping': analyser.position_uid_mapping,
+            'analysed_rows': analyser.analysed_rows,
+        }
+        json.dump(analyser_data, outfile, default=vars)
+
     if not analyser.is_valid:
         logger.info('\n\nInvalid migration excel, aborting...\n')
         return
@@ -1275,6 +1284,15 @@ def main():
         logger.info('\n\nCommitting transaction...\n')
         transaction.commit()
         logger.info('Finished migration.')
+
+    migrator_path = os.path.join(options.output_directory, "migrator.json")
+    with open(migrator_path, "w") as outfile:
+        migrator_data = {
+            'operations_list': migrator.operations_list,
+            'to_reindex': migrator.to_reindex.keys(),
+            'validation_errors': migrator.validation_errors,
+        }
+        json.dump(migrator_data, outfile, default=vars)
 
     tasks_to_sync_path = os.path.join(
         options.output_directory, "tasks_to_sync.json")
