@@ -1,3 +1,29 @@
+"""
+This script is used to migrate a repository tree and was developed for the HBA
+migration.
+    bin/instance run ./scripts/repository_migration.py xls_path
+
+optional arguments:
+  -o : path to a folder where output should be saved. The folder will be created.
+       This defaults to var/migration-TIMESTAMP
+  -s : sync tasks. By default tasks are not synced as the migration is not
+       performed on the original OGDS. Instead UIDs of tasks that will need
+       syncing are stored and dumped in a json file that can then be used
+       to sync the tasks.
+  -n : dry-run.
+
+If task syncing was skipped, it can be later performed in debug mode:
+
+from opengever.maintenance import dm; dm()
+from opengever.maintenance.scripts.repository_migration import TaskSyncer
+import json
+import transaction
+with open(path/to/tasks_to_sync.json, "r") as infile:
+    tasks_to_sync = json.load(infile)
+TaskSyncer(tasks_to_sync)()
+transaction.commit()
+"""
+
 from Acquisition import aq_inner
 from Acquisition import aq_parent
 from collections import defaultdict
@@ -51,6 +77,7 @@ logging.root.setLevel(logging.INFO)
 
 MIGRATION_KEY = 'opengever.maintenance.repository_migration'
 MIGRATIOM_TIMESTAMP = time.strftime('%d%m%Y-%H%M%S')
+tasks_to_sync = set()
 
 
 def log_progress(i, tot, step=100):
@@ -209,6 +236,22 @@ class PatchTaskSyncWith(MonkeyPatch):
 
             self.sync_reminders(plone_task)
 
+        self.patch_refs(Task, 'sync_with', sync_with)
+
+
+class SkipTaskSyncWith(MonkeyPatch):
+    """ We skip syncing the tasks altogether, as migration is not done with the
+    productive OGDS. We will then sync the tasks at a later stage. We therefore store
+    the UIDs of tasks for later use.
+    """
+
+    def __call__(self):
+        from opengever.globalindex.model.task import Task
+
+        def sync_with(self, plone_task):
+            """Sync this task instace with its corresponding plone taks."""
+            tasks_to_sync.add(plone_task.UID())
+            return
         self.patch_refs(Task, 'sync_with', sync_with)
 
 
@@ -1152,6 +1195,19 @@ class RepositoryMigrator(object):
         return self.catalog.getIndexDataForRID(rid)
 
 
+class TaskSyncer(object):
+
+    def __init__(self, tasks_to_sync):
+        self.tasks_to_sync = tasks_to_sync
+
+    def __call__(self):
+        """Syncs all plone tasks with their model
+        """
+        for uid in self.tasks_to_sync:
+            obj = uuidToObject(uid)
+            obj.sync()
+
+
 class FakeOptions(object):
     dry_run = False
 
@@ -1162,6 +1218,8 @@ def main():
         '-o', dest='output_directory',
         default='var/migration-{}'.format(MIGRATIOM_TIMESTAMP),
         help='Path to the output directory')
+    parser.add_option("-t", "--sync-task", action="store_true",
+                      dest="sync_task", default=False)
     parser.add_option("-n", "--dry-run", action="store_true",
                       dest="dryrun", default=False)
     (options, args) = parser.parse_args()
@@ -1192,7 +1250,10 @@ def main():
     PatchCommitSection()()
     PatchReindexContainersSection()()
     PatchReportSection()()
-    PatchTaskSyncWith()()
+    if options.sync_task:
+        PatchTaskSyncWith()()
+    else:
+        SkipTaskSyncWith()()
     PatchDisableLDAP()()
 
     logger.info('\n\nstarting analysis...\n')
@@ -1214,6 +1275,11 @@ def main():
         logger.info('\n\nCommitting transaction...\n')
         transaction.commit()
         logger.info('Finished migration.')
+
+    tasks_to_sync_path = os.path.join(
+        options.output_directory, "tasks_to_sync.json")
+    with open(tasks_to_sync_path, "w") as outfile:
+        json.dump(tuple(tasks_to_sync), outfile)
 
 
 if __name__ == '__main__':
