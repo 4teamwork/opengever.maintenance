@@ -515,7 +515,8 @@ class RepositoryExcelAnalyser(object):
 
     def validate_operation(self, operation):
         """Make sure that operation satisfies all necessary conditions and add
-        is_valid, repository_depth_violated and leaf_node_violated to it.
+        is_valid, repository_depth_violated and leaf_node_violated and
+        permissions_disregarded to it.
         """
         operation['is_valid'] = True
 
@@ -601,6 +602,19 @@ class RepositoryExcelAnalyser(object):
                     " {}".format(operation))
                 operation['is_valid'] = False
             self.new_positions.add(new_position)
+
+        # if position is being merged, then permissions set in that row will
+        # be lost. Best would be to compare the permissions of that row with
+        # the ones it gets merged into. Instead we simply log and write it
+        # in the analysis excel. The user can make sure this is correct himself.
+        operation['permissions_disregarded'] = False
+        if operation['merge_into']:
+            permissions = operation['permissions']
+            if any(permissions.values()):
+                logger.info(
+                    "Permissions disregarded: this position gets merged"
+                    " {}".format(operation))
+                operation['permissions_disregarded'] = True
 
     def get_new_title(self, new_repo_pos, old_repo_pos):
         """Returns the new title or none if no rename is necessary."""
@@ -825,6 +839,7 @@ class RepositoryExcelAnalyser(object):
             'Ist ungultig',
 
             # permission
+            'Ignorierte Bewilligungen',
             'Bewilligungen',
         ]
 
@@ -851,6 +866,7 @@ class RepositoryExcelAnalyser(object):
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
                 'x' if not data['is_valid'] else '',
+                'x' if data['permissions_disregarded'] else '',
                 json.dumps(data['permissions']),
             ]
 
