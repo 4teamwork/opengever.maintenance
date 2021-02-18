@@ -34,6 +34,8 @@ from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.base.monkey.patching import MonkeyPatch
+from opengever.base.role_assignments import ASSIGNMENT_VIA_SHARING
+from opengever.base.role_assignments import RoleAssignmentManager
 from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
 from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
@@ -78,6 +80,8 @@ logging.root.setLevel(logging.INFO)
 MIGRATION_KEY = 'opengever.maintenance.repository_migration'
 MIGRATIOM_TIMESTAMP = time.strftime('%d%m%Y-%H%M%S')
 tasks_to_sync = set()
+
+managed_roles_shortnames = ['read', 'add', 'edit', 'close', 'reactivate', 'manage_dossiers']
 
 
 def log_progress(i, tot, step=100):
@@ -452,8 +456,6 @@ class RepositoryExcelAnalyser(object):
             new_position_parent_guid = None
             new_position_guid = None
 
-            permissions = None
-
             needs_creation = not bool(old_repo_pos.position)
             need_number_change, need_move, need_merge = self.needs_number_change_move_or_merge(new_repo_pos, old_repo_pos)
 
@@ -466,7 +468,8 @@ class RepositoryExcelAnalyser(object):
             if needs_creation:
                 new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_repo_pos)
                 new_position_guid = uuid4().hex[:8]
-                permissions = self.extract_permissions(row)
+
+            permissions = self.extract_permissions(row)
 
             operation = {
                 'uid': self.get_uuid_for_position(old_repo_pos.position),
@@ -607,14 +610,38 @@ class RepositoryExcelAnalyser(object):
         # be lost. Best would be to compare the permissions of that row with
         # the ones it gets merged into. Instead we simply log and write it
         # in the analysis excel. The user can make sure this is correct himself.
+        permissions = operation['permissions']
         operation['permissions_disregarded'] = False
+        operation['local_roles_deleted'] = False
         if operation['merge_into']:
-            permissions = operation['permissions']
             if any(permissions.values()):
                 logger.info(
                     "Permissions disregarded: this position gets merged"
                     " {}".format(operation))
                 operation['permissions_disregarded'] = True
+        else:
+            # We also check that permissions are only set when inheritance is
+            # blocked and if local roles were defined on such positions before,
+            # we emit a warning as they will be lost during migration
+            has_local_roles = any(permissions[role_shortname] for role_shortname in managed_roles_shortnames)
+            inheritance_blocked = permissions['block_inheritance']
+            if has_local_roles and not inheritance_blocked:
+                logger.warning(
+                    "Invalid operation: setting local roles without blocking "
+                    "inheritance. {}".format(operation))
+                operation['is_valid'] = False
+            elif inheritance_blocked and not has_local_roles:
+                logger.warning(
+                    "Invalid operation: blocking inheritance without setting "
+                    "local roles. {}".format(operation))
+                operation['is_valid'] = False
+            elif inheritance_blocked and has_local_roles:
+                obj = uuidToObject(operation['uid'])
+                if obj and RoleAssignmentManager(obj).get_assignments_by_cause(ASSIGNMENT_VIA_SHARING):
+                    operation['local_roles_deleted'] = True
+                    logger.warning(
+                        "Sharing assignments for {} will be deleted and "
+                        "replaced.".format(obj.absolute_url_path()))
 
     def get_new_title(self, new_repo_pos, old_repo_pos):
         """Returns the new title or none if no rename is necessary."""
@@ -794,7 +821,7 @@ class RepositoryExcelAnalyser(object):
             if block == 'ja':
                 permissions['block_inheritance'] = True
 
-        for key in ['read', 'add', 'edit', 'close', 'reactivate', 'manage_dossiers']:
+        for key in managed_roles_shortnames:
             groups = [group.strip() for group in getattr(row, key).split(',')]
             groups = [group for group in groups if group]
 
@@ -840,6 +867,7 @@ class RepositoryExcelAnalyser(object):
 
             # permission
             'Ignorierte Bewilligungen',
+            'Vorherige Lokalen Rollen entfernt'
             'Bewilligungen',
         ]
 
@@ -867,6 +895,7 @@ class RepositoryExcelAnalyser(object):
                 'x' if data['leaf_node_violated'] else '',
                 'x' if not data['is_valid'] else '',
                 'x' if data['permissions_disregarded'] else '',
+                'x' if data['local_roles_deleted'] else '',
                 json.dumps(data['permissions']),
             ]
 
