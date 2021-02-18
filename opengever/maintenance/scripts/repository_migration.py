@@ -896,7 +896,7 @@ class RepositoryExcelAnalyser(object):
                 'x' if not data['is_valid'] else '',
                 'x' if data['permissions_disregarded'] else '',
                 'x' if data['local_roles_deleted'] else '',
-                json.dumps(data['permissions']),
+                json.dumps(data['permissions']) if any(data['permissions'].values()) else '',
             ]
 
             for column, attr in enumerate(values, 1):
