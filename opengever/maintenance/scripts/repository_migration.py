@@ -444,7 +444,7 @@ class RepositoryExcelAnalyser(object):
 
             # Skip positions that should be deleted
             if not new_repo_pos.position:
-                logger.info("Skipping, we do not support deletion: {}".format(row))
+                logger.info("\nSkipping, we do not support deletion: {}\n".format(row))
                 continue
 
             new_number = None
@@ -501,8 +501,8 @@ class RepositoryExcelAnalyser(object):
                 portal_type='opengever.repository.repositoryfolder'):
             refnum = IReferenceNumber(brain.getObject()).get_repository_number()
             if not self.operation_by_old_refnum(refnum):
-                logger.warning("Excel is incomplete. No operation defined for "
-                               "position {}".format(brain.reference))
+                logger.warning("\nExcel is incomplete. No operation defined for "
+                               "position {}\n".format(brain.reference))
                 self.is_valid = False
 
         # Make sure that analysis is invalid if any operation was invalid
@@ -525,8 +525,8 @@ class RepositoryExcelAnalyser(object):
 
         # Each operation should either have a uid or a new_position_guid
         if not any((operation['new_position_guid'], operation['uid'])):
-            logger.warning("Invalid operation: needs new_position_guid "
-                           "or uid. {}".format(operation))
+            logger.warning("\nInvalid operation: needs new_position_guid "
+                           "or uid. {}\n".format(operation))
             operation['is_valid'] = False
 
         # Make sure that all UIDs are valid and that for existing UIDs,
@@ -534,42 +534,42 @@ class RepositoryExcelAnalyser(object):
         if operation['uid']:
             obj = uuidToObject(operation['uid'])
             if not obj:
-                logger.warning("Invalid operation: uid is not valid."
-                               "or uid. {}".format(operation))
+                logger.warning("\nInvalid operation: uid is not valid."
+                               "or uid. {}\n".format(operation))
                 operation['is_valid'] = False
 
             else:
                 old_repo_pos = operation['old_repo_pos']
                 if obj.title_de != old_repo_pos.title:
-                    logger.warning("Invalid operation: incorrect title."
-                                   "{}".format(operation))
+                    logger.warning("\nInvalid operation: incorrect title."
+                                   "{}\n".format(operation))
                     operation['is_valid'] = False
                 if obj.get_repository_number().replace('.', '') != old_repo_pos.position:
-                    logger.warning("Invalid operation: incorrect position."
-                                   "{}".format(operation))
+                    logger.warning("\nInvalid operation: incorrect position."
+                                   "{}\n".format(operation))
                     operation['is_valid'] = False
                 if (obj.description or old_repo_pos.description) and obj.description != old_repo_pos.description:
-                    logger.warning("Invalid operation: incorrect description."
-                                   "{}".format(operation))
+                    logger.warning("\nInvalid operation: incorrect description."
+                                   "{}\n".format(operation))
                     operation['is_valid'] = False
 
         # Each operation should have new position
         if not operation['new_repo_pos'].position:
-            logger.warning("Invalid operation: needs new position. {}".format(
+            logger.warning("\nInvalid operation: needs new position. {}\n".format(
                 operation))
             operation['is_valid'] = False
 
         if all((operation['new_position_guid'], operation['uid'])):
-            logger.warning("Invalid operation: can define only one of "
-                           "new_position_guid or uid. {}".format(operation))
+            logger.warning("\nInvalid operation: can define only one of "
+                           "new_position_guid or uid. {}\n".format(operation))
             operation['is_valid'] = False
 
         # A move operation should have a new_parent_uid
         if operation['new_parent_position'] or operation['new_parent_uid']:
             if not operation['new_parent_uid']:
                 logger.warning(
-                    "Invalid operation: move operation must define "
-                    "new_parent_uid. {}".format(operation))
+                    "\nInvalid operation: move operation must define "
+                    "new_parent_uid. {}\n".format(operation))
                 operation['is_valid'] = False
 
         # Make sure that if a position is being created, its parent will be found
@@ -579,8 +579,8 @@ class RepositoryExcelAnalyser(object):
 
             if not parent:
                 logger.warning(
-                    "Invalid operation: could not find new parent for create "
-                    "operation. {}".format(operation))
+                    "\nInvalid operation: could not find new parent for create "
+                    "operation. {}\n".format(operation))
                 operation['is_valid'] = False
 
         self.check_repository_depth_violation(operation)
@@ -591,8 +591,8 @@ class RepositoryExcelAnalyser(object):
         if old_position:
             if old_position in self.positions:
                 logger.warning(
-                    "Invalid operation: position appears twice in excel."
-                    " {}".format(operation))
+                    "\nInvalid operation: position appears twice in excel."
+                    " {}\n".format(operation))
                 operation['is_valid'] = False
             self.positions.add(old_position)
 
@@ -601,8 +601,8 @@ class RepositoryExcelAnalyser(object):
         if new_position and not operation['merge_into']:
             if new_position in self.new_positions:
                 logger.warning(
-                    "Invalid operation: new position appears twice in excel."
-                    " {}".format(operation))
+                    "\nInvalid operation: new position appears twice in excel."
+                    " {}\n".format(operation))
                 operation['is_valid'] = False
             self.new_positions.add(new_position)
 
@@ -616,8 +616,8 @@ class RepositoryExcelAnalyser(object):
         if operation['merge_into']:
             if any(permissions.values()):
                 logger.info(
-                    "Permissions disregarded: this position gets merged"
-                    " {}".format(operation))
+                    "\nPermissions disregarded: this position gets merged"
+                    " {}\n".format(operation))
                 operation['permissions_disregarded'] = True
         else:
             # We also check that permissions are only set when inheritance is
@@ -627,21 +627,21 @@ class RepositoryExcelAnalyser(object):
             inheritance_blocked = permissions['block_inheritance']
             if has_local_roles and not inheritance_blocked:
                 logger.warning(
-                    "Invalid operation: setting local roles without blocking "
-                    "inheritance. {}".format(operation))
+                    "\nInvalid operation: setting local roles without blocking "
+                    "inheritance. {}\n".format(operation))
                 operation['is_valid'] = False
             elif inheritance_blocked and not has_local_roles:
                 logger.warning(
-                    "Invalid operation: blocking inheritance without setting "
-                    "local roles. {}".format(operation))
+                    "\nInvalid operation: blocking inheritance without setting "
+                    "local roles. {}\n".format(operation))
                 operation['is_valid'] = False
             elif inheritance_blocked and has_local_roles:
                 obj = uuidToObject(operation['uid'])
                 if obj and RoleAssignmentManager(obj).get_assignments_by_cause(ASSIGNMENT_VIA_SHARING):
                     operation['local_roles_deleted'] = True
                     logger.warning(
-                        "Sharing assignments for {} will be deleted and "
-                        "replaced.".format(obj.absolute_url_path()))
+                        "\nSharing assignments for {} will be deleted and "
+                        "replaced.\n".format(obj.absolute_url_path()))
 
     def get_new_title(self, new_repo_pos, old_repo_pos):
         """Returns the new title or none if no rename is necessary."""
@@ -753,8 +753,8 @@ class RepositoryExcelAnalyser(object):
 
         new_repo_pos = operation['new_repo_pos']
         if new_repo_pos.position and len(new_repo_pos.position) > max_depth:
-            logger.warning(
-                "Invalid operation: repository depth violated. {}".format(operation))
+            logger.warning("\nInvalid operation: repository depth violated."
+                           " {}\n".format(operation))
             operation['is_valid'] = False
             operation['repository_depth_violated'] = True
         else:
@@ -784,12 +784,13 @@ class RepositoryExcelAnalyser(object):
         if not parent_repo:
             # Something is fishy, parent should either exist or be created
             operation['is_valid'] = False
-            logger.warning("Invalid operation: parent not found. {}".format(operation))
+            logger.warning("\nInvalid operation: parent not found. {}\n".format(operation))
             return
         if any([IDossierMarker.providedBy(item) for item in parent_repo.objectValues()]):
             operation['is_valid'] = False
             operation['leaf_node_violated'] = True
-            logger.warning("Invalid operation: leaf node principle violated. {}".format(operation))
+            logger.warning("\nInvalid operation: leaf node principle violated."
+                           " {}\n".format(operation))
 
     def get_repository_reference_mapping(self):
         if not self._reference_repository_mapping:
