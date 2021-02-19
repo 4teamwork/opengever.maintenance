@@ -934,8 +934,9 @@ class RepositoryExcelAnalyser(object):
 
 class RepositoryMigrator(object):
 
-    def __init__(self, operations_list):
+    def __init__(self, operations_list, dry_run):
         self.operations_list = operations_list
+        self.dry_run = dry_run
         self._reference_repository_mapping = None
         self.to_reindex = defaultdict(set)
         self.catalog = api.portal.get_tool('portal_catalog')
@@ -1013,6 +1014,8 @@ class RepositoryMigrator(object):
         self.start_bundle_import(tmpdirname)
 
         shutil.rmtree(tmpdirname)
+        if not self.dry_run:
+            transaction.commit()
 
     def start_bundle_import(self, bundle_path):
         logger.info("\n\nStarting bundle import...\n")
@@ -1042,6 +1045,8 @@ class RepositoryMigrator(object):
                 raise Exception('No parent or repo found for {}'.format(item))
 
             api.content.move(source=repo, target=parent, safe_id=True)
+            if not self.dry_run:
+                transaction.commit()
 
     def merge_branches(self, items):
         logger.info("\n\nMerging...\n")
@@ -1066,6 +1071,8 @@ class RepositoryMigrator(object):
 
             if item['uid'] in self.to_reindex:
                 self.to_reindex.pop(item['uid'])
+            if not self.dry_run:
+                transaction.commit()
 
     def adjust_reference_number_prefix(self, items):
         logger.info("\n\nAdjusting reference number prefix...\n")
@@ -1079,6 +1086,8 @@ class RepositoryMigrator(object):
             self.add_to_reindexing_queue(
                 item['uid'], ('Title', 'sortable_title', 'reference'),
                 with_children=True)
+        if not self.dry_run:
+            transaction.commit()
 
         self.regenerate_reference_number_mapping(list(parents))
 
@@ -1115,6 +1124,8 @@ class RepositoryMigrator(object):
             # recursively
             self.add_to_reindexing_queue(
                 item['uid'], ('Title', 'sortable_title'))
+            if not self.dry_run:
+                transaction.commit()
 
     def update_description(self, items):
         logger.info("\n\nUpdating descriptions...\n")
@@ -1129,6 +1140,8 @@ class RepositoryMigrator(object):
             if repo.description != new_description:
                 repo.description = new_description
                 self.add_to_reindexing_queue(item['uid'], ('Description',))
+        if not self.dry_run:
+            transaction.commit()
 
     def set_permissions(self, items):
         logger.info("\n\nUpdating permissions...\n")
@@ -1137,6 +1150,8 @@ class RepositoryMigrator(object):
             log_progress(i, n_tot, 5)
             repo = uuidToObject(item['uid'])
             self._set_permissions_on_object(repo, item['permissions'])
+            if not self.dry_run:
+                transaction.commit()
 
     def _set_permissions_on_object(self, obj, permissions):
         """ We set the local roles and block inheritance if needed.
@@ -1388,7 +1403,7 @@ def main():
         logger.info('\n\nInvalid migration excel, aborting...\n')
         return
 
-    migrator = RepositoryMigrator(analyser.analysed_rows)
+    migrator = RepositoryMigrator(analyser.analysed_rows, dry_run=options.dryrun)
     if not options.dryrun:
         logger.info('\n\nstarting migration...\n')
         migrator.run()
