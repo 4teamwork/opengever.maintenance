@@ -22,6 +22,12 @@ with open(path/to/tasks_to_sync.json, "r") as infile:
     tasks_to_sync = json.load(infile)
 TaskSyncer(tasks_to_sync)()
 transaction.commit()
+
+Notes:
+- Permissions are only taken into account if both inheritance is blocked and some
+  local_roles are set
+- permissions for positions that get merged are disregarded
+- Setting new permissions will replace the existing sharing permissions.
 """
 
 from Acquisition import aq_inner
@@ -36,6 +42,8 @@ from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.base.monkey.patching import MonkeyPatch
 from opengever.base.role_assignments import ASSIGNMENT_VIA_SHARING
 from opengever.base.role_assignments import RoleAssignmentManager
+from opengever.base.role_assignments import SharingRoleAssignment
+from opengever.base.schemadump.config import ROLES_BY_SHORTNAME
 from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
 from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
@@ -613,6 +621,7 @@ class RepositoryExcelAnalyser(object):
         permissions = operation['permissions']
         operation['permissions_disregarded'] = False
         operation['local_roles_deleted'] = False
+        operation['set_permissions'] = False
         if operation['merge_into']:
             if any(permissions.values()):
                 logger.info(
@@ -637,6 +646,10 @@ class RepositoryExcelAnalyser(object):
                 operation['is_valid'] = False
             elif inheritance_blocked and has_local_roles:
                 obj = uuidToObject(operation['uid'])
+                if obj:
+                    # newly created positions will have the local_roles set
+                    # in the pipeline
+                    operation['set_permissions'] = True
                 if obj and RoleAssignmentManager(obj).get_assignments_by_cause(ASSIGNMENT_VIA_SHARING):
                     operation['local_roles_deleted'] = True
                     logger.warning(
@@ -919,6 +932,7 @@ class RepositoryMigrator(object):
             raise MigrationPreconditionsError("Some operations are invalid.")
 
     def run(self):
+        self.set_permissions(self.items_to_set_permissions())
         self.create_repository_folders(self.items_to_create())
         self.move_branches(self.items_to_move())
         self.merge_branches(self.items_to_merge())
@@ -942,6 +956,9 @@ class RepositoryMigrator(object):
 
     def items_to_rename(self):
         return [item for item in self.operations_list if item['new_title']]
+
+    def items_to_set_permissions(self):
+        return [item for item in self.operations_list if item['set_permissions']]
 
     def add_to_reindexing_queue(self, uid, idxs, with_children=False):
         self.to_reindex[uid].update(idxs)
@@ -1098,6 +1115,40 @@ class RepositoryMigrator(object):
             if repo.description != new_description:
                 repo.description = new_description
                 self.add_to_reindexing_queue(item['uid'], ('Description',))
+
+    def set_permissions(self, items):
+        logger.info("\n\nUpdating permissions...\n")
+        n_tot = len(items)
+        for i, item in enumerate(items):
+            log_progress(i, n_tot, 5)
+            repo = uuidToObject(item['uid'])
+            self._set_permissions_on_object(repo, item['permissions'])
+
+    def _set_permissions_on_object(self, obj, permissions):
+        """ We set the local roles and block inheritance if needed.
+        local_roles are only set if the inheritance is blocked.
+        Other conditions should have risen a validation error for the
+        excel.
+        """
+        block_inheritance = permissions['block_inheritance']
+
+        roles_by_principals = defaultdict(list)
+        for role_shortname in managed_roles_shortnames:
+            role = ROLES_BY_SHORTNAME[role_shortname]
+            principals = permissions.get(role_shortname)
+            for principal in principals:
+                roles_by_principals[principal].append(role)
+
+        if not (block_inheritance and roles_by_principals):
+            return
+
+        obj.__ac_local_roles_block__ = block_inheritance
+        manager = RoleAssignmentManager(obj)
+        manager.storage.clear_by_cause(ASSIGNMENT_VIA_SHARING)
+        for principal, roles in roles_by_principals.items():
+            assignment = SharingRoleAssignment(principal, roles)
+            RoleAssignmentManager(obj).add_or_update_assignment(assignment)
+        obj.reindexObjectSecurity()
 
     def reindex(self):
         logger.info("\n\nReindexing...\n")
