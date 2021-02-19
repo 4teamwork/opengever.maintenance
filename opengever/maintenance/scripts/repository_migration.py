@@ -267,6 +267,20 @@ class SkipTaskSyncWith(MonkeyPatch):
         self.patch_refs(Task, 'sync_with', sync_with)
 
 
+class SkipDocPropsUpdate(MonkeyPatch):
+    """ No nead to update the docproperties, we anyway don't have the
+    blobs during the migration
+    """
+
+    def __call__(self):
+        from opengever.document import handlers
+
+        def _update_docproperties(document, raise_on_error=False):
+            return
+
+        self.patch_refs(handlers, '_update_docproperties', _update_docproperties)
+
+
 def cleanup_position(position):
     """Remove splitting dots - they're not usefull for comparison.
     This only works for grouped_by_three formatter.
@@ -1352,6 +1366,7 @@ def main():
     else:
         SkipTaskSyncWith()()
     PatchDisableLDAP()()
+    SkipDocPropsUpdate()()
 
     logger.info('\n\nstarting analysis...\n')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output_directory)
