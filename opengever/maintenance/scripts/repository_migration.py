@@ -281,6 +281,20 @@ class SkipDocPropsUpdate(MonkeyPatch):
         self.patch_refs(handlers, '_update_docproperties', _update_docproperties)
 
 
+class SkipSearchableTextExtraction(MonkeyPatch):
+    """ During migration we do not have the blobs, so that we should
+    avoid extracting full text from the blobs.
+    """
+
+    def __call__(self):
+        from ftw.solr.connection import SolrConnection
+
+        def extract(self, blob, field, data, content_type):
+            return
+
+        self.patch_refs(SolrConnection, 'extract', extract)
+
+
 def cleanup_position(position):
     """Remove splitting dots - they're not usefull for comparison.
     This only works for grouped_by_three formatter.
@@ -1382,6 +1396,7 @@ def main():
         SkipTaskSyncWith()()
     PatchDisableLDAP()()
     SkipDocPropsUpdate()()
+    SkipSearchableTextExtraction()()
 
     logger.info('\n\nstarting analysis...\n')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output_directory)
