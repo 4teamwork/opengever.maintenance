@@ -22,6 +22,12 @@ with open(path/to/tasks_to_sync.json, "r") as infile:
     tasks_to_sync = json.load(infile)
 TaskSyncer(tasks_to_sync)()
 transaction.commit()
+
+Notes:
+- Permissions are only taken into account if both inheritance is blocked and some
+  local_roles are set
+- permissions for positions that get merged are disregarded
+- Setting new permissions will replace the existing sharing permissions.
 """
 
 from Acquisition import aq_inner
@@ -34,6 +40,10 @@ from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberPrefix
 from opengever.base.monkey.patching import MonkeyPatch
+from opengever.base.role_assignments import ASSIGNMENT_VIA_SHARING
+from opengever.base.role_assignments import RoleAssignmentManager
+from opengever.base.role_assignments import SharingRoleAssignment
+from opengever.base.schemadump.config import ROLES_BY_SHORTNAME
 from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
 from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
@@ -78,6 +88,8 @@ logging.root.setLevel(logging.INFO)
 MIGRATION_KEY = 'opengever.maintenance.repository_migration'
 MIGRATIOM_TIMESTAMP = time.strftime('%d%m%Y-%H%M%S')
 tasks_to_sync = set()
+
+managed_roles_shortnames = ['read', 'add', 'edit', 'close', 'reactivate', 'manage_dossiers']
 
 
 def log_progress(i, tot, step=100):
@@ -253,6 +265,34 @@ class SkipTaskSyncWith(MonkeyPatch):
             tasks_to_sync.add(plone_task.UID())
             return
         self.patch_refs(Task, 'sync_with', sync_with)
+
+
+class SkipDocPropsUpdate(MonkeyPatch):
+    """ No nead to update the docproperties, we anyway don't have the
+    blobs during the migration
+    """
+
+    def __call__(self):
+        from opengever.document import handlers
+
+        def _update_docproperties(document, raise_on_error=False):
+            return
+
+        self.patch_refs(handlers, '_update_docproperties', _update_docproperties)
+
+
+class SkipSearchableTextExtraction(MonkeyPatch):
+    """ During migration we do not have the blobs, so that we should
+    avoid extracting full text from the blobs.
+    """
+
+    def __call__(self):
+        from ftw.solr.connection import SolrConnection
+
+        def extract(self, blob, field, data, content_type):
+            return
+
+        self.patch_refs(SolrConnection, 'extract', extract)
 
 
 def cleanup_position(position):
@@ -440,7 +480,7 @@ class RepositoryExcelAnalyser(object):
 
             # Skip positions that should be deleted
             if not new_repo_pos.position:
-                logger.info("Skipping, we do not support deletion: {}".format(row))
+                logger.info("\nSkipping, we do not support deletion: {}\n".format(row))
                 continue
 
             new_number = None
@@ -451,8 +491,6 @@ class RepositoryExcelAnalyser(object):
             new_position_parent_position = None
             new_position_parent_guid = None
             new_position_guid = None
-
-            permissions = None
 
             needs_creation = not bool(old_repo_pos.position)
             need_number_change, need_move, need_merge = self.needs_number_change_move_or_merge(new_repo_pos, old_repo_pos)
@@ -466,7 +504,8 @@ class RepositoryExcelAnalyser(object):
             if needs_creation:
                 new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_repo_pos)
                 new_position_guid = uuid4().hex[:8]
-                permissions = self.extract_permissions(row)
+
+            permissions = self.extract_permissions(row)
 
             operation = {
                 'uid': self.get_uuid_for_position(old_repo_pos.position),
@@ -498,8 +537,8 @@ class RepositoryExcelAnalyser(object):
                 portal_type='opengever.repository.repositoryfolder'):
             refnum = IReferenceNumber(brain.getObject()).get_repository_number()
             if not self.operation_by_old_refnum(refnum):
-                logger.warning("Excel is incomplete. No operation defined for "
-                               "position {}".format(brain.reference))
+                logger.warning("\nExcel is incomplete. No operation defined for "
+                               "position {}\n".format(brain.reference))
                 self.is_valid = False
 
         # Make sure that analysis is invalid if any operation was invalid
@@ -515,14 +554,15 @@ class RepositoryExcelAnalyser(object):
 
     def validate_operation(self, operation):
         """Make sure that operation satisfies all necessary conditions and add
-        is_valid, repository_depth_violated and leaf_node_violated to it.
+        is_valid, repository_depth_violated and leaf_node_violated and
+        permissions_disregarded to it.
         """
         operation['is_valid'] = True
 
         # Each operation should either have a uid or a new_position_guid
         if not any((operation['new_position_guid'], operation['uid'])):
-            logger.warning("Invalid operation: needs new_position_guid "
-                           "or uid. {}".format(operation))
+            logger.warning("\nInvalid operation: needs new_position_guid "
+                           "or uid. {}\n".format(operation))
             operation['is_valid'] = False
 
         # Make sure that all UIDs are valid and that for existing UIDs,
@@ -530,42 +570,42 @@ class RepositoryExcelAnalyser(object):
         if operation['uid']:
             obj = uuidToObject(operation['uid'])
             if not obj:
-                logger.warning("Invalid operation: uid is not valid."
-                               "or uid. {}".format(operation))
+                logger.warning("\nInvalid operation: uid is not valid."
+                               "or uid. {}\n".format(operation))
                 operation['is_valid'] = False
 
             else:
                 old_repo_pos = operation['old_repo_pos']
                 if obj.title_de != old_repo_pos.title:
-                    logger.warning("Invalid operation: incorrect title."
-                                   "{}".format(operation))
+                    logger.warning("\nInvalid operation: incorrect title."
+                                   "{}\n".format(operation))
                     operation['is_valid'] = False
                 if obj.get_repository_number().replace('.', '') != old_repo_pos.position:
-                    logger.warning("Invalid operation: incorrect position."
-                                   "{}".format(operation))
+                    logger.warning("\nInvalid operation: incorrect position."
+                                   "{}\n".format(operation))
                     operation['is_valid'] = False
                 if (obj.description or old_repo_pos.description) and obj.description != old_repo_pos.description:
-                    logger.warning("Invalid operation: incorrect description."
-                                   "{}".format(operation))
+                    logger.warning("\nInvalid operation: incorrect description."
+                                   "{}\n".format(operation))
                     operation['is_valid'] = False
 
         # Each operation should have new position
         if not operation['new_repo_pos'].position:
-            logger.warning("Invalid operation: needs new position. {}".format(
+            logger.warning("\nInvalid operation: needs new position. {}\n".format(
                 operation))
             operation['is_valid'] = False
 
         if all((operation['new_position_guid'], operation['uid'])):
-            logger.warning("Invalid operation: can define only one of "
-                           "new_position_guid or uid. {}".format(operation))
+            logger.warning("\nInvalid operation: can define only one of "
+                           "new_position_guid or uid. {}\n".format(operation))
             operation['is_valid'] = False
 
         # A move operation should have a new_parent_uid
         if operation['new_parent_position'] or operation['new_parent_uid']:
             if not operation['new_parent_uid']:
                 logger.warning(
-                    "Invalid operation: move operation must define "
-                    "new_parent_uid. {}".format(operation))
+                    "\nInvalid operation: move operation must define "
+                    "new_parent_uid. {}\n".format(operation))
                 operation['is_valid'] = False
 
         # Make sure that if a position is being created, its parent will be found
@@ -575,8 +615,8 @@ class RepositoryExcelAnalyser(object):
 
             if not parent:
                 logger.warning(
-                    "Invalid operation: could not find new parent for create "
-                    "operation. {}".format(operation))
+                    "\nInvalid operation: could not find new parent for create "
+                    "operation. {}\n".format(operation))
                 operation['is_valid'] = False
 
         self.check_repository_depth_violation(operation)
@@ -587,8 +627,8 @@ class RepositoryExcelAnalyser(object):
         if old_position:
             if old_position in self.positions:
                 logger.warning(
-                    "Invalid operation: position appears twice in excel."
-                    " {}".format(operation))
+                    "\nInvalid operation: position appears twice in excel."
+                    " {}\n".format(operation))
                 operation['is_valid'] = False
             self.positions.add(old_position)
 
@@ -597,10 +637,52 @@ class RepositoryExcelAnalyser(object):
         if new_position and not operation['merge_into']:
             if new_position in self.new_positions:
                 logger.warning(
-                    "Invalid operation: new position appears twice in excel."
-                    " {}".format(operation))
+                    "\nInvalid operation: new position appears twice in excel."
+                    " {}\n".format(operation))
                 operation['is_valid'] = False
             self.new_positions.add(new_position)
+
+        # if position is being merged, then permissions set in that row will
+        # be lost. Best would be to compare the permissions of that row with
+        # the ones it gets merged into. Instead we simply log and write it
+        # in the analysis excel. The user can make sure this is correct himself.
+        permissions = operation['permissions']
+        operation['permissions_disregarded'] = False
+        operation['local_roles_deleted'] = False
+        operation['set_permissions'] = False
+        if operation['merge_into']:
+            if any(permissions.values()):
+                logger.info(
+                    "\nPermissions disregarded: this position gets merged"
+                    " {}\n".format(operation))
+                operation['permissions_disregarded'] = True
+        else:
+            # We also check that permissions are only set when inheritance is
+            # blocked and if local roles were defined on such positions before,
+            # we emit a warning as they will be lost during migration
+            has_local_roles = any(permissions[role_shortname] for role_shortname in managed_roles_shortnames)
+            inheritance_blocked = permissions['block_inheritance']
+            if has_local_roles and not inheritance_blocked:
+                logger.warning(
+                    "\nInvalid operation: setting local roles without blocking "
+                    "inheritance. {}\n".format(operation))
+                operation['is_valid'] = False
+            elif inheritance_blocked and not has_local_roles:
+                logger.warning(
+                    "\nInvalid operation: blocking inheritance without setting "
+                    "local roles. {}\n".format(operation))
+                operation['is_valid'] = False
+            elif inheritance_blocked and has_local_roles:
+                obj = uuidToObject(operation['uid'])
+                if obj:
+                    # newly created positions will have the local_roles set
+                    # in the pipeline
+                    operation['set_permissions'] = True
+                if obj and RoleAssignmentManager(obj).get_assignments_by_cause(ASSIGNMENT_VIA_SHARING):
+                    operation['local_roles_deleted'] = True
+                    logger.warning(
+                        "\nSharing assignments for {} will be deleted and "
+                        "replaced.\n".format(obj.absolute_url_path()))
 
     def get_new_title(self, new_repo_pos, old_repo_pos):
         """Returns the new title or none if no rename is necessary."""
@@ -712,8 +794,8 @@ class RepositoryExcelAnalyser(object):
 
         new_repo_pos = operation['new_repo_pos']
         if new_repo_pos.position and len(new_repo_pos.position) > max_depth:
-            logger.warning(
-                "Invalid operation: repository depth violated. {}".format(operation))
+            logger.warning("\nInvalid operation: repository depth violated."
+                           " {}\n".format(operation))
             operation['is_valid'] = False
             operation['repository_depth_violated'] = True
         else:
@@ -743,12 +825,13 @@ class RepositoryExcelAnalyser(object):
         if not parent_repo:
             # Something is fishy, parent should either exist or be created
             operation['is_valid'] = False
-            logger.warning("Invalid operation: parent not found. {}".format(operation))
+            logger.warning("\nInvalid operation: parent not found. {}\n".format(operation))
             return
         if any([IDossierMarker.providedBy(item) for item in parent_repo.objectValues()]):
             operation['is_valid'] = False
             operation['leaf_node_violated'] = True
-            logger.warning("Invalid operation: leaf node principle violated. {}".format(operation))
+            logger.warning("\nInvalid operation: leaf node principle violated."
+                           " {}\n".format(operation))
 
     def get_repository_reference_mapping(self):
         if not self._reference_repository_mapping:
@@ -780,7 +863,7 @@ class RepositoryExcelAnalyser(object):
             if block == 'ja':
                 permissions['block_inheritance'] = True
 
-        for key in ['read', 'add', 'edit', 'close', 'reactivate', 'manage_dossiers']:
+        for key in managed_roles_shortnames:
             groups = [group.strip() for group in getattr(row, key).split(',')]
             groups = [group for group in groups if group]
 
@@ -825,6 +908,8 @@ class RepositoryExcelAnalyser(object):
             'Ist ungultig',
 
             # permission
+            'Ignorierte Bewilligungen',
+            'Vorherige Lokalen Rollen entfernt'
             'Bewilligungen',
         ]
 
@@ -851,7 +936,9 @@ class RepositoryExcelAnalyser(object):
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
                 'x' if not data['is_valid'] else '',
-                json.dumps(data['permissions']),
+                'x' if data['permissions_disregarded'] else '',
+                'x' if data['local_roles_deleted'] else '',
+                json.dumps(data['permissions']) if any(data['permissions'].values()) else '',
             ]
 
             for column, attr in enumerate(values, 1):
@@ -861,8 +948,9 @@ class RepositoryExcelAnalyser(object):
 
 class RepositoryMigrator(object):
 
-    def __init__(self, operations_list):
+    def __init__(self, operations_list, dry_run):
         self.operations_list = operations_list
+        self.dry_run = dry_run
         self._reference_repository_mapping = None
         self.to_reindex = defaultdict(set)
         self.catalog = api.portal.get_tool('portal_catalog')
@@ -873,6 +961,7 @@ class RepositoryMigrator(object):
             raise MigrationPreconditionsError("Some operations are invalid.")
 
     def run(self):
+        self.set_permissions(self.items_to_set_permissions())
         self.create_repository_folders(self.items_to_create())
         self.move_branches(self.items_to_move())
         self.merge_branches(self.items_to_merge())
@@ -896,6 +985,9 @@ class RepositoryMigrator(object):
 
     def items_to_rename(self):
         return [item for item in self.operations_list if item['new_title']]
+
+    def items_to_set_permissions(self):
+        return [item for item in self.operations_list if item['set_permissions']]
 
     def add_to_reindexing_queue(self, uid, idxs, with_children=False):
         self.to_reindex[uid].update(idxs)
@@ -936,6 +1028,8 @@ class RepositoryMigrator(object):
         self.start_bundle_import(tmpdirname)
 
         shutil.rmtree(tmpdirname)
+        if not self.dry_run:
+            transaction.commit()
 
     def start_bundle_import(self, bundle_path):
         logger.info("\n\nStarting bundle import...\n")
@@ -965,6 +1059,8 @@ class RepositoryMigrator(object):
                 raise Exception('No parent or repo found for {}'.format(item))
 
             api.content.move(source=repo, target=parent, safe_id=True)
+            if not self.dry_run:
+                transaction.commit()
 
     def merge_branches(self, items):
         logger.info("\n\nMerging...\n")
@@ -989,6 +1085,8 @@ class RepositoryMigrator(object):
 
             if item['uid'] in self.to_reindex:
                 self.to_reindex.pop(item['uid'])
+            if not self.dry_run:
+                transaction.commit()
 
     def adjust_reference_number_prefix(self, items):
         logger.info("\n\nAdjusting reference number prefix...\n")
@@ -1002,6 +1100,8 @@ class RepositoryMigrator(object):
             self.add_to_reindexing_queue(
                 item['uid'], ('Title', 'sortable_title', 'reference'),
                 with_children=True)
+        if not self.dry_run:
+            transaction.commit()
 
         self.regenerate_reference_number_mapping(list(parents))
 
@@ -1038,6 +1138,8 @@ class RepositoryMigrator(object):
             # recursively
             self.add_to_reindexing_queue(
                 item['uid'], ('Title', 'sortable_title'))
+            if not self.dry_run:
+                transaction.commit()
 
     def update_description(self, items):
         logger.info("\n\nUpdating descriptions...\n")
@@ -1052,6 +1154,44 @@ class RepositoryMigrator(object):
             if repo.description != new_description:
                 repo.description = new_description
                 self.add_to_reindexing_queue(item['uid'], ('Description',))
+        if not self.dry_run:
+            transaction.commit()
+
+    def set_permissions(self, items):
+        logger.info("\n\nUpdating permissions...\n")
+        n_tot = len(items)
+        for i, item in enumerate(items):
+            log_progress(i, n_tot, 5)
+            repo = uuidToObject(item['uid'])
+            self._set_permissions_on_object(repo, item['permissions'])
+            if not self.dry_run:
+                transaction.commit()
+
+    def _set_permissions_on_object(self, obj, permissions):
+        """ We set the local roles and block inheritance if needed.
+        local_roles are only set if the inheritance is blocked.
+        Other conditions should have risen a validation error for the
+        excel.
+        """
+        block_inheritance = permissions['block_inheritance']
+
+        roles_by_principals = defaultdict(list)
+        for role_shortname in managed_roles_shortnames:
+            role = ROLES_BY_SHORTNAME[role_shortname]
+            principals = permissions.get(role_shortname)
+            for principal in principals:
+                roles_by_principals[principal].append(role)
+
+        if not (block_inheritance and roles_by_principals):
+            return
+
+        obj.__ac_local_roles_block__ = block_inheritance
+        manager = RoleAssignmentManager(obj)
+        manager.storage.clear_by_cause(ASSIGNMENT_VIA_SHARING)
+        for principal, roles in roles_by_principals.items():
+            assignment = SharingRoleAssignment(principal, roles)
+            RoleAssignmentManager(obj).add_or_update_assignment(assignment)
+        obj.reindexObjectSecurity()
 
     def reindex(self):
         logger.info("\n\nReindexing...\n")
@@ -1255,6 +1395,8 @@ def main():
     else:
         SkipTaskSyncWith()()
     PatchDisableLDAP()()
+    SkipDocPropsUpdate()()
+    SkipSearchableTextExtraction()()
 
     logger.info('\n\nstarting analysis...\n')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output_directory)
@@ -1276,7 +1418,7 @@ def main():
         logger.info('\n\nInvalid migration excel, aborting...\n')
         return
 
-    migrator = RepositoryMigrator(analyser.analysed_rows)
+    migrator = RepositoryMigrator(analyser.analysed_rows, dry_run=options.dryrun)
     if not options.dryrun:
         logger.info('\n\nstarting migration...\n')
         migrator.run()
