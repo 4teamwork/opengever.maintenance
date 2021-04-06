@@ -1075,7 +1075,7 @@ class RepositoryMigrator(object):
             for obj in repo.contentValues():
                 api.content.move(source=obj, target=target, safe_id=True)
                 self.add_to_reindexing_queue(
-                    obj.UID(), ('Title', 'sortable_title', 'reference'),
+                    obj.UID(), ('Title', 'sortable_title', 'reference', 'sortable_reference'),
                     with_children=True)
 
             deleter = RepositoryDeleter(repo)
@@ -1098,7 +1098,7 @@ class RepositoryMigrator(object):
             referenceprefix.IReferenceNumberPrefix(repo).reference_number_prefix = item['new_number']
             parents.add(aq_parent(aq_inner(repo)))
             self.add_to_reindexing_queue(
-                item['uid'], ('Title', 'sortable_title', 'reference'),
+                item['uid'], ('Title', 'sortable_title', 'reference', 'sortable_reference'),
                 with_children=True)
         if not self.dry_run:
             transaction.commit()
