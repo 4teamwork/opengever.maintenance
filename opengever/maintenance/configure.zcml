@@ -23,4 +23,9 @@
       name="trigger-missing-archival-file-conversion"
       />
 
+  <adapter
+      factory=".nightly_maintenance_jobs.NightlyMaintenanceJobsProvider"
+      name="nightly-maintenance-jobs-provider"
+      />
+
 </configure>
