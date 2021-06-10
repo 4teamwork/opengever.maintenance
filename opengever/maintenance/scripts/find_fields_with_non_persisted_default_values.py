@@ -25,7 +25,10 @@ import sys
 import transaction
 
 
-root_logger = logging.root
+logger = logging.getLogger('check_default_values')
+logging.getLogger().setLevel(logging.INFO)
+for handler in logging.getLogger().handlers:
+    handler.setLevel(logging.INFO)
 
 
 class NonPersistedValueFinder(object):
@@ -48,7 +51,7 @@ class NonPersistedValueFinder(object):
             'find-nonpersistent-values-summary-%s.log' % ts)
 
     def run(self):
-        sys.stderr.write("Checking for non-persisted values...\n\n")
+        logger.info("Checking for non-persisted values...\n\n")
 
         all_brains = self.catalog.unrestrictedSearchResults()
         total = len(all_brains)
@@ -66,7 +69,7 @@ class NonPersistedValueFinder(object):
                         self.write_csv_row(obj, missing_fields)
 
                     if i % 100 == 0:
-                        sys.stderr.write("Progress: %s of %s objects\n" % (i, total))
+                        logger.info("Progress: %s of %s objects\n" % (i, total))
 
                 self.display_stats()
 
@@ -138,7 +141,7 @@ class NonPersistedValueFinder(object):
     def display_stats(self):
 
         def log(line):
-            sys.stdout.write(line)
+            logger.info(line)
             self.summary_log.write(line)
 
         log("\n")
@@ -172,11 +175,11 @@ class NonPersistedValueFinder(object):
         eventlog = getattr(zconf, 'eventlog', None)
 
         if eventlog is None:
-            root_logger.error('')
-            root_logger.error(
+            logger.error('')
+            logger.error(
                 "Couldn't find eventlog configuration in order to determine "
                 "logfile location - aborting!")
-            root_logger.error('')
+            logger.error('')
             sys.exit(1)
 
         handler_factories = eventlog.handler_factories
