@@ -59,12 +59,12 @@ class TitleInitializor(object):
         ]
 
     glossary = {
-            u"Meine Ablage": u"Mon dépôt",
-            u"Eingangskorb": u"Boîte de réception",
-            u"Vorlagen": u"Modèles",
+            u"Meine Ablage": u'Mon d\xe9p\xf4t',
+            u"Eingangskorb": u'Bo\xeete de r\xe9ception',
+            u"Vorlagen": u'Mod\xe8les',
             u"Kontakte": u"Contactes",
             u'Teamr\xe4ume': u"Espaces de travail",
-            u"Sitzungen": u"Séances",
+            u"Sitzungen": u'S\xe9ances',
         }
 
     def __init__(self, path_to_excel):
