@@ -7,6 +7,20 @@ except ImportError:
     # opengever.core < 4.2
     from opengever.ogds.base.utils import create_session
 
+try:
+    from opengever.nightlyjobs.runner import nightly_run_within_24h
+except ImportError:
+    # opengever.core < 2021.19.0
+    def nightly_run_within_24h():
+        return True
+
+try:
+    from opengever.ogds.base.sync.import_stamp import ogds_sync_within_24h
+except ImportError:
+    # opengever.core < 2021.19.0
+    def ogds_sync_within_24h():
+        return True
+
 
 class HealthCheckView(BrowserView):
     """Health check view to be used by superlance httpok plugin and/or
@@ -18,10 +32,38 @@ class HealthCheckView(BrowserView):
     """
 
     def __call__(self):
+        extended = bool(self.request.form.get('extended'))
+
         # Access the session in order to trigger a possible
         # 'MySQL server has gone away' error
         session = create_session()
         session.execute('SELECT 1')
 
         result = dict(status='OK')
+
+        if extended:
+            nightly_ok = nightly_run_within_24h()
+            ogds_ok = ogds_sync_within_24h()
+            overall_ok = nightly_ok and ogds_ok
+
+            # Instance is considered healthy once we reach this point
+            instance_status = 'healthy'
+
+            ogds_status = 'healthy' if ogds_ok else 'unhealthy'
+            nightly_status = 'healthy' if nightly_ok else 'unhealthy'
+            overall_status = 'healthy' if overall_ok else 'unhealthy'
+
+            result = {
+                'status': overall_status,
+                'instance': {
+                    'instance_status': instance_status,
+                },
+                'ogds': {
+                    'ogds_sync_status': ogds_status,
+                },
+                'nightly_jobs': {
+                    'nightly_jobs_status': nightly_status,
+                },
+            }
+
         return json.dumps(result)
