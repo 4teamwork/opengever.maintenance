@@ -21,6 +21,13 @@ except ImportError:
     def ogds_sync_within_24h():
         return True
 
+try:
+    from opengever.ogds.base.sync.import_stamp import get_ogds_sync_stamp
+except ImportError:
+    # opengever.core < 2021.19.0
+    def get_ogds_sync_stamp():
+        return None
+
 
 class HealthCheckView(BrowserView):
     """Health check view to be used by superlance httpok plugin and/or
@@ -53,6 +60,10 @@ class HealthCheckView(BrowserView):
             nightly_status = 'healthy' if nightly_ok else 'unhealthy'
             overall_status = 'healthy' if overall_ok else 'unhealthy'
 
+            last_ogds_sync = get_ogds_sync_stamp()
+            if last_ogds_sync:
+                last_ogds_sync = last_ogds_sync.isoformat()
+
             result = {
                 'status': overall_status,
                 'instance': {
@@ -60,6 +71,7 @@ class HealthCheckView(BrowserView):
                 },
                 'ogds': {
                     'ogds_sync_status': ogds_status,
+                    'last_ogds_sync': last_ogds_sync,
                 },
                 'nightly_jobs': {
                     'nightly_jobs_status': nightly_status,
