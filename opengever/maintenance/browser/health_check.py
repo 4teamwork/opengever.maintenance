@@ -1,4 +1,6 @@
+from plone.memoize import ram
 from Products.Five.browser import BrowserView
+from time import time
 import json
 
 try:
@@ -34,6 +36,20 @@ except ImportError:
     # opengever.core < 2021.19.0
     def get_nightly_run_timestamp():
         return None
+
+try:
+    from opengever.nightlyjobs.runner import get_job_counts
+except ImportError:
+    # opengever.core < 2021.19.0
+    def get_job_counts():
+        return {}
+
+
+@ram.cache(lambda *args: time() // (60 * 5))
+def get_nightly_job_counts():
+    """Get nightly job queue lengths (cached for 5min).
+    """
+    return get_job_counts()
 
 
 class HealthCheckView(BrowserView):
@@ -87,6 +103,7 @@ class HealthCheckView(BrowserView):
                 'nightly_jobs': {
                     'nightly_jobs_status': nightly_status,
                     'last_nightly_run': last_nightly_run,
+                    'job_counts': get_nightly_job_counts(),
                 },
             }
 
