@@ -175,6 +175,8 @@ def main():
     cleaner.check()
 
     stats = cleaner.adjust_dossier_permission()
+    transaction.commit()
+
 
 if __name__ == '__main__':
     main()
