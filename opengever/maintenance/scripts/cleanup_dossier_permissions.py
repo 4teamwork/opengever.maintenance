@@ -15,8 +15,9 @@ DISREGARDED_ROLES = [
 
 SEPERATOR = 100 * "="
 
+
 class DossierPermissionCleaner(object):
-    """A maintenance object handler, which checks and simplify the
+    """A maintenance object handler, which checks and simplifies the
     local roles of dossiers with a blocked permission inheritance.
 
     Used in SG, after the DIGS migration.
@@ -33,8 +34,7 @@ class DossierPermissionCleaner(object):
 
         for brain in brains:
             dossier = brain.getObject()
-            local_roles_blocked = hasattr(dossier, '__ac_local_roles_block__') \
-                                  and dossier.__ac_local_roles_block__
+            local_roles_blocked = getattr(dossier, '__ac_local_roles_block__', False)
 
             if local_roles_blocked:
                 yield dossier
