@@ -49,6 +49,10 @@ class ReopenMeeting(object):
         newer_held_meetings = Meeting.query.by_committee(
             self.meeting.committee).filter(
             Meeting.meeting_number > self.meeting_number).all()
+        newer_held_meetings = filter(
+            lambda each: Period.get_current(each.committee.resolve_committee(),
+                                            each.start.date()) == self.period,
+            newer_held_meetings)
         if newer_held_meetings:
             errors.append(u"The meetings '{}' need to be reopened first.".format(
                 u"', '".join(each.get_title() for each in newer_held_meetings))
