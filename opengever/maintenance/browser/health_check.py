@@ -1,4 +1,6 @@
+from ftw.solr.interfaces import ISolrConnectionManager
 from Products.Five.browser import BrowserView
+from zope.component import queryUtility
 import json
 
 try:
@@ -58,13 +60,15 @@ class HealthCheckView(BrowserView):
         if extended:
             nightly_ok = nightly_run_within_24h()
             ogds_ok = ogds_sync_within_24h()
-            overall_ok = nightly_ok and ogds_ok
+            solr_ping_resp = self.ping_solr()
+            overall_ok = nightly_ok and ogds_ok and solr_ping_resp.is_ok()
 
             # Instance is considered healthy once we reach this point
             instance_status = 'healthy'
 
             ogds_status = 'healthy' if ogds_ok else 'unhealthy'
             nightly_status = 'healthy' if nightly_ok else 'unhealthy'
+            solr_status = 'healthy' if solr_ping_resp.is_ok() else 'unhealthy'
             overall_status = 'healthy' if overall_ok else 'unhealthy'
 
             last_ogds_sync = get_ogds_sync_stamp()
@@ -88,6 +92,14 @@ class HealthCheckView(BrowserView):
                     'nightly_jobs_status': nightly_status,
                     'last_nightly_run': last_nightly_run,
                 },
+                'solr': {
+                    'solr_ping_status': solr_status,
+                    'solr_ping_details': solr_ping_resp.error_msg(),
+                }
             }
 
         return json.dumps(result)
+
+    def ping_solr(self):
+        manager = queryUtility(ISolrConnectionManager)
+        return manager.connection.get('/admin/ping')
