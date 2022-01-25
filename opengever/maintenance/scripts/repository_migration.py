@@ -419,7 +419,8 @@ class RepositoryExcelAnalyser(object):
         self.position_guid_mapping = {}
 
         self.check_preconditions()
-        self.reporoot, self.reporoot_guid = self.prepare_guids()
+        self.prepare_guids()
+        self.reporoot, self.reporoot_guid = self.get_reporoot_and_guid()
 
         self.positions = set()
         self.new_positions = set()
@@ -445,17 +446,26 @@ class RepositoryExcelAnalyser(object):
         Moreover the repository root needs to have a GUID, as it does not
         have a reference number allowing to find the parent when creating
         a new repository folder in the repository root.
+        We also add a guid for all repository folders, as these allow to
+        unequivocally identify a parent when creating a new repofolder.
         """
         logger.info(u"\n\nPreparing GUIDs...\n")
         add_guid_index()
-        brain = self.catalog.unrestrictedSearchResults(
-            portal_type='opengever.repository.repositoryroot')[0]
-        reporoot = brain.getObject()
+        brains = self.catalog.unrestrictedSearchResults(
+            portal_type=['opengever.repository.repositoryroot',
+                         'opengever.repository.repositoryfolder']
+            )
+        for brain in brains:
+            obj = brain.getObject()
+            if not IAnnotations(obj).get(BUNDLE_GUID_KEY):
+                IAnnotations(obj)[BUNDLE_GUID_KEY] = uuid4().hex[:8]
+                obj.reindexObject(idxs=['bundle_guid'])
 
-        if not IAnnotations(reporoot).get(BUNDLE_GUID_KEY):
-            IAnnotations(reporoot)[BUNDLE_GUID_KEY] = uuid4().hex[:8]
-        reporoot.reindexObject(idxs=['bundle_guid'])
-        return reporoot, IAnnotations(reporoot).get(BUNDLE_GUID_KEY)
+    def get_reporoot_and_guid(self):
+        brains = self.catalog.unrestrictedSearchResults(
+            portal_type='opengever.repository.repositoryroot')
+        reporoot = brains[0].getObject()
+        return reporoot, IAnnotations(reporoot)[BUNDLE_GUID_KEY]
 
     def analyse(self):
         logger.info(u"\n\nStarting analysis...\n")
