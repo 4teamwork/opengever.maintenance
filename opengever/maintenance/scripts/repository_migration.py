@@ -947,7 +947,7 @@ class RepositoryExcelAnalyser(object):
 
 class RepositoryMigrator(object):
 
-    def __init__(self, operations_list, dry_run):
+    def __init__(self, operations_list, dry_run=False):
         self.operations_list = operations_list
         self.dry_run = dry_run
         self._reference_repository_mapping = None
