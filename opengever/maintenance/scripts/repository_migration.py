@@ -664,9 +664,8 @@ class RepositoryExcelAnalyser(object):
             inheritance_blocked = permissions['block_inheritance']
             if has_local_roles and not inheritance_blocked:
                 logger.warning(
-                    "\nInvalid operation: setting local roles without blocking "
+                    "\nSetting local roles without blocking "
                     "inheritance. {}\n".format(operation))
-                operation['is_valid'] = False
             elif inheritance_blocked and not has_local_roles:
                 logger.warning(
                     "\nInvalid operation: blocking inheritance without setting "
