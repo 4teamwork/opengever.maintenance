@@ -1419,10 +1419,11 @@ def main():
         return
 
     migrator = RepositoryMigrator(analyser.analysed_rows, dry_run=options.dryrun)
-    if not options.dryrun:
-        logger.info('\n\nstarting migration...\n')
-        migrator.run()
 
+    logger.info('\n\nstarting migration...\n')
+    migrator.run()
+
+    if not options.dryrun:
         logger.info('\n\nCommitting transaction...\n')
         transaction.commit()
         logger.info('Finished migration.')
