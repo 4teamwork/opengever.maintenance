@@ -908,7 +908,7 @@ class RepositoryExcelAnalyser(object):
 
             # permission
             'Ignorierte Bewilligungen',
-            'Vorherige Lokalen Rollen entfernt'
+            'Vorherige Lokalen Rollen entfernt',
             'Bewilligungen',
         ]
 
