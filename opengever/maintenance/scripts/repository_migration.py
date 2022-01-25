@@ -467,10 +467,11 @@ class RepositoryExcelAnalyser(object):
         reporoot = brains[0].getObject()
         return reporoot, IAnnotations(reporoot)[BUNDLE_GUID_KEY]
 
-    def analyse(self):
-        logger.info(u"\n\nStarting analysis...\n")
+    def extract_data(self):
+        logger.info(u"\n\nExtracting data from Excel...\n")
         data_extractor = ExcelDataExtractor(self.diff_xlsx_path)
 
+        operations = []
         for i, row in enumerate(data_extractor.get_data()):
             log_progress(i, data_extractor.n_data)
             if row.new_position in ['', u'l\xf6schen', '-']:
@@ -492,6 +493,22 @@ class RepositoryExcelAnalyser(object):
             if not new_repo_pos.position:
                 logger.info("\nSkipping, we do not support deletion: {}\n".format(row))
                 continue
+
+            permissions = self.extract_permissions(row)
+            operations.append({
+                'old_repo_pos': old_repo_pos,
+                'new_repo_pos': new_repo_pos,
+                'permissions': permissions,
+                'is_valid': True})
+        return operations
+
+    def analyse(self):
+        logger.info(u"\n\nStarting analysis...\n")
+        data = self.extract_data()
+
+        for operation in data:
+            old_repo_pos = operation['old_repo_pos']
+            new_repo_pos = operation['new_repo_pos']
 
             new_number = None
             new_parent_position = None
@@ -515,9 +532,7 @@ class RepositoryExcelAnalyser(object):
                 new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_repo_pos)
                 new_position_guid = uuid4().hex[:8]
 
-            permissions = self.extract_permissions(row)
-
-            operation = {
+            operation.update({
                 'uid': self.get_uuid_for_position(old_repo_pos.position),
                 'new_position_parent_position': new_position_parent_position,
                 'new_position_parent_guid': new_position_parent_guid,
@@ -526,11 +541,8 @@ class RepositoryExcelAnalyser(object):
                 'new_number': new_number,
                 'new_parent_position': new_parent_position,
                 'new_parent_uid': new_parent_uid,
-                'merge_into': merge_into,
-                'old_repo_pos': old_repo_pos,
-                'new_repo_pos': new_repo_pos,
-                'permissions': permissions
-            }
+                'merge_into': merge_into})
+
             self.validate_operation(operation)
 
             self.analysed_rows.append(operation)
@@ -567,8 +579,6 @@ class RepositoryExcelAnalyser(object):
         is_valid, repository_depth_violated and leaf_node_violated and
         permissions_disregarded to it.
         """
-        operation['is_valid'] = True
-
         # Each operation should either have a uid or a new_position_guid
         if not any((operation['new_position_guid'], operation['uid'])):
             logger.warning("\nInvalid operation: needs new_position_guid "
