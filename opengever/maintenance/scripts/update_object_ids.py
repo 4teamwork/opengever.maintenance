@@ -48,8 +48,8 @@ def marmoset_patch(old, new, extra_globals={}):
 
 
 # deferred arguments will be injected via globals while patching
-def deferred_sync_task(obj, event):
-    deferred_arguments.append((obj, event))
+def deferred_sync_task(obj, event, graceful=False):
+    deferred_arguments.append((obj, event, graceful))
 
 
 class DeferredOrDisabledEventHandlers(object):
@@ -87,11 +87,11 @@ class DeferredOrDisabledEventHandlers(object):
         self._orig_journal_factory = None
 
     def perform_deferred_task_syncing(self):
-        for obj, event in self.deferred_sync_task_call_arguments:
+        for obj, event, graceful in self.deferred_sync_task_call_arguments:
             # this is the code that would be run by `sync_task`.
             if IContainerModifiedEvent.providedBy(event):
                 return
-            TaskSqlSyncer(obj, event).sync()
+            TaskSqlSyncer(obj, event, graceful).sync()
 
         self.deferred_sync_task_call_arguments = None
 

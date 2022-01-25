@@ -5,6 +5,8 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Handle new argument "graceful" of task syncer in ObjectIDUpdater. [njohner]
+
 - Add extended health checks (Nightly Jobs and OGDS sync). [lgraf]
 
 - Add script to cleanup notifications for ToDo activities. [njohner]
