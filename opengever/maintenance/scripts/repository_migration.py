@@ -400,6 +400,105 @@ class ExcelDataExtractor(object):
             yield Row(row, self.column_mapping)
 
 
+class PositionsMapping(object):
+    """Mapping of both existing and newly created positions.
+    Maps old_position_numbers and new_position_numbers to
+    obj and guid.
+    """
+
+    def __init__(self, operations, reference_repository_mapping):
+        logger.info(u"\n\nPreparing new positions mapping...\n")
+        self.old_pos_guid = {}
+        self.new_pos_guid = {}
+        self.old_pos_new_guid = {}
+        self.reference_repository_mapping = reference_repository_mapping
+        self._create_mapping(operations)
+
+    def _add_creation(self, operation):
+        new_refnum = operation['new_repo_pos'].position
+        if new_refnum in self.new_pos_guid:
+            # we have a creation operation for a position that already
+            # exists and does not change, this should not happen
+            raise Exception("Useless creation operation for {}".format(new_refnum))
+        self.new_pos_guid[new_refnum] = uuid4().hex[:8]
+
+    def _add_move(self, operation):
+        old_refnum = operation['old_repo_pos'].position
+        new_refnum = operation['new_repo_pos'].position
+
+        if old_refnum in self.old_pos_guid:
+            # only one row allowed for each existing position
+            logger.warning(
+                "\nInvalid operation: position appears twice in excel."
+                " {}\n".format(operation))
+            operation['is_valid'] = False
+        if not new_refnum:
+            raise Exception("This should not happen, we normally skip deletions")
+
+        obj = self.get_object_for_position(old_refnum)
+        guid = IAnnotations(obj)[BUNDLE_GUID_KEY]
+
+        self.old_pos_guid[old_refnum] = guid
+        if new_refnum not in self.new_pos_guid:
+            self.new_pos_guid[new_refnum] = guid
+        else:
+            # Will get merged, let's remember into which guid
+            self.old_pos_new_guid[old_refnum] = self.new_pos_guid[new_refnum]
+
+    def get_old_pos_guid(self, old_refnum):
+        """Maps an old position to its guid"""
+        return self.old_pos_guid.get(old_refnum)
+
+    def get_old_pos_new_guid(self, old_refnum):
+        """Maps an old position to its new guid, only if it changes (merges)"""
+        return self.old_pos_new_guid.get(old_refnum)
+
+    def get_new_pos_guid(self, new_refnum):
+        """Maps a new position to its guid"""
+        return self.new_pos_guid.get(new_refnum)
+
+    def get_object_for_position(self, position):
+        return self.reference_repository_mapping.get(position)
+
+    def _create_mapping(self, operations):
+        # we split the operations so as to first treat all rows where the reference
+        # number is not changed, then creation operations and finally move and
+        # merge operations. This will help optimize the operations we will
+        # execute in the end.
+        unchanged = []
+        creations = []
+        moves_or_merges = []
+        for operation in operations:
+            old_repo_pos = operation['old_repo_pos']
+            new_repo_pos = operation['new_repo_pos']
+            if old_repo_pos.position == new_repo_pos.position:
+                unchanged.append(operation)
+            elif old_repo_pos.position is None:
+                creations.append(operation)
+            else:
+                moves_or_merges.append(operation)
+
+        for operation in unchanged:
+            self._add_move(operation)
+
+        for operation in creations:
+            self._add_creation(operation)
+
+        for operation in moves_or_merges:
+            self._add_move(operation)
+
+    def is_complete(self):
+        """Now we make sure that the excel was complete, i.e. there was a row
+        for each existing repository folder"""
+        complete = True
+        for ref_num in self.reference_repository_mapping:
+            if ref_num not in self.old_pos_guid:
+                logger.warning("\nExcel is incomplete. No operation defined for "
+                               "position {}\n".format(ref_num))
+                complete = False
+        return complete
+
+
 class RepositoryExcelAnalyser(object):
 
     def __init__(self, mapping_path, output_directory):
@@ -422,7 +521,6 @@ class RepositoryExcelAnalyser(object):
         self.prepare_guids()
         self.reporoot, self.reporoot_guid = self.get_reporoot_and_guid()
 
-        self.positions = set()
         self.new_positions = set()
 
     def check_preconditions(self):
@@ -506,6 +604,13 @@ class RepositoryExcelAnalyser(object):
         logger.info(u"\n\nStarting analysis...\n")
         data = self.extract_data()
 
+        self.positions_mapping = PositionsMapping(data, self.get_repository_reference_mapping())
+        # add the repository root to the mapping
+        self.positions_mapping.old_pos_guid[''] = self.reporoot_guid
+        self.positions_mapping.new_pos_guid[''] = self.reporoot_guid
+        if not self.positions_mapping.is_complete():
+            self.is_valid = False
+
         for operation in data:
             old_repo_pos = operation['old_repo_pos']
             new_repo_pos = operation['new_repo_pos']
@@ -552,16 +657,6 @@ class RepositoryExcelAnalyser(object):
                 self.position_uid_mapping[new_repo_pos.position] = operation['uid']
             else:
                 self.position_guid_mapping[new_repo_pos.position] = new_position_guid
-
-        # Now we make sure that the excel was complete, i.e. there is a row for each
-        # existing repository folder
-        for brain in self.catalog.unrestrictedSearchResults(
-                portal_type='opengever.repository.repositoryfolder'):
-            refnum = IReferenceNumber(brain.getObject()).get_repository_number()
-            if not self.operation_by_old_refnum(refnum):
-                logger.warning("\nExcel is incomplete. No operation defined for "
-                               "position {}\n".format(brain.reference))
-                self.is_valid = False
 
         # Make sure that analysis is invalid if any operation was invalid
         if any([not op['is_valid'] for op in self.analysed_rows]):
@@ -641,16 +736,6 @@ class RepositoryExcelAnalyser(object):
 
         self.check_repository_depth_violation(operation)
         self.check_leaf_node_principle_violation(operation)
-
-        # Each existing position can only have one row in the excel
-        old_position = operation['old_repo_pos'].position
-        if old_position:
-            if old_position in self.positions:
-                logger.warning(
-                    "\nInvalid operation: position appears twice in excel."
-                    " {}\n".format(operation))
-                operation['is_valid'] = False
-            self.positions.add(old_position)
 
         # Each new position can only have one row in the excel except for merge operations
         new_position = operation['new_repo_pos'].position
