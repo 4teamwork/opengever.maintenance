@@ -625,7 +625,7 @@ class RepositoryExcelAnalyser(object):
             new_position_guid = None
 
             needs_creation = not bool(old_repo_pos.position)
-            need_number_change, need_move, need_merge = self.needs_number_change_move_or_merge(new_repo_pos, old_repo_pos)
+            need_number_change, need_move, need_merge = self.needs_number_change_move_or_merge(operation)
 
             if need_number_change:
                 new_number = self.get_new_number(new_repo_pos)
@@ -852,18 +852,23 @@ class RepositoryExcelAnalyser(object):
             # The parent is being created, so we will identify it through its guid.
             return None, parent_row[0]['new_position_guid']
 
-    def needs_number_change_move_or_merge(self, new_repo_pos, old_repo_pos):
+    def needs_number_change_move_or_merge(self, operation):
         """Check if a number change, a move or a merge is necessary
         """
         need_number_change = False
         need_move = False
         need_merge = False
 
-        if new_repo_pos.position and old_repo_pos.position and new_repo_pos.position != old_repo_pos.position:
+        old_repo_pos = operation['old_repo_pos']
+        new_repo_pos = operation['new_repo_pos']
+        old_refnum = old_repo_pos.position
+        new_refnum = new_repo_pos.position
+
+        if new_refnum and old_refnum and new_refnum != old_refnum:
             # It's a move, merge or number change, we need to figure out which
 
             # guid change is a merge operation
-            if self.positions_mapping.get_old_pos_new_guid(old_repo_pos.position):
+            if self.positions_mapping.get_old_pos_new_guid(old_refnum):
                 need_merge = True
                 return need_number_change, need_move, need_merge
 
@@ -871,6 +876,13 @@ class RepositoryExcelAnalyser(object):
             # merged into the new parent
             old_parent_pos_guid = self.positions_mapping.get_old_pos_guid(old_repo_pos.parent_position)
             new_parent_pos_guid = self.positions_mapping.get_new_pos_guid(new_repo_pos.parent_position)
+            if not new_parent_pos_guid:
+                logger.warning(
+                    "\nInvalid operation: cannot find new parent. "
+                    "{}\n".format(operation))
+                operation['is_valid'] = False
+                return need_number_change, need_move, need_merge
+
             if old_parent_pos_guid != new_parent_pos_guid:
                 old_parent_new_guid = self.positions_mapping.get_old_pos_new_guid(old_repo_pos.parent_position)
                 # if current parent is merged into the future parent, no need to move
