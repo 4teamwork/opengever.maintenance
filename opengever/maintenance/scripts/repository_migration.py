@@ -511,12 +511,6 @@ class RepositoryExcelAnalyser(object):
         self.catalog = api.portal.get_tool('portal_catalog')
         self.is_valid = True
 
-        # A mapping new_position_number:UID
-        self.position_uid_mapping = {}
-
-        # A mapping new_position_number:guid
-        self.position_guid_mapping = {}
-
         self.check_preconditions()
         self.prepare_guids()
         self.reporoot, self.reporoot_guid = self.get_reporoot_and_guid()
@@ -647,12 +641,6 @@ class RepositoryExcelAnalyser(object):
             self.validate_operation(operation)
 
             self.analysed_rows.append(operation)
-            if need_merge:
-                pass
-            elif not needs_creation:
-                self.position_uid_mapping[new_repo_pos.position] = operation['uid']
-            else:
-                self.position_guid_mapping[new_repo_pos.position] = new_position_guid
 
         # Make sure that analysis is invalid if any operation was invalid
         if any([not op['is_valid'] for op in self.analysed_rows]):
@@ -1492,8 +1480,7 @@ def main():
     analyser_path = os.path.join(options.output_directory, "analyser.json")
     with open(analyser_path, "w") as outfile:
         analyser_data = {
-            'position_guid_mapping': analyser.position_guid_mapping,
-            'position_uid_mapping': analyser.position_uid_mapping,
+            'position_mapping': analyser.positions_mapping,
             'analysed_rows': analyser.analysed_rows,
         }
         json.dump(analyser_data, outfile, default=vars)
