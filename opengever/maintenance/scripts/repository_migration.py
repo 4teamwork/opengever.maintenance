@@ -611,30 +611,26 @@ class RepositoryExcelAnalyser(object):
 
             new_number = None
             new_parent_guid = None
-
-            new_position_parent_position = None
-            new_position_parent_guid = None
             new_position_guid = None
 
-            needs_creation = not bool(old_repo_pos.position)
+            need_creation = not bool(old_repo_pos.position)
             need_number_change, need_move, need_merge = self.needs_number_change_move_or_merge(operation)
 
             if need_number_change:
                 new_number = self.get_new_number(new_repo_pos)
             if need_move or need_merge:
                 new_parent_guid = self.get_new_parent_guid(new_repo_pos)
-            if needs_creation:
-                new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_repo_pos)
-                new_position_guid = uuid4().hex[:8]
+            if need_creation:
+                new_parent_guid = self.get_new_parent_guid(new_repo_pos)
+                new_position_guid = self.positions_mapping.get_new_pos_guid(new_repo_pos.position)
 
             operation.update({
                 'uid': self.get_uuid_for_position(old_repo_pos.position),
-                'new_position_parent_position': new_position_parent_position,
-                'new_position_parent_guid': new_position_parent_guid,
                 'new_position_guid': new_position_guid,
                 'need_move': need_move,
                 'need_merge': need_merge,
-                'new_title': self.get_new_title(new_repo_pos, old_repo_pos) if not (needs_creation or need_merge) else None,
+                'need_creation': need_creation,
+                'new_title': self.get_new_title(new_repo_pos, old_repo_pos) if not (need_creation or need_merge) else None,
                 'new_number': new_number,
                 'new_parent_guid': new_parent_guid})
 
@@ -708,11 +704,8 @@ class RepositoryExcelAnalyser(object):
                 operation['is_valid'] = False
 
         # Make sure that if a position is being created, its parent will be found
-        if not bool(operation['old_repo_pos'].position) and not operation['new_position_parent_guid']:
-            parent = self.get_object_for_position(
-                operation['new_position_parent_position'])
-
-            if not parent:
+        if operation['need_creation']:
+            if not operation['new_parent_guid'] in self.positions_mapping.new_pos_guid.values():
                 logger.warning(
                     "\nInvalid operation: could not find new parent for create "
                     "operation. {}\n".format(operation))
@@ -788,29 +781,6 @@ class RepositoryExcelAnalyser(object):
         """Returns the new parent guid."""
         return self.positions_mapping.get_new_pos_guid(new_repo_pos.parent_position)
 
-    def get_parent_of_new_position(self, new_repo_pos):
-        final_parent_position = new_repo_pos.parent_position
-        if not final_parent_position:
-            # We are creating a new position in the reporoot
-            return final_parent_position, self.reporoot_guid
-
-        parent_row = [item for item in self.analysed_rows
-                      if item['new_repo_pos'].position == final_parent_position]
-
-        if not parent_row:
-            # bundle import (ConstructorSection) will find parent from
-            # the reference number
-            return final_parent_position, None
-
-        # Two possibilities, the new parent is being created or moved.
-        if parent_row[0]['old_repo_pos'].position:
-            # The parent will be moved to the right position so we need to add
-            # the subrepofolder on the "old position"
-            return parent_row[0]['old_repo_pos'].position, None
-        else:
-            # The parent is being created, so we will identify it through its guid.
-            return None, parent_row[0]['new_position_guid']
-
     def needs_number_change_move_or_merge(self, operation):
         """Check if a number change, a move or a merge is necessary
         """
@@ -869,24 +839,15 @@ class RepositoryExcelAnalyser(object):
 
     def check_leaf_node_principle_violation(self, operation):
         operation['leaf_node_violated'] = False
-        if not (operation['need_move'] or operation['new_position_guid']):
+        if not (operation['need_move'] or operation['need_creation']):
             # object is neither moved nor created, nothing to worry about
             return
 
-        if operation['need_move']:
-            if operation['new_parent_guid'] not in self.positions_mapping.old_pos_guid.values():
-                # parent is being created, hard to check leaf node principle
-                return
-            parent_repo = self.guid_to_object(operation['new_parent_guid'])
-        else:
-            # object is being created, parent is identified either by
-            # new_position_parent_position or new_position_parent_guid
-            if operation['new_position_parent_position']:
-                # this corresponds to the old position, as creation happens before move
-                parent_repo = self.get_object_for_position(operation['new_position_parent_position'])
-            else:
-                # parent is being created, hard to check leaf node principle
-                return
+        if operation['new_parent_guid'] not in self.positions_mapping.old_pos_guid.values():
+            # parent is being created, hard to check leaf node principle
+            return
+        parent_repo = self.guid_to_object(operation['new_parent_guid'])
+
         if not parent_repo:
             # Something is fishy, parent should either exist or be created
             operation['is_valid'] = False
@@ -964,7 +925,7 @@ class RepositoryExcelAnalyser(object):
             'Alt: Position', 'Alt: Titel', 'Alt: Description',
 
             # operations
-            'Position Erstellen (Parent Aktenzeichen oder GUID)',
+            'Position Erstellen',
             'Umbenennung (Neuer Titel)',
             'Nummer Anpassung (Neuer `Praefix`)',
             'Verschiebung noetig',
@@ -996,7 +957,7 @@ class RepositoryExcelAnalyser(object):
                 data['old_repo_pos'].position,
                 data['old_repo_pos'].title,
                 data['old_repo_pos'].description,
-                data['new_position_parent_position'] or data['new_position_parent_guid'],
+                data['need_creation'],
                 data['new_title'],
                 data['new_number'],
                 data['need_move'],
@@ -1073,16 +1034,10 @@ class RepositoryMigrator(object):
         logger.info("\n\nCreating bundle...\n")
         bundle_items = []
         for item in items:
-            # Bundle expect the format [[repository], [dossier]]
-            parent_reference = None
-            if item['new_position_parent_position']:
-                parent_reference = [[int(x) for x in list(item['new_position_parent_position'])]]
-
             bundle_items.append(
                 {'guid': item['new_position_guid'],
                  'description': item['new_repo_pos'].description,
-                 'parent_reference': parent_reference,
-                 'parent_guid': item['new_position_parent_guid'],
+                 'parent_guid': item['new_parent_guid'],
                  'reference_number_prefix': item['new_repo_pos'].reference_number_prefix,
                  'review_state': 'repositoryfolder-state-active',
                  'title_de': item['new_repo_pos'].title,
@@ -1349,8 +1304,7 @@ class RepositoryMigrator(object):
                 'new_parent_guid': operation['new_parent_guid'],
                 'need_move': operation['need_move'],
                 'need_merge': operation['need_merge'],
-                'new_position_parent_guid': operation['new_position_parent_guid'],
-                'new_position_parent_position': operation['new_position_parent_position'],
+                'need_creation': operation['need_creation'],
                 'permissions': operation['permissions']
             }
 
