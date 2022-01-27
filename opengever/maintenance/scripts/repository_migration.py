@@ -616,8 +616,7 @@ class RepositoryExcelAnalyser(object):
             new_repo_pos = operation['new_repo_pos']
 
             new_number = None
-            new_parent_position = None
-            new_parent_uid = None
+            new_parent_guid = None
             merge_into = None
 
             new_position_parent_position = None
@@ -630,7 +629,7 @@ class RepositoryExcelAnalyser(object):
             if need_number_change:
                 new_number = self.get_new_number(new_repo_pos)
             if need_move:
-                new_parent_position, new_parent_uid = self.get_new_parent_position_and_uid(new_repo_pos)
+                new_parent_guid = self.get_new_parent_guid(new_repo_pos)
             if need_merge:
                 merge_into = self.get_position_and_uid_to_merge_into(new_repo_pos)
             if needs_creation:
@@ -642,10 +641,10 @@ class RepositoryExcelAnalyser(object):
                 'new_position_parent_position': new_position_parent_position,
                 'new_position_parent_guid': new_position_parent_guid,
                 'new_position_guid': new_position_guid,
+                'need_move': need_move,
                 'new_title': self.get_new_title(new_repo_pos, old_repo_pos) if not (needs_creation or need_merge) else None,
                 'new_number': new_number,
-                'new_parent_position': new_parent_position,
-                'new_parent_uid': new_parent_uid,
+                'new_parent_guid': new_parent_guid,
                 'merge_into': merge_into})
 
             self.validate_operation(operation)
@@ -715,12 +714,12 @@ class RepositoryExcelAnalyser(object):
                            "new_position_guid or uid. {}\n".format(operation))
             operation['is_valid'] = False
 
-        # A move operation should have a new_parent_uid
-        if operation['new_parent_position'] or operation['new_parent_uid']:
-            if not operation['new_parent_uid']:
+        # A move operation should have a new_parent_guid
+        if operation['need_move']:
+            if not operation['new_parent_guid']:
                 logger.warning(
                     "\nInvalid operation: move operation must define "
-                    "new_parent_uid. {}\n".format(operation))
+                    "new_parent_guid. {}\n".format(operation))
                 operation['is_valid'] = False
 
         # Make sure that if a position is being created, its parent will be found
@@ -800,21 +799,9 @@ class RepositoryExcelAnalyser(object):
         prefix"""
         return new_repo_pos.reference_number_prefix
 
-    def get_new_parent_position_and_uid(self, new_repo_pos):
-        """Returns the new parent position and the uid. If the object does not
-        yet exists it returns the guid."""
-
-        parent_position = new_repo_pos.parent_position
-        if not parent_position:
-            # We are moving into the reporoot
-            return parent_position, self.reporoot.UID()
-
-        if parent_position not in self.position_uid_mapping:
-            # Parent does not exist yet and will be created in the
-            # first step of the migration
-            return parent_position, self.position_guid_mapping.get(parent_position)
-
-        return parent_position, self.position_uid_mapping[parent_position]
+    def get_new_parent_guid(self, new_repo_pos):
+        """Returns the new parent guid."""
+        return self.positions_mapping.get_new_pos_guid(new_repo_pos.parent_position)
 
     def get_position_and_uid_to_merge_into(self, new_repo_pos):
         """Returns the position and the uid this should be merged into.
@@ -910,16 +897,15 @@ class RepositoryExcelAnalyser(object):
 
     def check_leaf_node_principle_violation(self, operation):
         operation['leaf_node_violated'] = False
-        if not (operation['new_parent_uid'] or operation['new_position_guid']):
+        if not (operation['need_move'] or operation['new_position_guid']):
             # object is neither moved nor created, nothing to worry about
             return
 
-        if operation['new_parent_uid']:
-            # object is being moved
-            if operation['new_parent_uid'] in self.position_guid_mapping.values():
+        if operation['need_move']:
+            if operation['new_parent_guid'] not in self.positions_mapping.old_pos_guid.values():
                 # parent is being created, hard to check leaf node principle
                 return
-            parent_repo = uuidToObject(operation['new_parent_uid'])
+            parent_repo = self.guid_to_object(operation['new_parent_guid'])
         else:
             # object is being created, parent is identified either by
             # new_position_parent_position or new_position_parent_guid
@@ -960,6 +946,9 @@ class RepositoryExcelAnalyser(object):
     def get_object_for_position(self, position):
         mapping = self.get_repository_reference_mapping()
         return mapping.get(position)
+
+    def guid_to_object(self, guid):
+        return self.catalog(bundle_guid=guid)[0].getObject()
 
     def extract_permissions(self, row):
         permissions = {'block_inheritance': False}
@@ -1006,7 +995,7 @@ class RepositoryExcelAnalyser(object):
             'Position Erstellen (Parent Aktenzeichen oder GUID)',
             'Umbenennung (Neuer Titel)',
             'Nummer Anpassung (Neuer `Praefix`)',
-            'Verschiebung (Aktenzeichen neues Parent)',
+            'Verschiebung noetig',
             'Merge mit (UID oder GUID)',
 
             # rule violations
@@ -1038,7 +1027,7 @@ class RepositoryExcelAnalyser(object):
                 data['new_position_parent_position'] or data['new_position_parent_guid'],
                 data['new_title'],
                 data['new_number'],
-                data['new_parent_position'],
+                data['need_move'],
                 data['merge_into'],
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
@@ -1082,7 +1071,7 @@ class RepositoryMigrator(object):
         return [item for item in self.operations_list if item['new_position_guid']]
 
     def items_to_move(self):
-        return [item for item in self.operations_list if item['new_parent_uid']]
+        return [item for item in self.operations_list if item['need_move']]
 
     def items_to_merge(self):
         return [item for item in self.operations_list if item['merge_into']]
@@ -1149,6 +1138,9 @@ class RepositoryMigrator(object):
         with DisabledLDAP(portal):
             transmogrifier(u'opengever.bundle.oggbundle')
 
+    def guid_to_object(self, guid):
+        return self.catalog(bundle_guid=guid)[0].getObject()
+
     def uid_or_guid_to_object(self, uid_or_guid):
         obj = uuidToObject(uid_or_guid)
         if not obj:
@@ -1160,7 +1152,7 @@ class RepositoryMigrator(object):
         n_tot = len(items)
         for i, item in enumerate(items):
             log_progress(i, n_tot, 1)
-            parent = self.uid_or_guid_to_object(item['new_parent_uid'])
+            parent = self.guid_to_object(item['new_parent_guid'])
             repo = uuidToObject(item['uid'])
             if not parent or not repo:
                 raise Exception('No parent or repo found for {}'.format(item))
@@ -1382,8 +1374,9 @@ class RepositoryMigrator(object):
                 'new_title': operation['new_repo_pos'].title,
                 'old_description': operation['old_repo_pos'].description,
                 'new_description': operation['new_repo_pos'].description,
-                'new_parent_uid': operation['new_parent_uid'],
+                'new_parent_guid': operation['new_parent_guid'],
                 'merge_into': operation['merge_into'],
+                'need_move': operation['need_move'],
                 'new_position_parent_guid': operation['new_position_parent_guid'],
                 'new_position_parent_position': operation['new_position_parent_position'],
                 'permissions': operation['permissions']
