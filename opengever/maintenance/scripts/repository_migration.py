@@ -642,13 +642,6 @@ class RepositoryExcelAnalyser(object):
         if any([not op['is_valid'] for op in self.analysed_rows]):
             self.is_valid = False
 
-    def operation_by_old_refnum(self, reference_number):
-        refnum = cleanup_position(reference_number)
-        for op in self.analysed_rows:
-            if op['old_repo_pos'].position == refnum:
-                return op
-        return None
-
     def validate_operation(self, operation):
         """Make sure that operation satisfies all necessary conditions and add
         is_valid, repository_depth_violated and leaf_node_violated and
@@ -876,10 +869,6 @@ class RepositoryExcelAnalyser(object):
 
         return None
 
-    def get_object_for_position(self, position):
-        mapping = self.get_repository_reference_mapping()
-        return mapping.get(position)
-
     def guid_to_object(self, guid):
         return self.catalog(bundle_guid=guid)[0].getObject()
 
@@ -1064,15 +1053,6 @@ class RepositoryMigrator(object):
 
         with DisabledLDAP(portal):
             transmogrifier(u'opengever.bundle.oggbundle')
-
-    def guid_to_object(self, guid):
-        return self.catalog(bundle_guid=guid)[0].getObject()
-
-    def uid_or_guid_to_object(self, uid_or_guid):
-        obj = uuidToObject(uid_or_guid)
-        if not obj:
-            obj = self.catalog(bundle_guid=uid_or_guid)[0].getObject()
-        return obj
 
     def move_branches(self, items):
         logger.info("\n\nMoving...\n")
