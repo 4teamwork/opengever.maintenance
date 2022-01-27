@@ -617,7 +617,6 @@ class RepositoryExcelAnalyser(object):
 
             new_number = None
             new_parent_guid = None
-            merge_into = None
 
             new_position_parent_position = None
             new_position_parent_guid = None
@@ -628,10 +627,8 @@ class RepositoryExcelAnalyser(object):
 
             if need_number_change:
                 new_number = self.get_new_number(new_repo_pos)
-            if need_move:
+            if need_move or need_merge:
                 new_parent_guid = self.get_new_parent_guid(new_repo_pos)
-            if need_merge:
-                merge_into = self.get_position_and_uid_to_merge_into(new_repo_pos)
             if needs_creation:
                 new_position_parent_position, new_position_parent_guid = self.get_parent_of_new_position(new_repo_pos)
                 new_position_guid = uuid4().hex[:8]
@@ -642,10 +639,10 @@ class RepositoryExcelAnalyser(object):
                 'new_position_parent_guid': new_position_parent_guid,
                 'new_position_guid': new_position_guid,
                 'need_move': need_move,
+                'need_merge': need_merge,
                 'new_title': self.get_new_title(new_repo_pos, old_repo_pos) if not (needs_creation or need_merge) else None,
                 'new_number': new_number,
-                'new_parent_guid': new_parent_guid,
-                'merge_into': merge_into})
+                'new_parent_guid': new_parent_guid})
 
             self.validate_operation(operation)
 
@@ -738,7 +735,7 @@ class RepositoryExcelAnalyser(object):
 
         # Each new position can only have one row in the excel except for merge operations
         new_position = operation['new_repo_pos'].position
-        if new_position and not operation['merge_into']:
+        if new_position and not operation['need_merge']:
             if new_position in self.new_positions:
                 logger.warning(
                     "\nInvalid operation: new position appears twice in excel."
@@ -754,7 +751,7 @@ class RepositoryExcelAnalyser(object):
         operation['permissions_disregarded'] = False
         operation['local_roles_deleted'] = False
         operation['set_permissions'] = False
-        if operation['merge_into']:
+        if operation['need_merge']:
             if any(permissions.values()):
                 logger.info(
                     "\nPermissions disregarded: this position gets merged"
@@ -802,19 +799,6 @@ class RepositoryExcelAnalyser(object):
     def get_new_parent_guid(self, new_repo_pos):
         """Returns the new parent guid."""
         return self.positions_mapping.get_new_pos_guid(new_repo_pos.parent_position)
-
-    def get_position_and_uid_to_merge_into(self, new_repo_pos):
-        """Returns the position and the uid this should be merged into.
-        If the object does not yet exists it returns the guid."""
-
-        position = new_repo_pos.position
-
-        if position not in self.position_uid_mapping:
-            # Parent does not exist yet and will be created in the
-            # first step of the migration
-            return self.position_guid_mapping.get(position)
-
-        return self.position_uid_mapping[position]
 
     def get_parent_of_new_position(self, new_repo_pos):
         final_parent_position = new_repo_pos.parent_position
@@ -996,7 +980,7 @@ class RepositoryExcelAnalyser(object):
             'Umbenennung (Neuer Titel)',
             'Nummer Anpassung (Neuer `Praefix`)',
             'Verschiebung noetig',
-            'Merge mit (UID oder GUID)',
+            'Merge noetig',
 
             # rule violations
             'Verletzt Max. Tiefe',
@@ -1028,7 +1012,7 @@ class RepositoryExcelAnalyser(object):
                 data['new_title'],
                 data['new_number'],
                 data['need_move'],
-                data['merge_into'],
+                data['need_merge'],
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
                 'x' if not data['is_valid'] else '',
@@ -1074,7 +1058,7 @@ class RepositoryMigrator(object):
         return [item for item in self.operations_list if item['need_move']]
 
     def items_to_merge(self):
-        return [item for item in self.operations_list if item['merge_into']]
+        return [item for item in self.operations_list if item['need_merge']]
 
     def items_to_adjust_number(self):
         return [item for item in self.operations_list if item['new_number']]
@@ -1166,7 +1150,7 @@ class RepositoryMigrator(object):
         n_tot = len(items)
         for i, item in enumerate(items):
             log_progress(i, n_tot, 1)
-            target = self.uid_or_guid_to_object(item['merge_into'])
+            target = self.guid_to_object(item['new_parent_guid'])
             repo = uuidToObject(item['uid'])
             if not target or not repo:
                 raise Exception('No target or repo found for {}'.format(item))
@@ -1339,7 +1323,7 @@ class RepositoryMigrator(object):
                 obj = self.guid_to_object(operation['new_position_guid'])
             elif operation['uid']:
                 obj = uuidToObject(operation['uid'])
-                if operation['merge_into']:
+                if operation['need_merge']:
                     # position was deleted
                     if obj:
                         logger.error(u"Positions wasn't deleted correctly {}.".format(operation['uid']))
@@ -1375,8 +1359,8 @@ class RepositoryMigrator(object):
                 'old_description': operation['old_repo_pos'].description,
                 'new_description': operation['new_repo_pos'].description,
                 'new_parent_guid': operation['new_parent_guid'],
-                'merge_into': operation['merge_into'],
                 'need_move': operation['need_move'],
+                'need_merge': operation['need_merge'],
                 'new_position_parent_guid': operation['new_position_parent_guid'],
                 'new_position_parent_position': operation['new_position_parent_position'],
                 'permissions': operation['permissions']
