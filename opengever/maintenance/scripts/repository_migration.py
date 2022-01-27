@@ -618,8 +618,10 @@ class RepositoryExcelAnalyser(object):
 
             if need_number_change:
                 new_number = self.get_new_number(new_repo_pos)
-            if need_move or need_merge:
+            if need_move:
                 new_parent_guid = self.get_new_parent_guid(new_repo_pos)
+            if need_merge:
+                new_parent_guid = self.positions_mapping.get_new_pos_guid(new_repo_pos.position)
             if need_creation:
                 new_parent_guid = self.get_new_parent_guid(new_repo_pos)
                 new_position_guid = self.positions_mapping.get_new_pos_guid(new_repo_pos.position)
