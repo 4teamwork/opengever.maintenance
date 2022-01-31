@@ -644,7 +644,7 @@ class RepositoryExcelAnalyser(MigratorBase):
                     logger.warning("\nInvalid operation: incorrect position."
                                    "{}\n".format(operation))
                     operation['is_valid'] = False
-                if (obj.description or old_repo_pos.description) and obj.description != old_repo_pos.description:
+                if (obj.description or old_repo_pos.description) and obj.description.strip() != old_repo_pos.description.strip():
                     logger.warning("\nInvalid operation: incorrect description."
                                    "{}\n".format(operation))
                     operation['is_valid'] = False
