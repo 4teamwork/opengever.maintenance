@@ -461,10 +461,18 @@ class PositionsMapping(object):
         return self.reference_repository_mapping.get(position)
 
     def _create_mapping(self, operations):
-        # we split the operations so as to first treat all rows where the reference
-        # number is not changed, then creation operations and finally move and
-        # merge operations. This will help optimize the operations we will
-        # execute in the end.
+        """
+        we split the operations so as to first treat all rows where the reference
+        number is not changed, then creation operations and finally move and
+        merge operations. This will help optimize the operations we will
+        execute in the end, as new_pos_guid will contain the guid of
+        the object corresponding from the first operation pointing to that
+        position, all other operations pointing to that new position will be
+        considered merges. We therefore want to make sure that if one position
+        is unchanged and another merged into it, we do not instead move
+        the second one and merge the first one into it instead (same result
+        but inefficient).
+        """
         unchanged = []
         creations = []
         moves_or_merges = []
