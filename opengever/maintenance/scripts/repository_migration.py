@@ -1427,7 +1427,11 @@ def main():
     analyser_path = os.path.join(options.output_directory, "analyser.json")
     with open(analyser_path, "w") as outfile:
         analyser_data = {
-            'position_mapping': analyser.positions_mapping,
+            'position_mapping': {
+                'old_pos_guid': analyser.positions_mapping.old_pos_guid,
+                'new_pos_guid': analyser.positions_mapping.new_pos_guid,
+                'old_pos_new_guid': analyser.positions_mapping.old_pos_new_guid
+            },
             'analysed_rows': analyser.analysed_rows,
         }
         json.dump(analyser_data, outfile, default=vars)
