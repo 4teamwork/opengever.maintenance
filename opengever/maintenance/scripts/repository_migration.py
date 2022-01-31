@@ -260,7 +260,7 @@ class SkipTaskSyncWith(MonkeyPatch):
     def __call__(self):
         from opengever.globalindex.model.task import Task
 
-        def sync_with(self, plone_task):
+        def sync_with(self, plone_task, graceful=False):
             """Sync this task instace with its corresponding plone taks."""
             tasks_to_sync.add(plone_task.UID())
             return
