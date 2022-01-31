@@ -507,7 +507,27 @@ class PositionsMapping(object):
         return complete
 
 
-class RepositoryExcelAnalyser(object):
+class MigratorBase(object):
+
+    def guid_to_object(self, guid):
+        results = self.catalog.unrestrictedSearchResults(bundle_guid=guid)
+        if len(results) == 0:
+            # This should never happen. Object with a guid should have been created.
+            logger.warning(
+                u"Couldn't find object with GUID %s in catalog" % guid)
+            return
+
+        if len(results) > 1:
+            # Ambiguous GUID - this should never happen
+            logger.warning(
+                u"Ambiguous GUID! Found more than one result in catalog "
+                u"for GUID %s " % guid)
+            return
+
+        return results[0].getObject()
+
+
+class RepositoryExcelAnalyser(MigratorBase):
 
     def __init__(self, mapping_path, output_directory):
         self.number_changes = {}
@@ -882,9 +902,6 @@ class RepositoryExcelAnalyser(object):
 
         return None
 
-    def guid_to_object(self, guid):
-        return self.catalog(bundle_guid=guid)[0].getObject()
-
     def extract_permissions(self, row):
         permissions = {'block_inheritance': False}
 
@@ -977,7 +994,7 @@ class RepositoryExcelAnalyser(object):
                 cell.value = attr
 
 
-class RepositoryMigrator(object):
+class RepositoryMigrator(MigratorBase):
 
     def __init__(self, operations_list, dry_run=False):
         self.operations_list = operations_list
@@ -1225,23 +1242,6 @@ class RepositoryMigrator(object):
             if obj.portal_type == 'opengever.task.task':
                 # make sure that the model is up to date.
                 TaskSqlSyncer(obj, None).sync()
-
-    def guid_to_object(self, guid):
-        results = self.catalog.unrestrictedSearchResults(bundle_guid=guid)
-        if len(results) == 0:
-            # This should never happen. Object with a guid should have been created.
-            logger.warning(
-                u"Couldn't find object with GUID %s in catalog" % guid)
-            return
-
-        if len(results) > 1:
-            # Ambiguous GUID - this should never happen
-            logger.warning(
-                u"Ambiguous GUID! Found more than one result in catalog "
-                u"for GUID %s " % guid)
-            return
-
-        return results[0].getObject()
 
     def validate(self):
         """This steps make sure that the repository system has
