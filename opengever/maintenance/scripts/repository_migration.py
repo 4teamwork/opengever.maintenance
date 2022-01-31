@@ -559,7 +559,9 @@ class RepositoryExcelAnalyser(object):
             obj = brain.getObject()
             if not IAnnotations(obj).get(BUNDLE_GUID_KEY):
                 IAnnotations(obj)[BUNDLE_GUID_KEY] = uuid4().hex[:8]
-                obj.reindexObject(idxs=['bundle_guid'])
+            # reindex, whether the guid was already here or not, to make sure
+            # it's also in the catalog
+            obj.reindexObject(idxs=['bundle_guid'])
 
     def get_reporoot_and_guid(self):
         brains = self.catalog.unrestrictedSearchResults(
