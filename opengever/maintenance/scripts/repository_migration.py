@@ -44,6 +44,7 @@ from opengever.base.role_assignments import ASSIGNMENT_VIA_SHARING
 from opengever.base.role_assignments import RoleAssignmentManager
 from opengever.base.role_assignments import SharingRoleAssignment
 from opengever.base.schemadump.config import ROLES_BY_SHORTNAME
+from opengever.base.utils import unrestrictedUuidToObject
 from opengever.bundle.console import add_guid_index
 from opengever.bundle.ldap import DisabledLDAP
 from opengever.bundle.sections.bundlesource import BUNDLE_PATH_KEY
@@ -64,7 +65,6 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 from plone import api
 from plone.app.uuid.utils import uuidToCatalogBrain
-from plone.app.uuid.utils import uuidToObject
 from plone.uuid.interfaces import IUUID
 from Products.CMFPlone.utils import safe_unicode
 from uuid import uuid4
@@ -628,7 +628,7 @@ class RepositoryExcelAnalyser(MigratorBase):
         # Make sure that all UIDs are valid and that for existing UIDs,
         # the title, position and description match the ones in the Excel
         if operation['uid']:
-            obj = uuidToObject(operation['uid'])
+            obj = unrestrictedUuidToObject(operation['uid'])
             if not obj:
                 logger.warning("\nInvalid operation: uid is not valid."
                                "or uid. {}\n".format(operation))
@@ -719,7 +719,7 @@ class RepositoryExcelAnalyser(MigratorBase):
                     "local roles. {}\n".format(operation))
                 operation['is_valid'] = False
             elif inheritance_blocked and has_local_roles:
-                obj = uuidToObject(operation['uid'])
+                obj = unrestrictedUuidToObject(operation['uid'])
                 if obj:
                     # newly created positions will have the local_roles set
                     # in the pipeline
@@ -979,7 +979,7 @@ class RepositoryMigrator(MigratorBase):
 
     def add_to_reindexing_queue(self, uid, idxs, with_children=False):
         self.to_reindex[uid].update(idxs)
-        obj = uuidToObject(uid)
+        obj = unrestrictedUuidToObject(uid)
         if not with_children:
             return
 
@@ -1030,7 +1030,7 @@ class RepositoryMigrator(MigratorBase):
         for i, item in enumerate(items):
             log_progress(i, n_tot, 1)
             parent = self.guid_to_object(item['new_parent_guid'])
-            repo = uuidToObject(item['uid'])
+            repo = unrestrictedUuidToObject(item['uid'])
             if not parent or not repo:
                 raise Exception('No parent or repo found for {}'.format(item))
 
@@ -1044,7 +1044,7 @@ class RepositoryMigrator(MigratorBase):
         for i, item in enumerate(items):
             log_progress(i, n_tot, 1)
             target = self.guid_to_object(item['new_parent_guid'])
-            repo = uuidToObject(item['uid'])
+            repo = unrestrictedUuidToObject(item['uid'])
             if not target or not repo:
                 raise Exception('No target or repo found for {}'.format(item))
 
@@ -1070,7 +1070,7 @@ class RepositoryMigrator(MigratorBase):
         n_tot = len(items)
         for i, item in enumerate(items):
             log_progress(i, n_tot, 5)
-            repo = uuidToObject(item['uid'])
+            repo = unrestrictedUuidToObject(item['uid'])
             referenceprefix.IReferenceNumberPrefix(repo).reference_number_prefix = item['new_number']
             parents.add(aq_parent(aq_inner(repo)))
             self.add_to_reindexing_queue(
@@ -1102,7 +1102,7 @@ class RepositoryMigrator(MigratorBase):
         n_tot = len(items)
         for i, item in enumerate(items):
             log_progress(i, n_tot, 1)
-            repo = uuidToObject(item['uid'])
+            repo = unrestrictedUuidToObject(item['uid'])
 
             # Rename
             repo.title_de = item['new_title']
@@ -1122,7 +1122,7 @@ class RepositoryMigrator(MigratorBase):
         n_tot = len(items)
         for i, item in enumerate(items):
             log_progress(i, n_tot, 5)
-            repo = uuidToObject(item['uid'])
+            repo = unrestrictedUuidToObject(item['uid'])
             if not repo:
                 continue
 
@@ -1138,7 +1138,7 @@ class RepositoryMigrator(MigratorBase):
         n_tot = len(items)
         for i, item in enumerate(items):
             log_progress(i, n_tot, 5)
-            repo = uuidToObject(item['uid'])
+            repo = unrestrictedUuidToObject(item['uid'])
             self._set_permissions_on_object(repo, item['permissions'])
             if not self.dry_run:
                 transaction.commit()
@@ -1174,7 +1174,7 @@ class RepositoryMigrator(MigratorBase):
         n_tot = len(self.to_reindex)
         for i, (uid, idxs) in enumerate(self.to_reindex.items()):
             log_progress(i, n_tot)
-            obj = uuidToObject(uid)
+            obj = unrestrictedUuidToObject(uid)
             if not obj:
                 logger.error("Could not find {} to reindex. Skipping".format(uid))
                 continue
@@ -1198,7 +1198,7 @@ class RepositoryMigrator(MigratorBase):
                 # new position was created
                 obj = self.guid_to_object(operation['new_position_guid'])
             elif operation['uid']:
-                obj = uuidToObject(operation['uid'])
+                obj = unrestrictedUuidToObject(operation['uid'])
                 if operation['need_merge']:
                     # position was deleted
                     if obj:
@@ -1303,7 +1303,7 @@ class TaskSyncer(object):
         """Syncs all plone tasks with their model
         """
         for uid in self.tasks_to_sync:
-            obj = uuidToObject(uid)
+            obj = unrestrictedUuidToObject(uid)
             obj.sync()
 
 
