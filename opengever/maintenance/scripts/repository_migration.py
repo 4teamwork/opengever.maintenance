@@ -6,7 +6,7 @@ migration.
 optional arguments:
   -o : path to a folder where output should be saved. The folder will be created.
        This defaults to var/migration-TIMESTAMP
-  -s : sync tasks. By default tasks are not synced as the migration is not
+  -t : sync tasks. By default tasks are not synced as the migration is not
        performed on the original OGDS. Instead UIDs of tasks that will need
        syncing are stored and dumped in a json file that can then be used
        to sync the tasks.
