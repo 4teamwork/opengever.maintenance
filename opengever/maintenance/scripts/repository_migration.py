@@ -24,10 +24,13 @@ TaskSyncer(tasks_to_sync)()
 transaction.commit()
 
 Notes:
-- Permissions are only taken into account if both inheritance is blocked and some
-  local_roles are set
+- Permissions are only taken into account if some local_roles are set (i.e. it
+  is currently not possible to set local_roles back to None)
 - permissions for positions that get merged are disregarded
 - Setting new permissions will replace the existing sharing permissions.
+- Metadata (classification, privacy_layer, retention_period,
+  retention_period_annotation, archival_value, archival_value_annotation,
+  custody_period) are only handled for new object creations.
 """
 
 from Acquisition import aq_inner
@@ -35,6 +38,9 @@ from Acquisition import aq_parent
 from collections import defaultdict
 from collections import namedtuple
 from collective.transmogrifier.transmogrifier import Transmogrifier
+from opengever.base.behaviors.classification import IClassification
+from opengever.base.behaviors.lifecycle import ILifeCycle
+from opengever.base.default_values import get_persisted_value_for_field
 from opengever.base.indexes import sortable_title
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
@@ -60,6 +66,7 @@ from opengever.repository.behaviors import referenceprefix
 from opengever.repository.deleter import RepositoryDeleter
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.interfaces import IRepositoryFolderRecords
+from opengever.setup.sections.xlssource import MAPPED_FIELDS
 from opengever.setup.sections.xlssource import xlrd_xls2array
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -90,6 +97,16 @@ MIGRATIOM_TIMESTAMP = time.strftime('%d%m%Y-%H%M%S')
 tasks_to_sync = set()
 
 managed_roles_shortnames = ['read', 'add', 'edit', 'close', 'reactivate', 'manage_dossiers']
+
+metadata_fields = (
+    IClassification["classification"],
+    IClassification["privacy_layer"],
+    ILifeCycle["retention_period"],
+    ILifeCycle["retention_period_annotation"],
+    ILifeCycle["archival_value"],
+    ILifeCycle["archival_value_annotation"],
+    ILifeCycle["custody_period"],
+                   )
 
 
 def log_progress(i, tot, step=100):
@@ -302,9 +319,20 @@ class ExcelDataExtractor(object):
         'old_position': Column(0, '', u'Ordnungs-\npositions-\nnummer'),
         'old_title': Column(1, '', u'Titel der Ordnungsposition'),
         'old_description': Column(2, '', u'Beschreibung (optional)'),
-        'new_position': Column(5, 'reference_number', u'Ordnungs-\npositions-\nnummer'),
+        'new_position': Column(5, 'reference_number',
+                               u'Ordnungs-\npositions-\nnummer'),
         'new_title': Column(6, 'effective_title', u'Titel der Ordnungsposition'),
         'new_description': Column(8, 'description', u'Beschreibung (optional)'),
+        'classification': Column(11, 'classification', u'Klassifikation'),
+        'privacy_layer': Column(12, 'privacy_layer', u'Datenschutz'),
+        'retention_period': Column(13, 'retention_period',
+                                   u'Aufbewahrung in Verwaltung'),
+        'retention_period_annotation': Column(14, 'retention_period_annotation',
+                                              u'Kommentar zur Aufbewahrungsdauer\n(optional)'),
+        'archival_value': Column(15, 'archival_value', u'Archiv-\nw\xfcrdigkeit'),
+        'archival_value_annotation': Column(16, 'archival_value_annotation',
+                                            u'Kommentar zur Archivw\xfcrdigkeit\n(optional)'),
+        'custody_period': Column(17, 'custody_period', u'Archivische Schutzfrist'),
         'block_inheritance': Column(22, 'block_inheritance', ''),
         'read': Column(23, 'read_dossiers_access', ''),
         'add': Column(24, 'add_dossiers_access', ''),
@@ -557,10 +585,12 @@ class RepositoryExcelAnalyser(MigratorBase):
                 continue
 
             permissions = self.extract_permissions(row)
+            metadata = self.extract_metadata(row)
             operations.append({
                 'old_repo_pos': old_repo_pos,
                 'new_repo_pos': new_repo_pos,
                 'permissions': permissions,
+                'metadata': metadata,
                 'is_valid': True})
         return operations
 
@@ -626,7 +656,10 @@ class RepositoryExcelAnalyser(MigratorBase):
             operation['is_valid'] = False
 
         # Make sure that all UIDs are valid and that for existing UIDs,
-        # the title, position and description match the ones in the Excel
+        # the title, position and description match the ones in the Excel.
+        # We also check that the provided metadata match with the existing
+        # object's but only issue a warning if they don't.
+        operation['metadata_mismatch'] = False
         if operation['uid']:
             obj = unrestrictedUuidToObject(operation['uid'])
             if not obj:
@@ -648,6 +681,8 @@ class RepositoryExcelAnalyser(MigratorBase):
                     logger.warning("\nInvalid operation: incorrect description."
                                    "{}\n".format(operation))
                     operation['is_valid'] = False
+
+                self.check_metadata(operation, obj)
 
         # Each operation should have new position
         if not operation['new_repo_pos'].position:
@@ -859,6 +894,35 @@ class RepositoryExcelAnalyser(MigratorBase):
 
         return permissions
 
+    def extract_metadata(self, row):
+        metadata = {}
+        for field in metadata_fields:
+            fieldname = field.getName()
+            value = getattr(row, fieldname)
+
+            if value in (None, '', u''):
+                continue
+
+            if fieldname in MAPPED_FIELDS.keys():
+                mapping = MAPPED_FIELDS[fieldname]
+
+                # Data not already a valid term
+                if value not in mapping.values():
+                    value = mapping[value.lower()]
+
+            metadata[fieldname] = value
+        return metadata
+
+    def check_metadata(self, operation, obj):
+        metadata = operation["metadata"]
+        try:
+            for field in metadata_fields:
+                assert(get_persisted_value_for_field(obj, field) == metadata.get(field.getName()))
+        except AssertionError:
+            logger.warning("\nMetadata mismatch. Metadata will not be "
+                           "updated during migration! {}\n".format(operation))
+            operation['metadata_mismatch'] = True
+
     def export_to_excel(self):
         analyse_xlsx_path = os.path.join(self.output_directory, 'analysis.xlsx')
         workbook = self.prepare_workbook(self.analysed_rows)
@@ -895,6 +959,9 @@ class RepositoryExcelAnalyser(MigratorBase):
             'Verletzt Leafnode Prinzip',
             'Ist ungultig',
 
+            # metadata
+            'Metadaten stimmen nicht ueberein',
+
             # permission
             'Ignorierte Bewilligungen',
             'Vorherige Lokalen Rollen entfernt',
@@ -924,6 +991,7 @@ class RepositoryExcelAnalyser(MigratorBase):
                 'x' if data['repository_depth_violated'] else '',
                 'x' if data['leaf_node_violated'] else '',
                 'x' if not data['is_valid'] else '',
+                'x' if data['metadata_mismatch'] else '',
                 'x' if data['permissions_disregarded'] else '',
                 'x' if data['local_roles_deleted'] else '',
                 json.dumps(data['permissions']) if any(data['permissions'].values()) else '',
@@ -993,15 +1061,17 @@ class RepositoryMigrator(MigratorBase):
         logger.info("\n\nCreating bundle...\n")
         bundle_items = []
         for item in items:
-            bundle_items.append(
-                {'guid': item['new_position_guid'],
-                 'description': item['new_repo_pos'].description,
-                 'parent_guid': item['new_parent_guid'],
-                 'reference_number_prefix': item['new_repo_pos'].reference_number_prefix,
-                 'review_state': 'repositoryfolder-state-active',
-                 'title_de': item['new_repo_pos'].title,
-                 '_permissions': item['permissions']
-                 })
+            bundle_item = {
+                'guid': item['new_position_guid'],
+                'description': item['new_repo_pos'].description,
+                'parent_guid': item['new_parent_guid'],
+                'reference_number_prefix': item['new_repo_pos'].reference_number_prefix,
+                'review_state': 'repositoryfolder-state-active',
+                'title_de': item['new_repo_pos'].title,
+                '_permissions': item['permissions']
+                }
+            bundle_item.update(item["metadata"])
+            bundle_items.append(bundle_item)
 
         tmpdirname = tempfile.mkdtemp()
         with open('{}/repofolders.json'.format(tmpdirname), 'w') as _file:
@@ -1226,6 +1296,10 @@ class RepositoryMigrator(MigratorBase):
             # Assert that data in the catalog is consistent with data on the object
             self.checkObjectConsistency(obj)
 
+            if operation['need_creation']:
+                # Check that metadata was set correctly
+                self.check_metadata(obj, operation)
+
             # Store some migration information on the object
             IAnnotations(obj)[MIGRATION_KEY] = {
                 'old_position': operation['old_repo_pos'].position,
@@ -1243,6 +1317,16 @@ class RepositoryMigrator(MigratorBase):
 
         if self.validation_failed:
             raise MigrationValidationError("See log for details")
+
+    def check_metadata(self, obj, operation):
+        err_msg = "metadata not set correctly"
+        uid = obj.UID()
+        metadata = operation["metadata"]
+        for field in metadata_fields:
+            if field.getName() not in metadata:
+                continue
+            self.checkEqual(uid, get_persisted_value_for_field(obj, field),
+                            metadata.get(field.getName()), err_msg)
 
     def checkObjectConsistency(self, obj):
         err_msg = "data inconsistency"
