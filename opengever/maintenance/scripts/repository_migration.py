@@ -42,6 +42,7 @@ from copy import deepcopy
 from opengever.base.behaviors.classification import IClassification
 from opengever.base.behaviors.lifecycle import ILifeCycle
 from opengever.base.default_values import get_persisted_value_for_field
+from opengever.base.default_values import object_has_value_for_field
 from opengever.base.indexes import sortable_title
 from opengever.base.interfaces import IReferenceNumber
 from opengever.base.interfaces import IReferenceNumberFormatter
@@ -928,7 +929,11 @@ class RepositoryExcelAnalyser(MigratorBase):
         metadata = operation["metadata"]
         try:
             for field in metadata_fields:
-                assert(get_persisted_value_for_field(obj, field) == metadata.get(field.getName()))
+                if object_has_value_for_field(obj, field):
+                    persisted_value = get_persisted_value_for_field(obj, field)
+                else:
+                    persisted_value = None
+                assert(persisted_value == metadata.get(field.getName()))
         except AssertionError:
             logger.warning("\nMetadata mismatch. Metadata will not be "
                            "updated during migration! {}\n".format(operation))
@@ -1336,7 +1341,11 @@ class RepositoryMigrator(MigratorBase):
         for field in metadata_fields:
             if field.getName() not in metadata:
                 continue
-            self.checkEqual(uid, get_persisted_value_for_field(obj, field),
+            if object_has_value_for_field(obj, field):
+                persisted_value = get_persisted_value_for_field(obj, field)
+            else:
+                persisted_value = None
+            self.checkEqual(uid, persisted_value,
                             metadata.get(field.getName()), err_msg)
 
     def checkObjectConsistency(self, obj):
