@@ -38,6 +38,7 @@ from Acquisition import aq_parent
 from collections import defaultdict
 from collections import namedtuple
 from collective.transmogrifier.transmogrifier import Transmogrifier
+from copy import deepcopy
 from opengever.base.behaviors.classification import IClassification
 from opengever.base.behaviors.lifecycle import ILifeCycle
 from opengever.base.default_values import get_persisted_value_for_field
@@ -107,6 +108,16 @@ metadata_fields = (
     ILifeCycle["archival_value_annotation"],
     ILifeCycle["custody_period"],
                    )
+
+MAPPED_FIELDS = deepcopy(MAPPED_FIELDS)
+# Mapping used in StaSG migration for some reason
+MAPPED_FIELDS["archival_value"].update({
+    u'ng': u'unchecked',
+    u'an': u'prompt',
+    u'ar': u'archival worthy',
+    u'na': u'not archival worthy',
+    u'sa': u'archival worthy with sampling',
+                                       })
 
 
 def log_progress(i, tot, step=100):
