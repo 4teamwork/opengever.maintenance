@@ -48,7 +48,7 @@ def generate_report(request, context):
 
     reference_number = IReferenceNumber(context)
     reference_numbers = reference_number.get_numbers()
-    ref_depth = len(reference_numbers['repository']) + len(reference_numbers.get('dossier', []))
+    ref_depth = len(reference_numbers.get('repository', [])) + len(reference_numbers.get('dossier', []))
 
     column_map = (
         {'id': 'number', 'title': 'Aktenzeichen'},
