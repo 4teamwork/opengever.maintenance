@@ -25,7 +25,7 @@ class RepoOrFolderItem(object):
         self.number = reference_number.get_number()
         self.title = obj.Title()
         self.responsible = getattr(obj, "responsible_label", "")
-        refnum = reference_number.get_parent_numbers()
+        refnum = reference_number.get_numbers()
         self.depth = (len(refnum['repository']) +
                       len(refnum.get('dossier', [])))
 
@@ -47,7 +47,7 @@ class RepoOrFolderItem(object):
 def generate_report(request, context):
 
     reference_number = IReferenceNumber(context)
-    reference_numbers = reference_number.get_parent_numbers()
+    reference_numbers = reference_number.get_numbers()
     ref_depth = len(reference_numbers['repository']) + len(reference_numbers.get('dossier', []))
 
     column_map = (
