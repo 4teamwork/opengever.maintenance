@@ -20,6 +20,7 @@ class ParticipantsChecker(object):
         self.misconfigured = TextTable()
         self.misconfigured.add_row((
             u"Pfad",
+            u"Fehlender Admin",
             u"Fehlende Zugriffseinschr\xe4nkung",
             u"Teilnehmer ohne Berechtigung auf \xfcbergeordneten Objekt"))
         self.catalog = api.portal.get_tool("portal_catalog")
@@ -43,9 +44,15 @@ class ParticipantsChecker(object):
             missing_local_roles_block = bool(
                 participants and not getattr(obj, '__ac_local_roles_block__', False))
 
-            if misconfigured_userids or missing_local_roles_block:
+            missing_admin = bool(
+                participants and not any(["WorkspaceAdmin" in participant["roles"]
+                                          for participant in participants])
+                )
+
+            if any((missing_admin, misconfigured_userids, missing_local_roles_block)):
                 self.misconfigured.add_row((
                     obj.absolute_url(),
+                    'x' if missing_admin else'',
                     'x' if missing_local_roles_block else '',
                     u" ".join(misconfigured_userids)))
 
