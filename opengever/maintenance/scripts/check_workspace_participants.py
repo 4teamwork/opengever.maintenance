@@ -8,6 +8,7 @@ from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
+from opengever.ogds.base.utils import get_current_admin_unit
 from opengever.workspace.participation.browser.manage_participants import ManageParticipants
 from plone import api
 from zope.globalrequest import getRequest
@@ -20,9 +21,16 @@ class ParticipantsChecker(object):
         self.misconfigured = TextTable()
         self.misconfigured.add_row((
             u"Pfad",
+            u"Fehlender Admin",
             u"Fehlende Zugriffseinschr\xe4nkung",
             u"Teilnehmer ohne Berechtigung auf \xfcbergeordneten Objekt"))
         self.catalog = api.portal.get_tool("portal_catalog")
+
+    def get_url(self, obj):
+        url_tool = api.portal.get_tool('portal_url')
+        public_url = get_current_admin_unit().public_url
+        path = "/".join(url_tool.getRelativeContentPath(obj))
+        return "/".join([public_url, path])
 
     def check_participants(self):
         brains = self.catalog.unrestrictedSearchResults(
@@ -43,9 +51,15 @@ class ParticipantsChecker(object):
             missing_local_roles_block = bool(
                 participants and not getattr(obj, '__ac_local_roles_block__', False))
 
-            if misconfigured_userids or missing_local_roles_block:
+            missing_admin = bool(
+                participants and not any(["WorkspaceAdmin" in participant["roles"]
+                                          for participant in participants])
+                )
+
+            if any((missing_admin, misconfigured_userids, missing_local_roles_block)):
                 self.misconfigured.add_row((
-                    obj.absolute_url(),
+                    self.get_url(obj),
+                    'x' if missing_admin else'',
                     'x' if missing_local_roles_block else '',
                     u" ".join(misconfigured_userids)))
 
