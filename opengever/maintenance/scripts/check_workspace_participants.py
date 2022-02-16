@@ -34,7 +34,8 @@ class ParticipantsChecker(object):
 
     def check_participants(self):
         brains = self.catalog.unrestrictedSearchResults(
-            portal_type='opengever.workspace.folder')
+            portal_type='opengever.workspace.folder',
+            sort_on="path")
 
         for i, brain in enumerate(brains, 1):
             obj = brain.getObject()
