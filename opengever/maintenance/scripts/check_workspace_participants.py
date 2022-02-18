@@ -62,6 +62,12 @@ class ParticipantsChecker(object):
             yield brain.getObject()
 
     @staticmethod
+    def get_participants_with_multiple_roles(obj, manager):
+        participants = manager.get_participants()
+        return [participant for participant in participants
+                if len(participant["roles"]) > 1]
+
+    @staticmethod
     def get_misconfigured_participants(obj, manager):
         if obj.portal_type == 'opengever.workspace.workspace':
             return []
@@ -164,6 +170,7 @@ class ParticipantsChecker(object):
             "Title",
             u"Fehlender Admin",
             u"Fehlende Zugriffseinschr\xe4nkung",
+            u"Teilnehmer mit mehreren Rollen",
             u"Teilnehmer ohne Berechtigung auf \xfcbergeordneten Objekt"))
 
         for i, obj in enumerate(self.workspaces_and_workspace_folders, 1):
@@ -171,13 +178,15 @@ class ParticipantsChecker(object):
             misconfigured_participants = self.get_misconfigured_participants(obj, manager)
             missing_local_roles_block = self.is_local_roles_block_missing(obj, manager)
             missing_admin = self.is_admin_missing(obj, manager)
-
-            if any((missing_admin, misconfigured_participants, missing_local_roles_block)):
+            with_multiple_roles = self.get_participants_with_multiple_roles(obj, manager)
+            if any((missing_admin, misconfigured_participants,
+                    missing_local_roles_block, with_multiple_roles)):
                 self.misconfigured.add_row((
                     self.get_url(obj),
                     self.get_titles(obj),
                     'x' if missing_admin else'',
                     'x' if missing_local_roles_block else '',
+                    'x' if with_multiple_roles else '',
                     u" ".join([participant["userid"] for participant in misconfigured_participants])))
 
     @staticmethod
