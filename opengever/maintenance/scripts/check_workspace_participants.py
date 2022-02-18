@@ -50,18 +50,22 @@ class ParticipantsChecker(object):
         self._recurse_title(parent, titles)
 
     @property
-    def workspace_folders(self):
+    def workspaces_and_workspace_folders(self):
         """Sorting on path is essential to first fix the parents and then their
         children.
         """
         brains = self.catalog.unrestrictedSearchResults(
-            portal_type='opengever.workspace.folder',
+            portal_type=['opengever.workspace.folder',
+                         'opengever.workspace.workspace'],
             sort_on="path")
         for brain in brains:
             yield brain.getObject()
 
     @staticmethod
     def get_misconfigured_participants(obj, manager):
+        if obj.portal_type == 'opengever.workspace.workspace':
+            return []
+
         participants = manager.get_participants()
         allowed_userids = {
             each["userid"] for each in
@@ -84,6 +88,9 @@ class ParticipantsChecker(object):
 
     @staticmethod
     def is_local_roles_block_missing(obj, manager):
+        if obj.portal_type == 'opengever.workspace.workspace':
+            return False
+
         participants = manager.get_participants()
         return bool(participants and not getattr(obj, '__ac_local_roles_block__', False))
 
@@ -159,7 +166,7 @@ class ParticipantsChecker(object):
             u"Fehlende Zugriffseinschr\xe4nkung",
             u"Teilnehmer ohne Berechtigung auf \xfcbergeordneten Objekt"))
 
-        for i, obj in enumerate(self.workspace_folders, 1):
+        for i, obj in enumerate(self.workspaces_and_workspace_folders, 1):
             manager = ManageParticipants(obj, getRequest())
             misconfigured_participants = self.get_misconfigured_participants(obj, manager)
             missing_local_roles_block = self.is_local_roles_block_missing(obj, manager)
@@ -184,7 +191,7 @@ class ParticipantsChecker(object):
 
     def correct_misconfigurations(self):
         corrections = []
-        for i, obj in enumerate(self.workspace_folders, 1):
+        for i, obj in enumerate(self.workspaces_and_workspace_folders, 1):
             manager = ManageParticipants(obj, getRequest())
             deleted = self.correct_misconfigured_participants(obj, manager)
             set_roles_block, added, updated = self.fix_roles_block(obj, manager)
