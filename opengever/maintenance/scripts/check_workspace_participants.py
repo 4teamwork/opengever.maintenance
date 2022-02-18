@@ -5,7 +5,11 @@ i.e. are also participants on their parent.
 bin/instance0 run src/opengever.maintenance/opengever/maintenance/scripts/check_workspace_participants.py
 """
 from Acquisition import aq_parent
+from collections import namedtuple
+from opengever.base.role_assignments import RoleAssignmentManager
+from opengever.base.role_assignments import SharingRoleAssignment
 from opengever.maintenance.debughelpers import setup_app
+from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
@@ -15,6 +19,11 @@ from opengever.workspace.participation.browser.manage_participants import Manage
 from plone import api
 from zope.globalrequest import getRequest
 import sys
+import transaction
+
+
+Correction = namedtuple(
+    'Correction', ['obj', 'set_roles_block', 'deleted', 'added', 'updated'])
 
 
 class ParticipantsChecker(object):
@@ -42,6 +51,9 @@ class ParticipantsChecker(object):
 
     @property
     def workspace_folders(self):
+        """Sorting on path is essential to first fix the parents and then their
+        children.
+        """
         brains = self.catalog.unrestrictedSearchResults(
             portal_type='opengever.workspace.folder',
             sort_on="path")
@@ -62,10 +74,73 @@ class ParticipantsChecker(object):
 
         return misconfigured_participants
 
+    def correct_misconfigured_participants(self, obj, manager):
+        misconfigured_participants = self.get_misconfigured_participants(obj, manager)
+        deleted = []
+        for participant in misconfigured_participants:
+            manager._delete(participant["type_"], participant["token"])
+            deleted.append(participant)
+        return deleted
+
     @staticmethod
     def is_local_roles_block_missing(obj, manager):
         participants = manager.get_participants()
         return bool(participants and not getattr(obj, '__ac_local_roles_block__', False))
+
+    @staticmethod
+    def get_role_with_most_permissions(roles):
+        SORTED_ROLES = ['WorkspaceAdmin', 'WorkspaceMember', 'WorkspaceGuest']
+        for role in SORTED_ROLES:
+            if role in roles:
+                return role
+        raise ValueError("No teamraum role found in {}".format(roles))
+
+    @staticmethod
+    def get_participant_for_token(participants, token):
+        matches = filter(lambda participant: participant["token"] == token, participants)
+        if len(matches) > 1:
+            raise ValueError("There should only be a single participant for a given token")
+        if matches:
+            return matches[0]
+
+    def fix_roles_block(self, obj, manager):
+        added = []
+        updated = []
+        if not self.is_local_roles_block_missing(obj, manager):
+            return False, added, updated
+
+        obj.__ac_local_roles_block__ = True
+
+        # We need to copy the local roles over from the parent
+        # It is enough to take over the roles from participations
+        participants = manager.get_participants()
+        parent_manager = ManageParticipants(obj.get_parent_with_local_roles(),
+                                            getRequest())
+        parent_participants = parent_manager.get_participants()
+        for parent_participant in parent_participants:
+            # find matching participant on obj if present
+            participant = self.get_participant_for_token(
+                participants, parent_participant["token"])
+
+            # determine which role to set (role with most permissions)
+            roles = list(parent_participant["roles"])
+            if participant:
+                roles.extend(participant["roles"])
+            role = self.get_role_with_most_permissions(roles)
+            if participant and role in participant["roles"]:
+                continue
+
+            # give or update role for participant
+            assignment = SharingRoleAssignment(
+                parent_participant["token"], [role], obj)
+            RoleAssignmentManager(obj).add_or_update_assignment(assignment)
+            data = {"userid": parent_participant["userid"], "roles": [role]}
+            if participant:
+                updated.append(data)
+            else:
+                added.append(data)
+
+        return True, added, updated
 
     @staticmethod
     def is_admin_missing(obj, manager):
@@ -98,21 +173,82 @@ class ParticipantsChecker(object):
                     'x' if missing_local_roles_block else '',
                     u" ".join([participant["userid"] for participant in misconfigured_participants])))
 
+    @staticmethod
+    def _format_participant(participant):
+        roles = ",".join(participant["roles"])
+        return "{}:{}".format(participant["userid"], roles)
+
+    def format_participants(self, participants):
+        return "\n".join([self._format_participant(participant)
+                          for participant in participants])
+
+    def correct_misconfigurations(self):
+        corrections = []
+        for i, obj in enumerate(self.workspace_folders, 1):
+            manager = ManageParticipants(obj, getRequest())
+            deleted = self.correct_misconfigured_participants(obj, manager)
+            set_roles_block, added, updated = self.fix_roles_block(obj, manager)
+
+            if any((deleted, set_roles_block)):
+                corrections.append(
+                    Correction(obj, set_roles_block, deleted, added, updated))
+
+        self.corrections_table = TextTable()
+        self.corrections_table.add_row((
+            u"Pfad",
+            "Title",
+            u"Zugriffseinschr\xe4nkung hinzugef\xfcgt",
+            u"Teilnehmer gel\xf6scht",
+            u"Teilnehmer hinzugef\xfcgt",
+            u"Teilnehmer modifiziert"))
+        for corr in corrections:
+            self.corrections_table.add_row((
+                self.get_url(corr.obj),
+                self.get_titles(corr.obj),
+                'x' if corr.set_roles_block else '',
+                self.format_participants(corr.deleted),
+                self.format_participants(corr.added),
+                self.format_participants(corr.updated)
+            ))
+
 
 def main():
+    parser = setup_option_parser()
+
+    parser.add_option(
+        '-f', '--fix', action='store_true', default=None,
+        help='Correct the permissions',
+        dest='fix')
+
+    (options, args) = parser.parse_args()
+
     app = setup_app()
     setup_plone(app)
 
     participants_checker = ParticipantsChecker()
-    participants_checker.check_misconfigurations()
+    if not options.fix:
+        participants_checker.check_misconfigurations()
 
-    sys.stdout.write("\n\nTable of all misconfigured dossiers:\n")
-    sys.stdout.write(participants_checker.misconfigured.generate_output())
+        sys.stdout.write("\n\nTable of all misconfigured dossiers:\n")
+        sys.stdout.write(participants_checker.misconfigured.generate_output())
 
-    log_filename = LogFilePathFinder().get_logfile_path(
-        'misconfigured_workspace_folders', extension="csv")
-    with open(log_filename, "w") as logfile:
-        participants_checker.misconfigured.write_csv(logfile)
+        log_filename = LogFilePathFinder().get_logfile_path(
+            'misconfigured_workspace_folders', extension="csv")
+        with open(log_filename, "w") as logfile:
+            participants_checker.misconfigured.write_csv(logfile)
+
+    else:
+        participants_checker.correct_misconfigurations()
+
+        sys.stdout.write("\n\nTable of all corrections:\n")
+        sys.stdout.write(participants_checker.corrections_table.generate_output())
+
+        log_filename = LogFilePathFinder().get_logfile_path(
+            'corrected_workspace_folders', extension="csv")
+        with open(log_filename, "w") as logfile:
+            participants_checker.corrections_table.write_csv(logfile)
+
+        transaction.commit()
 
 
 if __name__ == '__main__':
