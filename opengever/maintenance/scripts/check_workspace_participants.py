@@ -220,10 +220,19 @@ def main():
         help='Correct the permissions',
         dest='fix')
 
+    parser.add_option(
+        '-n', '--dry-run', dest='dryrun',
+        default=False, action="store_true",
+        help='Dryrun, do not commit changes. Only relevant for correction.')
+
     (options, args) = parser.parse_args()
 
     app = setup_app()
     setup_plone(app)
+
+    if options.dryrun:
+        print('Performing dryrun!\n')
+        transaction.doom()
 
     participants_checker = ParticipantsChecker()
     if not options.fix:
@@ -248,7 +257,8 @@ def main():
         with open(log_filename, "w") as logfile:
             participants_checker.corrections_table.write_csv(logfile)
 
-        transaction.commit()
+        if not options.dryrun:
+            transaction.commit()
 
 
 if __name__ == '__main__':
