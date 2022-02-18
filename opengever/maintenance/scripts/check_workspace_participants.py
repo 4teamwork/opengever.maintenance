@@ -20,13 +20,6 @@ import sys
 class ParticipantsChecker(object):
 
     def __init__(self):
-        self.misconfigured = TextTable()
-        self.misconfigured.add_row((
-            u"Pfad",
-            "Title",
-            u"Fehlender Admin",
-            u"Fehlende Zugriffseinschr\xe4nkung",
-            u"Teilnehmer ohne Berechtigung auf \xfcbergeordneten Objekt"))
         self.catalog = api.portal.get_tool("portal_catalog")
 
     def get_url(self, obj):
@@ -47,38 +40,63 @@ class ParticipantsChecker(object):
         parent = aq_parent(obj)
         self._recurse_title(parent, titles)
 
-    def check_participants(self):
+    @property
+    def workspace_folders(self):
         brains = self.catalog.unrestrictedSearchResults(
             portal_type='opengever.workspace.folder',
             sort_on="path")
+        for brain in brains:
+            yield brain.getObject()
 
-        for i, brain in enumerate(brains, 1):
-            obj = brain.getObject()
-            participants = ManageParticipants(obj, getRequest()).get_participants()
-            allowed_userids = {
-                each["userid"] for each in
-                ManageParticipants(obj.get_parent_with_local_roles(), getRequest()).get_participants()}
+    @staticmethod
+    def get_misconfigured_participants(obj, manager):
+        participants = manager.get_participants()
+        allowed_userids = {
+            each["userid"] for each in
+            ManageParticipants(obj.get_parent_with_local_roles(), getRequest()).get_participants()}
 
-            misconfigured_userids = []
-            for participant in participants:
-                if not participant["userid"] in allowed_userids:
-                    misconfigured_userids.append(participant["userid"])
+        misconfigured_participants = []
+        for participant in participants:
+            if not participant["userid"] in allowed_userids:
+                misconfigured_participants.append(participant)
 
-            missing_local_roles_block = bool(
-                participants and not getattr(obj, '__ac_local_roles_block__', False))
+        return misconfigured_participants
 
-            missing_admin = bool(
+    @staticmethod
+    def is_local_roles_block_missing(obj, manager):
+        participants = manager.get_participants()
+        return bool(participants and not getattr(obj, '__ac_local_roles_block__', False))
+
+    @staticmethod
+    def is_admin_missing(obj, manager):
+        participants = manager.get_participants()
+        return bool(
                 participants and not any(["WorkspaceAdmin" in participant["roles"]
                                           for participant in participants])
                 )
 
-            if any((missing_admin, misconfigured_userids, missing_local_roles_block)):
+    def check_misconfigurations(self):
+        self.misconfigured = TextTable()
+        self.misconfigured.add_row((
+            u"Pfad",
+            "Title",
+            u"Fehlender Admin",
+            u"Fehlende Zugriffseinschr\xe4nkung",
+            u"Teilnehmer ohne Berechtigung auf \xfcbergeordneten Objekt"))
+
+        for i, obj in enumerate(self.workspace_folders, 1):
+            manager = ManageParticipants(obj, getRequest())
+            misconfigured_participants = self.get_misconfigured_participants(obj, manager)
+            missing_local_roles_block = self.is_local_roles_block_missing(obj, manager)
+            missing_admin = self.is_admin_missing(obj, manager)
+
+            if any((missing_admin, misconfigured_participants, missing_local_roles_block)):
                 self.misconfigured.add_row((
                     self.get_url(obj),
                     self.get_titles(obj),
                     'x' if missing_admin else'',
                     'x' if missing_local_roles_block else '',
-                    u" ".join(misconfigured_userids)))
+                    u" ".join([participant["userid"] for participant in misconfigured_participants])))
 
 
 def main():
@@ -86,7 +104,7 @@ def main():
     setup_plone(app)
 
     participants_checker = ParticipantsChecker()
-    participants_checker.check_participants()
+    participants_checker.check_misconfigurations()
 
     sys.stdout.write("\n\nTable of all misconfigured dossiers:\n")
     sys.stdout.write(participants_checker.misconfigured.generate_output())
