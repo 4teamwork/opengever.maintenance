@@ -6,6 +6,7 @@ bin/instance0 run src/opengever.maintenance/opengever/maintenance/scripts/check_
 """
 from Acquisition import aq_parent
 from collections import namedtuple
+from copy import deepcopy
 from opengever.base.role_assignments import RoleAssignmentManager
 from opengever.base.role_assignments import SharingRoleAssignment
 from opengever.maintenance.debughelpers import setup_app
@@ -21,9 +22,10 @@ from zope.globalrequest import getRequest
 import sys
 import transaction
 
-
 Correction = namedtuple(
-    'Correction', ['obj', 'set_roles_block', 'deleted', 'added', 'updated', 'roles_cleaned_up'])
+    'Correction',
+    ['obj', 'set_roles_block', 'deleted', 'added', 'updated',
+     'roles_cleaned_up', 'former_participants', 'current_participants'])
 
 
 class ParticipantsChecker(object):
@@ -228,6 +230,7 @@ class ParticipantsChecker(object):
         corrections = []
         for i, obj in enumerate(self.workspaces_and_workspace_folders, 1):
             manager = ManageParticipants(obj, getRequest())
+            former_participants = deepcopy(manager.get_participants())
 
             roles_cleaned_up = self.correct_participants_with_multiple_roles(obj, manager)
 
@@ -235,8 +238,10 @@ class ParticipantsChecker(object):
             set_roles_block, added, updated = self.fix_roles_block(obj, manager)
 
             if any((roles_cleaned_up, deleted, set_roles_block)):
+                participants = manager.get_participants()
                 corrections.append(
-                    Correction(obj, set_roles_block, deleted, added, updated, roles_cleaned_up))
+                    Correction(obj, set_roles_block, deleted, added, updated,
+                               roles_cleaned_up, former_participants, participants))
 
         self.corrections_table = TextTable()
         self.corrections_table.add_row((
@@ -246,7 +251,9 @@ class ParticipantsChecker(object):
             u"Teilnehmer gel\xf6scht",
             u"Zugriffseinschr\xe4nkung hinzugef\xfcgt",
             u"Teilnehmer hinzugef\xfcgt",
-            u"Teilnehmer modifiziert"))
+            u"Teilnehmer modifiziert",
+            u"Vorherige Teilnehmer",
+            u"Neue Teilnehmer"))
         for corr in corrections:
             self.corrections_table.add_row((
                 self.get_url(corr.obj),
@@ -255,7 +262,9 @@ class ParticipantsChecker(object):
                 self.format_participants(corr.deleted),
                 'x' if corr.set_roles_block else '',
                 self.format_participants(corr.added),
-                self.format_participants(corr.updated)
+                self.format_participants(corr.updated),
+                self.format_participants(corr.former_participants),
+                self.format_participants(corr.current_participants)
             ))
 
 
