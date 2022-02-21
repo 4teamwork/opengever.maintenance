@@ -23,7 +23,7 @@ import transaction
 
 
 Correction = namedtuple(
-    'Correction', ['obj', 'set_roles_block', 'deleted', 'added', 'updated'])
+    'Correction', ['obj', 'set_roles_block', 'deleted', 'added', 'updated', 'roles_cleaned_up'])
 
 
 class ParticipantsChecker(object):
@@ -66,6 +66,22 @@ class ParticipantsChecker(object):
         participants = manager.get_participants()
         return [participant for participant in participants
                 if len(participant["roles"]) > 1]
+
+    def correct_participants_with_multiple_roles(self, obj, manager):
+        participants_with_multiple_roles = self.get_participants_with_multiple_roles(obj, manager)
+        cleaned_up = []
+        for participant in participants_with_multiple_roles:
+            former_roles = list(participant["roles"])
+            role = self.get_role_with_most_permissions(participant["roles"])
+            # give or update role for participant
+            assignment = SharingRoleAssignment(
+                participant["token"], [role], obj)
+            RoleAssignmentManager(obj).add_or_update_assignment(assignment)
+            data = {"userid": participant["userid"],
+                    "roles": [role],
+                    "former_roles": former_roles}
+            cleaned_up.append(data)
+        return cleaned_up
 
     @staticmethod
     def get_misconfigured_participants(obj, manager):
@@ -191,38 +207,53 @@ class ParticipantsChecker(object):
 
     @staticmethod
     def _format_participant(participant):
-        roles = ",".join(participant["roles"])
+        roles = ";".join(participant["roles"])
         return "{}:{}".format(participant["userid"], roles)
 
     def format_participants(self, participants):
         return "\n".join([self._format_participant(participant)
                           for participant in participants])
 
+    @staticmethod
+    def _format_participant_with_former_roles(participant):
+        roles = ";".join(participant["roles"])
+        former_roles = ";".join(participant["former_roles"])
+        return "{}:{} -> {}".format(participant["userid"], former_roles, roles)
+
+    def format_roles_cleaned_up(self, roles_cleaned_up):
+        return "\n".join([self._format_participant_with_former_roles(participant)
+                          for participant in roles_cleaned_up])
+
     def correct_misconfigurations(self):
         corrections = []
         for i, obj in enumerate(self.workspaces_and_workspace_folders, 1):
             manager = ManageParticipants(obj, getRequest())
+
+            roles_cleaned_up = self.correct_participants_with_multiple_roles(obj, manager)
+
             deleted = self.correct_misconfigured_participants(obj, manager)
             set_roles_block, added, updated = self.fix_roles_block(obj, manager)
 
-            if any((deleted, set_roles_block)):
+            if any((roles_cleaned_up, deleted, set_roles_block)):
                 corrections.append(
-                    Correction(obj, set_roles_block, deleted, added, updated))
+                    Correction(obj, set_roles_block, deleted, added, updated, roles_cleaned_up))
 
         self.corrections_table = TextTable()
         self.corrections_table.add_row((
             u"Pfad",
             "Title",
-            u"Zugriffseinschr\xe4nkung hinzugef\xfcgt",
+            u"Rollen zusammengefasst",
             u"Teilnehmer gel\xf6scht",
+            u"Zugriffseinschr\xe4nkung hinzugef\xfcgt",
             u"Teilnehmer hinzugef\xfcgt",
             u"Teilnehmer modifiziert"))
         for corr in corrections:
             self.corrections_table.add_row((
                 self.get_url(corr.obj),
                 self.get_titles(corr.obj),
-                'x' if corr.set_roles_block else '',
+                self.format_roles_cleaned_up(corr.roles_cleaned_up),
                 self.format_participants(corr.deleted),
+                'x' if corr.set_roles_block else '',
                 self.format_participants(corr.added),
                 self.format_participants(corr.updated)
             ))
