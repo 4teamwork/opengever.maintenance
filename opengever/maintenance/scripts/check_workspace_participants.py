@@ -213,8 +213,8 @@ class ParticipantsChecker(object):
         return "{}:{}".format(participant["userid"], roles)
 
     def format_participants(self, participants):
-        return "\n".join([self._format_participant(participant)
-                          for participant in participants])
+        return '"{}"'.format("\n".join([self._format_participant(participant)
+                                        for participant in participants]))
 
     @staticmethod
     def _format_participant_with_former_roles(participant):
@@ -223,8 +223,9 @@ class ParticipantsChecker(object):
         return "{}:{} -> {}".format(participant["userid"], former_roles, roles)
 
     def format_roles_cleaned_up(self, roles_cleaned_up):
-        return "\n".join([self._format_participant_with_former_roles(participant)
-                          for participant in roles_cleaned_up])
+        return '"{}"'.format('\n'.join(
+            [self._format_participant_with_former_roles(participant)
+             for participant in roles_cleaned_up]))
 
     def correct_misconfigurations(self):
         corrections = []
