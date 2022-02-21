@@ -4,11 +4,13 @@ i.e. are also participants on their parent.
 
 bin/instance0 run src/opengever.maintenance/opengever/maintenance/scripts/check_workspace_participants.py
 """
+from Acquisition import aq_parent
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
 from opengever.ogds.base.utils import get_current_admin_unit
+from opengever.workspace.interfaces import IWorkspace
 from opengever.workspace.participation.browser.manage_participants import ManageParticipants
 from plone import api
 from zope.globalrequest import getRequest
@@ -21,6 +23,7 @@ class ParticipantsChecker(object):
         self.misconfigured = TextTable()
         self.misconfigured.add_row((
             u"Pfad",
+            "Title",
             u"Fehlender Admin",
             u"Fehlende Zugriffseinschr\xe4nkung",
             u"Teilnehmer ohne Berechtigung auf \xfcbergeordneten Objekt"))
@@ -32,9 +35,22 @@ class ParticipantsChecker(object):
         path = "/".join(url_tool.getRelativeContentPath(obj))
         return "/".join([public_url, path])
 
+    def get_titles(self, obj):
+        titles = []
+        self._recurse_title(obj, titles)
+        return " | ".join(reversed(titles))
+
+    def _recurse_title(self, obj, titles):
+        titles.append(obj.Title())
+        if IWorkspace.providedBy(obj):
+            return
+        parent = aq_parent(obj)
+        self._recurse_title(parent, titles)
+
     def check_participants(self):
         brains = self.catalog.unrestrictedSearchResults(
-            portal_type='opengever.workspace.folder')
+            portal_type='opengever.workspace.folder',
+            sort_on="path")
 
         for i, brain in enumerate(brains, 1):
             obj = brain.getObject()
@@ -59,6 +75,7 @@ class ParticipantsChecker(object):
             if any((missing_admin, misconfigured_userids, missing_local_roles_block)):
                 self.misconfigured.add_row((
                     self.get_url(obj),
+                    self.get_titles(obj),
                     'x' if missing_admin else'',
                     'x' if missing_local_roles_block else '',
                     u" ".join(misconfigured_userids)))
