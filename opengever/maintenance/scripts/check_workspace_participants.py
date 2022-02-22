@@ -193,6 +193,7 @@ class ParticipantsChecker(object):
 
         for i, obj in enumerate(self.workspaces_and_workspace_folders, 1):
             manager = ManageParticipants(obj, getRequest())
+
             misconfigured_participants = self.get_misconfigured_participants(obj, manager)
             missing_local_roles_block = self.is_local_roles_block_missing(obj, manager)
             missing_admin = self.is_admin_missing(obj, manager)
@@ -231,6 +232,12 @@ class ParticipantsChecker(object):
         corrections = []
         for i, obj in enumerate(self.workspaces_and_workspace_folders, 1):
             manager = ManageParticipants(obj, getRequest())
+
+            # Overwrite the require_admin_assignment to avoid failures
+            # when deleting / updating participations on object where no admin
+            # is defined.
+            manager._require_admin_assignment = lambda: True
+
             former_participants = deepcopy(manager.get_participants())
 
             roles_cleaned_up = self.correct_participants_with_multiple_roles(obj, manager)
