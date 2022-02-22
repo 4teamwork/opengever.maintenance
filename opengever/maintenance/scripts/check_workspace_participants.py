@@ -273,7 +273,7 @@ def main():
     parser = setup_option_parser()
 
     parser.add_option(
-        '-f', '--fix', action='store_true', default=None,
+        '--fix', action='store_true', default=None,
         help='Correct the permissions',
         dest='fix')
 
@@ -313,6 +313,16 @@ def main():
             'corrected_workspace_folders', extension="csv")
         with open(log_filename, "w") as logfile:
             participants_checker.corrections_table.write_csv(logfile)
+
+        # validate correction
+        participants_checker.check_misconfigurations()
+        sys.stdout.write("\n\nTable of all misconfigured dossiers:\n")
+        sys.stdout.write(participants_checker.misconfigured.generate_output())
+
+        log_filename = LogFilePathFinder().get_logfile_path(
+            'misconfigured_workspace_folders_after_correction', extension="csv")
+        with open(log_filename, "w") as logfile:
+            participants_checker.misconfigured.write_csv(logfile)
 
         if not options.dryrun:
             transaction.commit()
