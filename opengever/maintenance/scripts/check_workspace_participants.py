@@ -42,7 +42,7 @@ class ParticipantsChecker(object):
     def get_titles(self, obj):
         titles = []
         self._recurse_title(obj, titles)
-        return " | ".join(reversed(titles))
+        return '"{}"'.format(" | ".join(reversed(titles)))
 
     def _recurse_title(self, obj, titles):
         titles.append(obj.Title())
