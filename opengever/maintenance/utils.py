@@ -154,7 +154,7 @@ class TextTable(object):
         return [[cell[i] if i < len(cell) else "" for cell in wrapped_row] for i in range(nlines + 1)]
 
     def write_csv(self, file):
-        frmtstr = u" , ".join(u"{}" for i in range(self.ncols))
+        frmtstr = u",".join(u"{}" for i in range(self.ncols))
         for row in self.data:
             file.write(safe_utf8(frmtstr.format(*row) + u"\n"))
 
