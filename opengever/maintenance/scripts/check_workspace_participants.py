@@ -25,7 +25,9 @@ import transaction
 Correction = namedtuple(
     'Correction',
     ['obj', 'set_roles_block', 'deleted', 'added', 'updated',
-     'roles_cleaned_up', 'former_participants', 'current_participants'])
+     'roles_cleaned_up', 'userid_cleaned_up', 'former_participants', 'current_participants'])
+
+SORTED_ROLES = ['WorkspaceAdmin', 'WorkspaceMember', 'WorkspaceGuest']
 
 
 class ParticipantsChecker(object):
@@ -85,6 +87,47 @@ class ParticipantsChecker(object):
             cleaned_up.append(data)
         return cleaned_up
 
+    def get_participants_with_unnecessary_local_roles(self, obj, manager):
+        # We check if there are local roles that are also inherited
+        # from the parent
+        if obj.portal_type == 'opengever.workspace.workspace':
+            return []
+
+        if getattr(obj, '__ac_local_roles_block__', False):
+            return []
+
+        participants_with_unnecessary_local_roles = []
+
+        participants = manager.get_participants()
+        parent_manager = ManageParticipants(obj.get_parent_with_local_roles(),
+                                            getRequest())
+        parent_participants = parent_manager.get_participants()
+        for participant in participants:
+            if participant['token'] == 'zopemaster':
+                continue
+            # find matching participant on obj if present
+            parent_participant = self.get_participant_for_token(
+                parent_participants, participant["token"])
+            if not parent_participant:
+                continue
+            if self.has_lower_or_equal_permissions(participant['roles'], parent_participant['roles']):
+                participants_with_unnecessary_local_roles.append(participant)
+        return participants_with_unnecessary_local_roles
+
+    def has_lower_or_equal_permissions(self, roles1, roles2):
+        # Smaller index means higher permission
+        level1 = SORTED_ROLES.index(self.get_role_with_most_permissions(roles1))
+        level2 = SORTED_ROLES.index(self.get_role_with_most_permissions(roles2))
+        return level1 >= level2
+
+    def correct_unnecessary_local_roles(self, obj, manager):
+        to_remove = self.get_participants_with_unnecessary_local_roles(obj, manager)
+        removed = []
+        for participant in to_remove:
+            manager._delete(participant["type_"], participant["token"])
+            removed.append(participant)
+        return removed
+
     @staticmethod
     def get_misconfigured_participants(obj, manager):
         if obj.portal_type == 'opengever.workspace.workspace':
@@ -120,7 +163,6 @@ class ParticipantsChecker(object):
 
     @staticmethod
     def get_role_with_most_permissions(roles):
-        SORTED_ROLES = ['WorkspaceAdmin', 'WorkspaceMember', 'WorkspaceGuest']
         for role in SORTED_ROLES:
             if role in roles:
                 return role
@@ -189,6 +231,7 @@ class ParticipantsChecker(object):
             u"Fehlender Admin",
             u"Fehlende Zugriffseinschr\xe4nkung",
             u"Teilnehmer mit mehreren Rollen",
+            u'Teilnehmer mit unn\xf6tigen lokalen Rollen',
             u"Teilnehmer ohne Berechtigung auf \xfcbergeordneten Objekt"))
 
         for i, obj in enumerate(self.workspaces_and_workspace_folders, 1):
@@ -198,6 +241,7 @@ class ParticipantsChecker(object):
             missing_local_roles_block = self.is_local_roles_block_missing(obj, manager)
             missing_admin = self.is_admin_missing(obj, manager)
             with_multiple_roles = self.get_participants_with_multiple_roles(obj, manager)
+            with_unnecessary_local_roles = self.get_participants_with_unnecessary_local_roles(obj, manager)
             if any((missing_admin, misconfigured_participants,
                     missing_local_roles_block, with_multiple_roles)):
                 self.misconfigured.add_row((
@@ -206,6 +250,7 @@ class ParticipantsChecker(object):
                     'x' if missing_admin else '',
                     'x' if missing_local_roles_block else '',
                     'x' if with_multiple_roles else '',
+                    'x' if with_unnecessary_local_roles else '',
                     u" ".join([participant["userid"] for participant in misconfigured_participants])))
 
     @staticmethod
@@ -241,21 +286,23 @@ class ParticipantsChecker(object):
             former_participants = deepcopy(manager.get_participants())
 
             roles_cleaned_up = self.correct_participants_with_multiple_roles(obj, manager)
-
+            userid_cleaned_up = self.correct_unnecessary_local_roles(obj, manager)
             deleted = self.correct_misconfigured_participants(obj, manager)
             set_roles_block, added, updated = self.fix_roles_block(obj, manager)
 
-            if any((roles_cleaned_up, deleted, set_roles_block)):
+            if any((roles_cleaned_up, userid_cleaned_up, deleted, set_roles_block)):
                 participants = manager.get_participants()
                 corrections.append(
                     Correction(obj, set_roles_block, deleted, added, updated,
-                               roles_cleaned_up, former_participants, participants))
+                               roles_cleaned_up, userid_cleaned_up,
+                               former_participants, participants))
 
         self.corrections_table = TextTable()
         self.corrections_table.add_row((
             u"Pfad",
             "Title",
             u"Rollen zusammengefasst",
+            u'Unn\xf6tigen lokale Rollen gel\xf6scht',
             u"Teilnehmer gel\xf6scht",
             u"Zugriffseinschr\xe4nkung hinzugef\xfcgt",
             u"Teilnehmer hinzugef\xfcgt",
@@ -267,6 +314,7 @@ class ParticipantsChecker(object):
                 self.get_url(corr.obj),
                 self.get_titles(corr.obj),
                 self.format_roles_cleaned_up(corr.roles_cleaned_up),
+                self.format_participants(corr.userid_cleaned_up),
                 self.format_participants(corr.deleted),
                 'x' if corr.set_roles_block else '',
                 self.format_participants(corr.added),
