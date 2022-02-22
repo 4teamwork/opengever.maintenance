@@ -105,7 +105,7 @@ class ParticipantsChecker(object):
         for participant in participants:
             if participant['token'] == 'zopemaster':
                 continue
-            # find matching participant on obj if present
+            # find matching participant on parent if present
             parent_participant = self.get_participant_for_token(
                 parent_participants, participant["token"])
             if not parent_participant:
@@ -130,7 +130,11 @@ class ParticipantsChecker(object):
 
     @staticmethod
     def get_misconfigured_participants(obj, manager):
+        """Get all participants on obj that are not participants on the parent
+        object.
+        """
         if obj.portal_type == 'opengever.workspace.workspace':
+            # Workspaces act as the root for participations.
             return []
 
         participants = manager.get_participants()
@@ -146,6 +150,9 @@ class ParticipantsChecker(object):
         return misconfigured_participants
 
     def correct_misconfigured_participants(self, obj, manager):
+        """All participants on a folder need to also be participants on
+        the parent object
+        """
         misconfigured_participants = self.get_misconfigured_participants(obj, manager)
         deleted = []
         for participant in misconfigured_participants:
@@ -155,6 +162,9 @@ class ParticipantsChecker(object):
 
     @staticmethod
     def is_local_roles_block_missing(obj, manager):
+        """local roles are only allowed on a folder if the inheritance is
+        blocked.
+        """
         if obj.portal_type == 'opengever.workspace.workspace':
             return False
 
@@ -163,6 +173,9 @@ class ParticipantsChecker(object):
 
     @staticmethod
     def get_role_with_most_permissions(roles):
+        """Roles in teamraum have a hierarchy, so that only one role per user
+        is necessary (and supported by the UI).
+        """
         for role in SORTED_ROLES:
             if role in roles:
                 return role
@@ -177,6 +190,12 @@ class ParticipantsChecker(object):
             return matches[0]
 
     def fix_roles_block(self, obj, manager):
+        """For objects defining local roles, we need to block inheritance
+        and then copy over the roles from the parent to end up with the same
+        permissions as before. Looking at the closest parent with local roles
+        is enough, as we only allow to define local roles when inheritance is
+        blocked.
+        """
         added = []
         updated = []
         if not self.is_local_roles_block_missing(obj, manager):
@@ -217,6 +236,9 @@ class ParticipantsChecker(object):
 
     @staticmethod
     def is_admin_missing(obj, manager):
+        """Check whether at least one participant has the admin role, as this
+        is mandatory in teamraum deployments.
+        """
         participants = manager.get_participants()
         return bool(
                 participants and not any(["WorkspaceAdmin" in participant["roles"]
