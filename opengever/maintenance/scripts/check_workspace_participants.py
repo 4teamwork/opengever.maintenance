@@ -202,7 +202,7 @@ class ParticipantsChecker(object):
                 self.misconfigured.add_row((
                     self.get_url(obj),
                     self.get_titles(obj),
-                    'x' if missing_admin else'',
+                    'x' if missing_admin else '',
                     'x' if missing_local_roles_block else '',
                     'x' if with_multiple_roles else '',
                     u" ".join([participant["userid"] for participant in misconfigured_participants])))
