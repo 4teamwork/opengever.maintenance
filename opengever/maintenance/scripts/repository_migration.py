@@ -765,7 +765,7 @@ class RepositoryExcelAnalyser(MigratorBase):
                     "\nInvalid operation: blocking inheritance without setting "
                     "local roles. {}\n".format(operation))
                 operation['is_valid'] = False
-            elif inheritance_blocked and has_local_roles:
+            if has_local_roles:
                 obj = unrestrictedUuidToObject(operation['uid'])
                 if obj:
                     # newly created positions will have the local_roles set
