@@ -3,7 +3,7 @@ Adds a webaction on Dossiers to launch eCH-0147 export via Intergever.
 
 Example Usage:
 
-    bin/instance run add_intergever_webaction.py sgtest
+    bin/instance run connect_to_intergever.py sgtest
 """
 from opengever.api.validation import get_validation_errors
 from opengever.maintenance.debughelpers import setup_app
