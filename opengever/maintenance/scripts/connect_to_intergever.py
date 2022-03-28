@@ -1,5 +1,7 @@
 """
-Adds a webaction on Dossiers to launch eCH-0147 export via Intergever.
+Connects a GEVER deployment to InterGEVER:
+- Adds a webaction on Dossiers to launch eCH-0147 export via Intergever
+- Ensures the 'intergever.app' service user is present with appropriate roles
 
 Example Usage:
 
@@ -11,16 +13,31 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.webactions.exceptions import ActionAlreadyExists
 from opengever.webactions.schema import IWebActionSchema
 from opengever.webactions.storage import get_storage
+from plone import api
+from random import SystemRandom
 import argparse
+import string
 import sys
 import transaction
 
+
+SERVICE_USER_ID = "intergever.app"
+
+NOTIFICATION_ROLE = "PrivilegedNotificationDispatcher"
 
 CLUSTERS = {
     "sgtest": {
         "gever_base_url": "https://gevertest.sg.ch",
         "intergever_url": "https://gevertest.sg.ch/intergever",
-    }
+    },
+    "oggdev": {
+        "gever_base_url": "https://dev.onegovgever.ch/",
+        "intergever_url": "https://igdev.onegovgever.ch/intergever",
+    },
+    "local": {
+        "gever_base_url": "http://localhost:8080/",
+        "intergever_url": "http://localhost:3000/intergever",
+    },
 }
 
 
@@ -63,6 +80,44 @@ def register_webaction(plone, options):
         print("Webaction with unique_name %r already exists, skipped." % unique_name)
 
 
+def random_password():
+    rand = SystemRandom()
+    chars = string.ascii_letters + string.digits
+    pw = "".join(rand.choice(chars) for i in range(32))
+    return pw
+
+
+def ensure_service_user_present(plone, options):
+    uf = api.portal.get_tool("acl_users")
+    user_manager = uf["source_users"]
+
+    if SERVICE_USER_ID not in user_manager.getUserIds():
+        user_manager.addUser(SERVICE_USER_ID, SERVICE_USER_ID, random_password())
+        print("Created InterGEVER service user %r" % SERVICE_USER_ID)
+    else:
+        print("InterGEVER service user %r already exists" % SERVICE_USER_ID)
+
+    role_manager = uf.portal_role_manager
+    valid_roles = role_manager.validRoles()
+    if NOTIFICATION_ROLE not in valid_roles:
+        raise Exception(
+            "Role %r not found! Is your GEVER deployment up to date? "
+            "(At least version 2022.7 is required)" % NOTIFICATION_ROLE
+        )
+
+    service_user = api.user.get(SERVICE_USER_ID)
+    existing_roles = role_manager.getRolesForPrincipal(service_user)
+
+    roles_to_assign = [NOTIFICATION_ROLE]
+    for role in roles_to_assign:
+        if role not in existing_roles:
+            role_manager.assignRoleToPrincipal(role, SERVICE_USER_ID)
+            print("Assigned role %r to InterGEVER service user" % role)
+
+        else:
+            print("InterGEVER service user already has role %r assigned" % role)
+
+
 if __name__ == "__main__":
     app = setup_app()
 
@@ -74,4 +129,5 @@ if __name__ == "__main__":
     plone = setup_plone(setup_app())
 
     register_webaction(plone, args)
+    ensure_service_user_present(plone, args)
     transaction.commit()
