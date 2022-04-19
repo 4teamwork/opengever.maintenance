@@ -46,6 +46,10 @@ def get_path(obj):
     return "/".join(obj.getPhysicalPath())
 
 
+def provides_any(obj, iface_list):
+    return any([iface.providedBy(obj) for iface in iface_list])
+
+
 def setup_logger():
     logger = getLogger()
     logger.setLevel(logging.INFO)
@@ -73,6 +77,13 @@ class MakeRepositoryReadOnly(object):
         u"Publisher",
         u"Reviewer",
     )
+
+    OPEN_STATES = DOSSIER_STATES_OPEN + OPEN_TASK_STATES
+
+    CLOSED_STATES = DOSSIER_STATES_CLOSED + CLOSED_TASK_STATES + [
+        'task-state-skipped',
+        'task-state-planned',
+    ]
 
     def __init__(self, plone, args):
         self.plone = plone
@@ -123,19 +134,19 @@ class MakeRepositoryReadOnly(object):
     def assert_no_open_dossiers(self):
         """Quick check using catalog to make sure no open dossiers exist.
         """
-        self._assert_no_open_objects("dossiers", IDossierMarker, DOSSIER_STATES_OPEN)
+        self._assert_no_open_objects("dossiers", IDossierMarker)
 
     def assert_no_open_tasks(self):
         """Quick check using catalog to make sure no open tasks exist.
         """
-        self._assert_no_open_objects("tasks", ITask, OPEN_TASK_STATES)
+        self._assert_no_open_objects("tasks", ITask)
 
-    def _assert_no_open_objects(self, type_name, type_iface, open_states):
+    def _assert_no_open_objects(self, type_name, type_iface):
         catalog = api.portal.get_tool("portal_catalog")
         open_objects = catalog.unrestrictedSearchResults(
             path=get_path(self.reporoot),
             object_provides=type_iface.__identifier__,
-            review_state=open_states,
+            review_state=self.OPEN_STATES,
         )
         if len(open_objects) > 0:
             logger.error("The following %s are not closed:" % type_name)
@@ -146,13 +157,19 @@ class MakeRepositoryReadOnly(object):
     def assert_in_closed_state(self, obj):
         """Check again that dossiers and tasks are closed (using the obj).
         """
-        if IDossierMarker.providedBy(obj):
-            if api.content.get_state(obj) not in DOSSIER_STATES_CLOSED:
-                raise Exception("Unexpected open dossier: %r" % obj)
+        if provides_any(obj, [IRepositoryRoot, IRepositoryFolder]):
+            return
 
-        if ITask.providedBy(obj):
-            if api.content.get_state(obj) not in CLOSED_TASK_STATES:
-                raise Exception("Unexpected open task: %r" % obj)
+        review_state = api.content.get_state(obj)
+
+        if review_state not in self.CLOSED_STATES + self.OPEN_STATES:
+            raise Exception(
+                "Unexpected review state %r for object %r! Please handle this "
+                "review state by making sure it's listed in either "
+                "OPEN_STATES or CLOSED_STATES." % (review_state, obj))
+
+        if review_state not in self.CLOSED_STATES:
+            raise Exception("Unexpected open object: %r" % obj)
 
     def assert_no_unexpected_roles_dropped(self, existing_roles):
         for existing_role in existing_roles:
@@ -203,11 +220,9 @@ class RepositoryContentIterator(object):
 
     def is_type_with_local_roles(self, obj):
 
-        def provides_any(obj, iface_list):
-            return any([iface.providedBy(obj) for iface in iface_list])
-
         if provides_any(obj, self.TYPES_WITH_LOCAL_ROLES):
             return True
+
         else:
             if not provides_any(obj, self.TYPES_WITHOUT_LOCAL_ROLES):
                 raise Exception(
