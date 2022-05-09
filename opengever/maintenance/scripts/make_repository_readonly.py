@@ -76,6 +76,7 @@ class MakeRepositoryReadOnly(object):
         u"Editor",
         u"Publisher",
         u"Reviewer",
+        u"Owner",
     )
 
     OPEN_STATES = DOSSIER_STATES_OPEN + OPEN_TASK_STATES
