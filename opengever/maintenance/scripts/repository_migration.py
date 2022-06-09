@@ -24,8 +24,6 @@ TaskSyncer(tasks_to_sync)()
 transaction.commit()
 
 Notes:
-- Permissions are only taken into account if some local_roles are set (i.e. it
-  is currently not possible to set local_roles back to None)
 - permissions for positions that get merged are disregarded
 - Setting new permissions will replace the existing sharing permissions.
 - Metadata (classification, privacy_layer, retention_period,
@@ -99,6 +97,7 @@ MIGRATIOM_TIMESTAMP = time.strftime('%d%m%Y-%H%M%S')
 tasks_to_sync = set()
 
 managed_roles_shortnames = ['read', 'add', 'edit', 'close', 'reactivate', 'manage_dossiers']
+SHORTNAMES_BY_ROLE = {value: key for key, value in ROLES_BY_SHORTNAME.items()}
 
 metadata_fields = (
     IClassification["classification"],
@@ -765,17 +764,33 @@ class RepositoryExcelAnalyser(MigratorBase):
                     "\nInvalid operation: blocking inheritance without setting "
                     "local roles. {}\n".format(operation))
                 operation['is_valid'] = False
-            if has_local_roles:
-                obj = unrestrictedUuidToObject(operation['uid'])
-                if obj:
-                    # newly created positions will have the local_roles set
-                    # in the pipeline
-                    operation['set_permissions'] = True
-                if obj and RoleAssignmentManager(obj).get_assignments_by_cause(ASSIGNMENT_VIA_SHARING):
+            obj = unrestrictedUuidToObject(operation['uid'])
+            if not obj:
+                # newly created positions will have the local_roles set
+                # in the pipeline
+                pass
+            elif self.needs_permission_update(obj, permissions, inheritance_blocked):
+                operation['set_permissions'] = True
+                if RoleAssignmentManager(obj).get_assignments_by_cause(ASSIGNMENT_VIA_SHARING):
                     operation['local_roles_deleted'] = True
                     logger.warning(
                         "\nSharing assignments for {} will be deleted and "
                         "replaced.\n".format(obj.absolute_url_path()))
+
+    def needs_permission_update(self, obj, permissions, inheritance_blocked):
+        if inheritance_blocked != getattr(obj, '__ac_local_roles_block__', False):
+            return True
+        old_permissions = {role_shortname: [] for role_shortname in managed_roles_shortnames}
+        assignments = RoleAssignmentManager(obj).get_assignments_by_cause(ASSIGNMENT_VIA_SHARING)
+        for assignment in assignments:
+            for role in assignment['roles']:
+                shortname = SHORTNAMES_BY_ROLE[role]
+                old_permissions[shortname].append(assignment['principal'])
+
+        for role_shortname in managed_roles_shortnames:
+            if not set(old_permissions[role_shortname]) == set(permissions[role_shortname]):
+                return True
+        return False
 
     def get_new_title(self, new_repo_pos, old_repo_pos):
         """Returns the new title or none if no rename is necessary."""
@@ -1243,9 +1258,6 @@ class RepositoryMigrator(MigratorBase):
             principals = permissions.get(role_shortname)
             for principal in principals:
                 roles_by_principals[principal].append(role)
-
-        if not (block_inheritance and roles_by_principals):
-            return
 
         obj.__ac_local_roles_block__ = block_inheritance
         manager = RoleAssignmentManager(obj)
