@@ -778,6 +778,10 @@ class RepositoryExcelAnalyser(MigratorBase):
         assignments = RoleAssignmentManager(obj).get_assignments_by_cause(ASSIGNMENT_VIA_SHARING)
         for assignment in assignments:
             for role in assignment['roles']:
+                if role not in SHORTNAMES_BY_ROLE or SHORTNAMES_BY_ROLE[role] not in managed_roles_shortnames:
+                    logger.info("Skipping {} role for {} when checking for permissions update for {}.".format(
+                        role, assignment['principal'], obj.absolute_url()))
+                    continue
                 shortname = SHORTNAMES_BY_ROLE[role]
                 old_permissions[shortname].append(assignment['principal'])
 
