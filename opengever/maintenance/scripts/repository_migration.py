@@ -750,16 +750,10 @@ class RepositoryExcelAnalyser(MigratorBase):
                     " {}\n".format(operation))
                 operation['permissions_disregarded'] = True
         else:
-            # We also check that permissions are only set when inheritance is
-            # blocked and if local roles were defined on such positions before,
-            # we emit a warning as they will be lost during migration
+            # We make sure that when inheritance is blocked, local roles are set
             has_local_roles = any(permissions[role_shortname] for role_shortname in managed_roles_shortnames)
             inheritance_blocked = permissions['block_inheritance']
-            if has_local_roles and not inheritance_blocked:
-                logger.warning(
-                    "\nSetting local roles without blocking "
-                    "inheritance. {}\n".format(operation))
-            elif inheritance_blocked and not has_local_roles:
+            if inheritance_blocked and not has_local_roles:
                 logger.warning(
                     "\nInvalid operation: blocking inheritance without setting "
                     "local roles. {}\n".format(operation))
