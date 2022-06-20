@@ -1262,8 +1262,10 @@ class RepositoryMigrator(MigratorBase):
         manager.storage.clear_by_cause(ASSIGNMENT_VIA_SHARING)
         for principal, roles in roles_by_principals.items():
             assignment = SharingRoleAssignment(principal, roles)
-            RoleAssignmentManager(obj).add_or_update_assignment(assignment)
-        obj.reindexObjectSecurity()
+            manager.storage.add_or_update(
+                assignment.principal, assignment.roles, assignment.cause, assignment.reference)
+
+        manager._update_local_roles()
 
     def reindex(self):
         logger.info("\n\nReindexing...\n")
