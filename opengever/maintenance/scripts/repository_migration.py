@@ -1194,7 +1194,7 @@ class RepositoryMigrator(MigratorBase):
                     raise Exception(
                         'A parent of a repositoryfolder contains dossiers')
                 ref_adapter.set_number(
-                    child, number=child.reference_number_prefix)
+                    child, number=IReferenceNumber(child).get_local_number())
 
     def rename(self, items):
         logger.info("\n\nRenaming...\n")
