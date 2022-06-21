@@ -623,16 +623,20 @@ class RepositoryExcelAnalyser(MigratorBase):
             new_number = None
             new_parent_guid = None
             new_position_guid = None
+            old_parent_guid = None
 
             need_creation = not bool(old_repo_pos.position)
             need_number_change, need_move, need_merge = self.needs_number_change_move_or_merge(operation)
 
             if need_number_change:
                 new_number = self.get_new_number(new_repo_pos)
+                old_parent_guid = self.positions_mapping.get_old_pos_guid(old_repo_pos.parent_position)
             if need_move:
                 new_parent_guid = self.get_new_parent_guid(new_repo_pos)
+                old_parent_guid = self.positions_mapping.get_old_pos_guid(old_repo_pos.parent_position)
             if need_merge:
                 new_parent_guid = self.positions_mapping.get_new_pos_guid(new_repo_pos.position)
+                old_parent_guid = self.positions_mapping.get_old_pos_guid(old_repo_pos.parent_position)
             if need_creation:
                 new_parent_guid = self.get_new_parent_guid(new_repo_pos)
                 new_position_guid = self.positions_mapping.get_new_pos_guid(new_repo_pos.position)
@@ -645,7 +649,8 @@ class RepositoryExcelAnalyser(MigratorBase):
                 'need_creation': need_creation,
                 'new_title': self.get_new_title(new_repo_pos, old_repo_pos) if not (need_creation or need_merge) else None,
                 'new_number': new_number,
-                'new_parent_guid': new_parent_guid})
+                'new_parent_guid': new_parent_guid,
+                'old_parent_guid': old_parent_guid})
 
             self.validate_operation(operation)
 
@@ -1051,10 +1056,34 @@ class RepositoryMigrator(MigratorBase):
         self.move_branches(self.items_to_move())
         self.merge_branches(self.items_to_merge())
         self.adjust_reference_number_prefix(self.items_to_adjust_number())
+        self.regenerate_reference_number_mapping(self.objects_to_fix_refnum_mapping())
         self.rename(self.items_to_rename())
         self.update_description(self.operations_list)
         self.reindex()
         self.validate()
+
+    def objects_to_fix_refnum_mapping(self):
+        """Items that get created over the bundle import will get the
+        default value as the reference number prefix is their number is already
+        taken, which is then saved in the mapping in saveReferenceNumberPrefix.
+        The reference number will then get updated later in the DexterityUpdateSection
+        when setting the values for the metadata. This leads to the position
+        appearing twice in the mapping on the parent (default reference number
+        marked as inactive).
+        Also moving repository folders is normally not allowed in Gever and
+        it seems the mappings of both the old and new parent objects do not get
+        updated correctly. So we need to update them by hand as well.
+        """
+        parent_guids = set()
+        for item in self.items_to_create():
+            parent_guids.add(item['new_parent_guid'])
+
+        for item in self.items_to_move():
+            parent_guids.add(item['new_parent_guid'])
+            parent_guids.add(item['old_parent_guid'])
+
+        for guid in parent_guids:
+            yield self.guid_to_object(guid)
 
     def items_to_create(self):
         return [item for item in self.operations_list if item['new_position_guid']]
