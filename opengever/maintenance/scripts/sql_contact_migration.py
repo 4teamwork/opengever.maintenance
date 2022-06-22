@@ -7,10 +7,17 @@ bin/instance run ./scripts/sql_contact_migration.py
 
 from opengever.contact.models.org_role import OrgRole
 from opengever.contact.models.organization import Organization
+from opengever.contact.models.participation import ContactParticipation
+from opengever.contact.models.participation import OgdsUserParticipation
+from opengever.contact.models.participation import OrgRoleParticipation
 from opengever.contact.models.person import Person
+from opengever.dossier.behaviors.dossier import IDossierMarker
+from opengever.dossier.participations import KuBParticipationHandler
+from opengever.dossier.participations import SQLParticipationHandler
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
+from plone import api
 from uuid import uuid4
 import json
 import logging
@@ -33,10 +40,12 @@ class SqlContactExporter(object):
         self.contact_mapping = {}
         self.org_role_mapping = {}
 
-    def run(self):
+    def run(self, skip_participations=False):
         os.mkdir(self.bundle_directory)
 
         self.export()
+        if not skip_participations:
+            self.migrate_participations()
 
     def export(self):
         persons = list(self.get_persons())
@@ -47,6 +56,49 @@ class SqlContactExporter(object):
 
         org_roles = list(self.get_org_roles())
         self.export_json('memberships.json', org_roles)
+
+    def migrate_participations(self):
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IDossierMarker.__identifier__)
+        for brain in brains:
+            dossier = brain.getObject()
+            self.migrate_participation(dossier)
+
+    def migrate_participation(self, dossier):
+        sql_handler = SQLParticipationHandler(dossier)
+        kub_handler = KuBParticipationHandler(dossier)
+        participations = sql_handler.get_participations()
+
+        for participation in participations:
+            # To avoid reindexing the dosiser after each participation we
+            # add the participation manually
+            if isinstance(participation, OgdsUserParticipation):
+                participant_id = participation.ogds_userid
+
+            elif isinstance(participation, ContactParticipation):
+                if participation.contact.contact_type == 'person':
+                    participant_id = u'person:{}'.format(
+                        self.contact_mapping[participation.contact_id])
+                else:
+                    participant_id = u'organization:{}'.format(
+                        self.contact_mapping[participation.contact_id])
+
+            elif isinstance(participation, OrgRoleParticipation):
+                participant_id = u'membership:{}'.format(
+                    self.org_role_mapping[participation.org_role_id])
+            else:
+                raise Exception(
+                    u'Not supported participation type: {}'.format(
+                        participation.participation_type))
+
+            kub_participation = kub_handler.create_participation(
+                participant_id=participant_id,
+                roles=[role.role for role in participation.roles])
+            kub_handler.append_participation(kub_participation)
+
+        if participations:
+            dossier.reindexObject(idxs=["participations", "UID"])
 
     def get_persons(self):
         for person in Person.query:
@@ -89,6 +141,9 @@ def main():
     parser = setup_option_parser()
     parser.add_option("-n", "--dry-run", action="store_true",
                       dest="dryrun", default=False)
+    parser.add_option("-p", "--skip-participations",
+                      action="store_true",
+                      dest="skip_participations", default=False)
     (options, args) = parser.parse_args()
 
     if options.dryrun:
@@ -100,7 +155,7 @@ def main():
 
     bundle_directory = u'var/kub-bundle-{}'.format(time.strftime('%d%m%Y-%H%M%S'))
     exporter = SqlContactExporter(bundle_directory)
-    exporter.run()
+    exporter.run(skip_participations=options.skip_participations)
 
     if not options.dryrun:
         transaction.commit()
