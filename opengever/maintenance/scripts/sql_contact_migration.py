@@ -75,6 +75,7 @@ class SqlContactExporter(object):
         catalog = api.portal.get_tool('portal_catalog')
         brains = catalog.unrestrictedSearchResults(
             object_provides=IDossierMarker.__identifier__)
+        brains = ProgressLogger('Migrate dossier participations.', brains)
         for brain in brains:
             dossier = brain.getObject()
             self.migrate_participation(dossier)
