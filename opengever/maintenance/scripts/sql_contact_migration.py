@@ -161,7 +161,8 @@ class SqlContactExporter(object):
                 'id': kub_uid,
                 'third_party_id': org_role.org_role_id,
                 'person': self.contact_mapping[org_role.person_id],
-                'organization': self.contact_mapping[org_role.organization_id]}
+                'organization': self.contact_mapping[org_role.organization_id],
+                'role': org_role.function}
 
     def export_json(self, filename, items):
         with open('/'.join((self.bundle_directory, filename)), 'w') as outfile:
