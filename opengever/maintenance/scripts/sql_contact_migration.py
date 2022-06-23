@@ -3,8 +3,16 @@ This script is used to export sql contacts in to bundle and removes contact
 references in manual journal entries.
 
 bin/instance run ./scripts/sql_contact_migration.py
+
+optional arguments:
+  -p : skip the migration of dossier participations
+  -t : skip the removal of contact references from manual journal entries.
+  -n : dry-run.
 """
 
+from ftw.journal.config import JOURNAL_ENTRIES_ANNOTATIONS_KEY
+from ftw.journal.interfaces import IAnnotationsJournalizable
+from ftw.upgrade.progresslogger import ProgressLogger
 from opengever.contact.models.org_role import OrgRole
 from opengever.contact.models.organization import Organization
 from opengever.contact.models.participation import ContactParticipation
@@ -14,11 +22,14 @@ from opengever.contact.models.person import Person
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.dossier.participations import KuBParticipationHandler
 from opengever.dossier.participations import SQLParticipationHandler
+from opengever.journal.entry import MANUAL_JOURNAL_ENTRY
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
+from persistent.list import PersistentList
 from plone import api
 from uuid import uuid4
+from zope.annotation.interfaces import IAnnotations
 import json
 import logging
 import os
@@ -40,12 +51,15 @@ class SqlContactExporter(object):
         self.contact_mapping = {}
         self.org_role_mapping = {}
 
-    def run(self, skip_participations=False):
+    def run(self, skip_participations=False, skip_journal_cleanup=False):
         os.mkdir(self.bundle_directory)
 
         self.export()
         if not skip_participations:
             self.migrate_participations()
+
+        if not skip_journal_cleanup:
+            self.cleanup_journal_entries()
 
     def export(self):
         persons = list(self.get_persons())
@@ -100,6 +114,22 @@ class SqlContactExporter(object):
         if participations:
             dossier.reindexObject(idxs=["participations", "UID"])
 
+    def cleanup_journal_entries(self):
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IAnnotationsJournalizable.__identifier__)
+        brains = ProgressLogger(
+            'Remove contact references from journal entries.', brains)
+        for brain in brains:
+            self.reset_contact_references(brain.getObject())
+
+    def reset_contact_references(self, obj):
+        annotations = IAnnotations(obj)
+        entries = annotations.get(JOURNAL_ENTRIES_ANNOTATIONS_KEY, [])
+        for entry in entries:
+            if entry.get('action', {}).get('type') == MANUAL_JOURNAL_ENTRY:
+                entry['action']['contacts'] = PersistentList()
+
     def get_persons(self):
         for person in Person.query:
             kub_uid = str(uuid4())
@@ -144,6 +174,9 @@ def main():
     parser.add_option("-p", "--skip-participations",
                       action="store_true",
                       dest="skip_participations", default=False)
+    parser.add_option("-j", "--skip-journal-cleanup",
+                      action="store_true",
+                      dest="skip_journal", default=False)
     (options, args) = parser.parse_args()
 
     if options.dryrun:
@@ -155,7 +188,8 @@ def main():
 
     bundle_directory = u'var/kub-bundle-{}'.format(time.strftime('%d%m%Y-%H%M%S'))
     exporter = SqlContactExporter(bundle_directory)
-    exporter.run(skip_participations=options.skip_participations)
+    exporter.run(skip_participations=options.skip_participations,
+                 skip_journal_cleanup=options.skip_journal)
 
     if not options.dryrun:
         transaction.commit()
