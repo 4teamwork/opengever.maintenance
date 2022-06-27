@@ -8,6 +8,7 @@ optional arguments:
   -k : url for the KuB deployment
   -p : skip the migration of dossier participations
   -t : skip the removal of contact references from manual journal entries.
+  -D : delete all sql contact data, including participations and archived data.
   -n : dry-run.
 """
 
@@ -15,12 +16,26 @@ from ftw.journal.config import JOURNAL_ENTRIES_ANNOTATIONS_KEY
 from ftw.journal.interfaces import IAnnotationsJournalizable
 from ftw.upgrade.progresslogger import ProgressLogger
 from opengever.contact.interfaces import IContactSettings
+from opengever.contact.models.address import Address
+from opengever.contact.models.archivedaddress import ArchivedAddress
+from opengever.contact.models.archivedcontact import ArchivedContact
+from opengever.contact.models.archivedmailaddress import ArchivedMailAddress
+from opengever.contact.models.archivedorganization import ArchivedOrganization
+from opengever.contact.models.archivedperson import ArchivedPerson
+from opengever.contact.models.archivedphonenumber import ArchivedPhoneNumber
+from opengever.contact.models.archivedurl import ArchivedURL
+from opengever.contact.models.contact import Contact
+from opengever.contact.models.mailaddress import MailAddress
 from opengever.contact.models.org_role import OrgRole
 from opengever.contact.models.organization import Organization
 from opengever.contact.models.participation import ContactParticipation
 from opengever.contact.models.participation import OgdsUserParticipation
 from opengever.contact.models.participation import OrgRoleParticipation
+from opengever.contact.models.participation import Participation
+from opengever.contact.models.participation_role import ParticipationRole
 from opengever.contact.models.person import Person
+from opengever.contact.models.phonenumber import PhoneNumber
+from opengever.contact.models.url import URL
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.dossier.participations import KuBParticipationHandler
 from opengever.dossier.participations import SQLParticipationHandler
@@ -56,7 +71,7 @@ class SqlContactExporter(object):
         self.kub_url = None
 
     def run(self, skip_participations=False, skip_journal_cleanup=False,
-            kub_url=None):
+            kub_url=None, delete_contacts=False):
 
         self.kub_url = kub_url
         os.mkdir(self.bundle_directory)
@@ -67,6 +82,9 @@ class SqlContactExporter(object):
 
         if not skip_journal_cleanup:
             self.cleanup_journal_entries()
+
+        if delete_contacts:
+            self.delete_contacts()
 
     def export(self):
         persons = list(self.get_persons())
@@ -188,6 +206,33 @@ class SqlContactExporter(object):
         with open('/'.join((self.bundle_directory, filename)), 'w') as outfile:
             json.dump(items, outfile, indent=4)
 
+    def delete_contacts(self):
+        models = [
+            ArchivedAddress,
+            ArchivedMailAddress,
+            ArchivedPhoneNumber,
+            ArchivedURL,
+            ArchivedOrganization,
+            ArchivedPerson,
+            ArchivedContact,
+            Address,
+            MailAddress,
+            PhoneNumber,
+            URL,
+            ParticipationRole,
+            ContactParticipation,
+            OgdsUserParticipation,
+            OrgRoleParticipation,
+            Participation,
+            OrgRole,
+            Person,
+            Organization,
+            Contact
+        ]
+
+        for model in models:
+            model.query.delete()
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -202,6 +247,8 @@ def main():
     parser.add_argument("-j", "--skip-journal-cleanup",
                         action="store_true",
                         dest="skip_journal", default=False)
+    parser.add_argument("-D", "--delete-sql-contacts", action="store_true",
+                        dest="delete_contacts", default=False)
 
     options = parser.parse_args(sys.argv[3:])
 
@@ -216,7 +263,8 @@ def main():
     exporter = SqlContactExporter(bundle_directory)
     exporter.run(skip_participations=options.skip_participations,
                  skip_journal_cleanup=options.skip_journal,
-                 kub_url=options.kub_url)
+                 kub_url=options.kub_url,
+                 delete_contacts=options.delete_contacts)
 
     if not options.dryrun:
         transaction.commit()
