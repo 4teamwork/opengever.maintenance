@@ -5,6 +5,7 @@ references in manual journal entries.
 bin/instance run ./scripts/sql_contact_migration.py
 
 optional arguments:
+  -k : url for the KuB deployment
   -p : skip the migration of dossier participations
   -t : skip the removal of contact references from manual journal entries.
   -n : dry-run.
@@ -13,6 +14,7 @@ optional arguments:
 from ftw.journal.config import JOURNAL_ENTRIES_ANNOTATIONS_KEY
 from ftw.journal.interfaces import IAnnotationsJournalizable
 from ftw.upgrade.progresslogger import ProgressLogger
+from opengever.contact.interfaces import IContactSettings
 from opengever.contact.models.org_role import OrgRole
 from opengever.contact.models.organization import Organization
 from opengever.contact.models.participation import ContactParticipation
@@ -23,13 +25,14 @@ from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.dossier.participations import KuBParticipationHandler
 from opengever.dossier.participations import SQLParticipationHandler
 from opengever.journal.entry import MANUAL_JOURNAL_ENTRY
+from opengever.kub.interfaces import IKuBSettings
 from opengever.maintenance.debughelpers import setup_app
-from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from persistent.list import PersistentList
 from plone import api
 from uuid import uuid4
 from zope.annotation.interfaces import IAnnotations
+import argparse
 import json
 import logging
 import os
@@ -50,8 +53,12 @@ class SqlContactExporter(object):
         self.bundle_directory = bundle_directory
         self.contact_mapping = {}
         self.org_role_mapping = {}
+        self.kub_url = None
 
-    def run(self, skip_participations=False, skip_journal_cleanup=False):
+    def run(self, skip_participations=False, skip_journal_cleanup=False,
+            kub_url=None):
+
+        self.kub_url = kub_url
         os.mkdir(self.bundle_directory)
 
         self.export()
@@ -72,6 +79,15 @@ class SqlContactExporter(object):
         self.export_json('memberships.json', org_roles)
 
     def migrate_participations(self):
+        if not self.kub_url:
+            raise Exception(
+                u'Enabling KUB is required for participations migration, '
+                u'kub_url necessary.')
+
+        api.portal.set_registry_record(
+            name='base_url', interface=IKuBSettings,
+            value=self.kub_url.decode('utf-8'))
+
         catalog = api.portal.get_tool('portal_catalog')
         brains = catalog.unrestrictedSearchResults(
             object_provides=IDossierMarker.__identifier__)
@@ -79,6 +95,10 @@ class SqlContactExporter(object):
         for brain in brains:
             dossier = brain.getObject()
             self.migrate_participation(dossier)
+
+        # Disable sql contacts feature
+        api.portal.set_registry_record(
+            name='is_feature_enabled', interface=IContactSettings, value=False)
 
     def migrate_participation(self, dossier):
         sql_handler = SQLParticipationHandler(dossier)
@@ -170,16 +190,20 @@ class SqlContactExporter(object):
 
 
 def main():
-    parser = setup_option_parser()
-    parser.add_option("-n", "--dry-run", action="store_true",
-                      dest="dryrun", default=False)
-    parser.add_option("-p", "--skip-participations",
-                      action="store_true",
-                      dest="skip_participations", default=False)
-    parser.add_option("-j", "--skip-journal-cleanup",
-                      action="store_true",
-                      dest="skip_journal", default=False)
-    (options, args) = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', dest='site_root', default=None,
+                        help='Absolute path to the Plone site')
+    parser.add_argument("-n", "--dry-run", action="store_true",
+                        dest="dryrun", default=False)
+    parser.add_argument("-k", "--kub-url", dest="kub_url", default=None)
+    parser.add_argument("-p", "--skip-participations",
+                        action="store_true",
+                        dest="skip_participations", default=False)
+    parser.add_argument("-j", "--skip-journal-cleanup",
+                        action="store_true",
+                        dest="skip_journal", default=False)
+
+    options = parser.parse_args(sys.argv[3:])
 
     if options.dryrun:
         logger.info("Dry run, dooming transaction")
@@ -191,7 +215,8 @@ def main():
     bundle_directory = u'var/kub-bundle-{}'.format(time.strftime('%d%m%Y-%H%M%S'))
     exporter = SqlContactExporter(bundle_directory)
     exporter.run(skip_participations=options.skip_participations,
-                 skip_journal_cleanup=options.skip_journal)
+                 skip_journal_cleanup=options.skip_journal,
+                 kub_url=options.kub_url)
 
     if not options.dryrun:
         transaction.commit()
