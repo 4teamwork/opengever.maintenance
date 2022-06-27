@@ -1083,7 +1083,11 @@ class RepositoryMigrator(MigratorBase):
             parent_guids.add(item['old_parent_guid'])
 
         for guid in parent_guids:
-            yield self.guid_to_object(guid)
+            obj = self.guid_to_object(guid)
+            if not obj:
+                # Some objects have been deleted because of merge operations
+                continue
+            yield obj
 
     def items_to_create(self):
         return [item for item in self.operations_list if item['new_position_guid']]
