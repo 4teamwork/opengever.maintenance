@@ -145,10 +145,17 @@ class SqlContactExporter(object):
                     u'Not supported participation type: {}'.format(
                         participation.participation_type))
 
-            kub_participation = kub_handler.create_participation(
-                participant_id=participant_id,
-                roles=[role.role for role in participation.roles])
-            kub_handler.append_participation(kub_participation)
+            roles = [role.role for role in participation.roles]
+
+            if kub_handler.has_participation(participant_id):
+                existing = kub_handler.get_participation(participant_id)
+                roles = list(set(roles + existing.roles))
+                existing.roles = roles
+            else:
+                kub_participation = kub_handler.create_participation(
+                    participant_id=participant_id,
+                    roles=[role.role for role in participation.roles])
+                kub_handler.append_participation(kub_participation)
 
         if participations:
             dossier.reindexObject(idxs=["participations", "UID"])
