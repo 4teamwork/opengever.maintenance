@@ -1217,15 +1217,11 @@ class RepositoryMigrator(MigratorBase):
         logger.info("\n\nRegenerating number mappings...\n")
         for obj in objs:
             ref_adapter = IReferenceNumberPrefix(obj)
-            # This purges also the dossier mapping, but the parents does not
-            # contain any dossier otherwise something is wrong and an
-            # exception will be raised when looping over the childs.
+            # This purges also the dossier mapping, but we regenerate them
+            # below.
             ref_adapter.purge_mappings()
 
             for child in obj.listFolderContents():
-                if not IRepositoryFolder.providedBy(child):
-                    raise Exception(
-                        'A parent of a repositoryfolder contains dossiers')
                 ref_adapter.set_number(
                     child, number=IReferenceNumber(child).get_local_number())
 
