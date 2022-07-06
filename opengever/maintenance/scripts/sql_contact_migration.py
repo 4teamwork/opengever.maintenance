@@ -8,6 +8,7 @@ optional arguments:
   -k : url for the KuB deployment
   -p : skip the migration of dossier participations
   -t : skip the removal of contact references from manual journal entries.
+  -r : reindex participations for all dossiers, which has kub-participations.
   -D : delete all sql contact data, including participations and archived data.
   -n : dry-run.
 """
@@ -71,7 +72,7 @@ class SqlContactExporter(object):
         self.kub_url = None
 
     def run(self, skip_participations=False, skip_journal_cleanup=False,
-            kub_url=None, delete_contacts=False):
+            kub_url=None, reindex_participations=False, delete_contacts=False):
 
         self.kub_url = kub_url
         os.mkdir(self.bundle_directory)
@@ -82,6 +83,9 @@ class SqlContactExporter(object):
 
         if not skip_journal_cleanup:
             self.cleanup_journal_entries()
+
+        if reindex_participations:
+            self.reindex_dossier_participations()
 
         if delete_contacts:
             self.delete_contacts()
@@ -157,9 +161,6 @@ class SqlContactExporter(object):
                     roles=[role.role for role in participation.roles])
                 kub_handler.append_participation(kub_participation)
 
-        if participations:
-            dossier.reindexObject(idxs=["participations", "UID"])
-
     def cleanup_journal_entries(self):
         catalog = api.portal.get_tool('portal_catalog')
         brains = catalog.unrestrictedSearchResults(
@@ -213,6 +214,17 @@ class SqlContactExporter(object):
         with open('/'.join((self.bundle_directory, filename)), 'w') as outfile:
             json.dump(items, outfile, indent=4)
 
+    def reindex_dossier_participations(self):
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IDossierMarker.__identifier__)
+        brains = ProgressLogger('Reindex dossier participations.', brains)
+        for brain in brains:
+            dossier = brain.getObject()
+            kub_handler = KuBParticipationHandler(dossier)
+            if kub_handler.get_participations():
+                dossier.reindexObject(idxs=["participations", "UID"])
+
     def delete_contacts(self):
         models = [
             ArchivedAddress,
@@ -254,6 +266,8 @@ def main():
     parser.add_argument("-j", "--skip-journal-cleanup",
                         action="store_true",
                         dest="skip_journal", default=False)
+    parser.add_argument("-r", "--reindexing-participations", action="store_true",
+                        dest="reindex_participations", default=False)
     parser.add_argument("-D", "--delete-sql-contacts", action="store_true",
                         dest="delete_contacts", default=False)
 
@@ -271,6 +285,7 @@ def main():
     exporter.run(skip_participations=options.skip_participations,
                  skip_journal_cleanup=options.skip_journal,
                  kub_url=options.kub_url,
+                 reindex_participations=options.reindex_participations,
                  delete_contacts=options.delete_contacts)
 
     if not options.dryrun:
