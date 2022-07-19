@@ -50,9 +50,9 @@ def reindex_path_depth(plone):
             i += 1
 
         print "Intermediate commit (done %s, remaining %s)" % (i, remaining)
-        manager.connection.commit(soft_commit=False, extract_after_commit=False)
+        manager.connection.commit(soft_commit=False, after_commit=False)
 
-    manager.connection.commit(soft_commit=False, extract_after_commit=False)
+    manager.connection.commit(soft_commit=False, after_commit=False)
 
 
 if __name__ == '__main__':
