@@ -45,7 +45,7 @@ def remove_filesize(portal):
 
     def commit():
         conn = sm.connection
-        conn.commit(extract_after_commit=False)
+        conn.commit(after_commit=False)
         zodb_conn.cacheGC()
         logger.info(
             'Intermediate commit (%d items processed, last batch in %s)',

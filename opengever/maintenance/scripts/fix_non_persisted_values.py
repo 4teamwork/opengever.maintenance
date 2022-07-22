@@ -977,7 +977,7 @@ class Reindexer(object):
 
     def _commit_to_solr(self):
         conn = self.solr_connection_manager.connection
-        conn.commit(extract_after_commit=False)
+        conn.commit(after_commit=False)
         print('Intermediate commit to solr (%d items '
               'processed)' % self.processed)
 
