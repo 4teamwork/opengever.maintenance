@@ -1,0 +1,34 @@
+[
+    {
+        "id": "dossier_default",
+        "assignments": ["IDossier.default"],
+        "fields": [
+            {
+                "name": "bildungsstufe",
+                "label": "Bildungsstufe/-typ",
+                "type": "choice",
+                "required": false,
+                "values": [
+                    "Volksschule",
+                    "Berufsbildung",
+                    "Sekundarstufe II",
+                    "Hochschulen",
+                    "Weiterbildungsbereich",
+                    "Kultur",
+                    "Sport"
+                ]
+            },
+            {
+                "name": "auftraggeber",
+                "label": "Auftraggeber",
+                "type": "choice",
+                "required": false,
+                "values": [
+                    "Abteilung A",
+                    "Abteilung B",
+                    "Abteilung C"
+                ]
+            }
+        ]
+    }
+]
