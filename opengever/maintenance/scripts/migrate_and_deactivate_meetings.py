@@ -8,6 +8,7 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
 from opengever.meeting.model import Meeting
+from opengever.meeting.model import Proposal
 from plone import api
 import logging
 import sys
@@ -43,7 +44,22 @@ class MeetingsContentMigrator(object):
 
             self.log_and_write_table(active_meetings_table, "Active Meetings", "active_meetings")
 
-        if active_meetings:
+        # There should be no active proposals
+        active_proposals = Proposal.query.active()
+        if active_proposals.count():
+            active_proposals_table = TextTable()
+            active_proposals_table.add_row(
+                (u"Path", u"Title", u"State"))
+
+            for proposal in active_proposals:
+                active_proposals_table.add_row((
+                    proposal.get_url(),
+                    proposal.title.replace(",", ""),
+                    proposal.workflow_state))
+
+            self.log_and_write_table(active_proposals_table, "Active Proposals", "active_proposals")
+
+        if active_meetings or active_proposals:
             raise PreconditionsError("Preconditions not satisfied")
 
     def log_and_write_table(self, table, title, filename):
