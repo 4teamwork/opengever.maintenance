@@ -45,14 +45,23 @@ class PreconditionsError(Exception):
 
 class MeetingsContentMigrator(object):
 
-    def __init__(self):
+    def __init__(self, dryrun=False):
+        self.dryrun = dryrun
         self.catalog = api.portal.get_tool("portal_catalog")
         self.check_preconditions()
 
     def __call__(self):
+        if self.dryrun:
+            logger.info('Performing dryrun!\n')
+            transaction.doom()
+
         self._task_queue = self.setup_task_queue()
         self.replace_meeting_dossier_with_normal_dossier()
         self.migrate_agendaitems_to_subdossiers()
+
+        if not self.dryrun:
+            transaction.commit()
+
         self.process_task_queue()
 
     def check_preconditions(self):
@@ -211,15 +220,8 @@ def main():
     parser.add_option("-n", dest="dryrun", action="store_true", default=False)
     (options, args) = parser.parse_args()
 
-    if options.dryrun:
-        logger.info('Performing dryrun!\n')
-        transaction.doom()
-
-    migrator = MeetingsContentMigrator()
+    migrator = MeetingsContentMigrator(options.dryrun)
     migrator()
-
-    if not options.dryrun:
-        transaction.commit()
 
 
 if __name__ == '__main__':
