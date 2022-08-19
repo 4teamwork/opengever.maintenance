@@ -50,6 +50,9 @@ class MeetingsContentMigrator(object):
         self.dryrun = dryrun
         self.catalog = api.portal.get_tool("portal_catalog")
         self.check_preconditions()
+        self.request = getRequest()
+        # Do not prepend document titles with 'Copy of'
+        self.request['prevent-copyname-on-document-copy'] = True
 
     def __call__(self):
         if self.dryrun:
