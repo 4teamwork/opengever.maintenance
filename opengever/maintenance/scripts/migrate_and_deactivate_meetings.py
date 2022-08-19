@@ -28,6 +28,9 @@ logger = logging.getLogger('opengever.maintenance')
 logging.root.setLevel(logging.INFO)
 
 
+PATH_MAPPING_KEY = 'MEETING_MIGRATION_PATH_MAPPING'
+
+
 class PreconditionsError(Exception):
     """Raised when preconditions for the migration are not satisfied"""
 
@@ -40,6 +43,7 @@ class MeetingsContentMigrator(object):
 
     def __call__(self):
         self.replace_meeting_dossier_with_normal_dossier()
+        self.migrate_agendaitems_to_subdossiers()
 
     def check_preconditions(self):
         # There should be no active meetings
@@ -105,6 +109,53 @@ class MeetingsContentMigrator(object):
 
             # delete meeting_dossier
             api.content.delete(meeting_dossier)
+
+    def migrate_agendaitems_to_subdossiers(self):
+        """ We create a subdossier in the meeting dossier for each agendaitem
+        and copy or move its documents into that subdossier.
+        """
+        for meeting in Meeting.query:
+            meeting_dossier = meeting.get_dossier()
+            for agendaitem in meeting.agenda_items:
+                # create a subdossier
+                dossier = api.content.create(
+                    type='opengever.dossier.businesscasedossier',
+                    title=agendaitem.get_title(include_number=True, formatted=True),
+                    container=meeting_dossier)
+
+                # Copy documents from submitted proposal into subdossier
+                for doc in agendaitem.get_documents():
+                    self.copy_and_add_to_mapping(doc, dossier)
+
+                # Move excerpts
+                for doc in agendaitem.get_excerpt_documents():
+                    self.move_and_add_to_mapping(doc, dossier)
+
+                # Move the proposal document
+                document = agendaitem.resolve_document()
+                self.move_and_add_to_mapping(document, dossier)
+
+    def get_path_mapping(self, obj):
+        annotations = IAnnotations(obj)
+        if PATH_MAPPING_KEY not in annotations:
+            annotations[PATH_MAPPING_KEY] = PersistentMapping()
+        return annotations[PATH_MAPPING_KEY]
+
+    def copy_and_add_to_mapping(self, obj, container):
+        former_path = obj.absolute_url_path()
+        copied = api.content.copy(source=obj, target=container)
+        new_path = copied.absolute_url_path()
+        mapping = self.get_path_mapping(container)
+        mapping[new_path] = former_path
+        return copied
+
+    def move_and_add_to_mapping(self, obj, container):
+        former_path = obj.absolute_url_path()
+        moved = api.content.move(obj, container)
+        new_path = moved.absolute_url_path()
+        mapping = self.get_path_mapping(container)
+        mapping[new_path] = former_path
+        return moved
 
     def log_and_write_table(self, table, title, filename):
         logger.info("\n{}".format(title))
