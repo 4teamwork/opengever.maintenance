@@ -3,6 +3,9 @@ This script is used to prepare deletion of the meetings from
 Gever and use RIS in its stead.
 """
 from Acquisition import aq_parent
+from collective.taskqueue.interfaces import ITaskQueue
+from collective.taskqueue.interfaces import ITaskQueueLayer
+from collective.taskqueue.taskqueue import LocalVolatileTaskQueue
 from opengever.base.model.favorite import Favorite
 from opengever.base.oguid import Oguid
 from opengever.base.transport import BASEDATA_KEY
@@ -20,8 +23,13 @@ from opengever.ogds.base.utils import decode_for_json
 from opengever.ogds.base.utils import encode_after_json
 from persistent.mapping import PersistentMapping
 from plone import api
+from plone.subrequest import subrequest
+from zope.annotation import IAnnotations
+from zope.component import provideUtility
+from zope.globalrequest import getRequest
+from zope.interface import alsoProvides
+from zope.interface import noLongerProvides
 import logging
-import sys
 import transaction
 
 logger = logging.getLogger('opengever.maintenance')
@@ -42,8 +50,10 @@ class MeetingsContentMigrator(object):
         self.check_preconditions()
 
     def __call__(self):
+        self._task_queue = self.setup_task_queue()
         self.replace_meeting_dossier_with_normal_dossier()
         self.migrate_agendaitems_to_subdossiers()
+        self.process_task_queue()
 
     def check_preconditions(self):
         # There should be no active meetings
@@ -165,6 +175,32 @@ class MeetingsContentMigrator(object):
             filename, extension="csv")
         with open(log_filename, "w") as logfile:
             table.write_csv(logfile)
+
+    def setup_task_queue(self):
+        task_queue = LocalVolatileTaskQueue()
+        provideUtility(task_queue, ITaskQueue, name='default')
+        return task_queue
+
+    def process_task_queue(self):
+        queue = self._task_queue.queue
+
+        logger.info('Processing %d task queue jobs...' % queue.qsize())
+        request = getRequest()
+        alsoProvides(request, ITaskQueueLayer)
+
+        while not queue.empty():
+            job = queue.get()
+
+            # Process job using plone.subrequest
+            response = subrequest(job['url'])
+            assert response.status == 200
+
+            # XXX: We don't currently handle the user that is supposed to be
+            # authenticated, and the task ID, both of which c.taskqueue
+            # provides in the job.
+
+        noLongerProvides(request, ITaskQueueLayer)
+        logger.info('All task queue jobs processed.')
 
 
 def main():
