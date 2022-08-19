@@ -17,6 +17,7 @@ from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
+from opengever.meeting.interfaces import IMeetingSettings
 from opengever.meeting.model import Meeting
 from opengever.meeting.model import Proposal
 from opengever.ogds.base.utils import decode_for_json
@@ -58,6 +59,7 @@ class MeetingsContentMigrator(object):
         self._task_queue = self.setup_task_queue()
         self.replace_meeting_dossier_with_normal_dossier()
         self.migrate_agendaitems_to_subdossiers()
+        self.disable_meeting_feature()
 
         if not self.dryrun:
             transaction.commit()
@@ -153,6 +155,10 @@ class MeetingsContentMigrator(object):
                 # Move the proposal document
                 document = agendaitem.resolve_document()
                 self.move_and_add_to_mapping(document, dossier)
+
+    def disable_meeting_feature(self):
+        api.portal.set_registry_record(
+            'is_feature_enabled', False, interface=IMeetingSettings)
 
     def get_path_mapping(self, obj):
         annotations = IAnnotations(obj)
