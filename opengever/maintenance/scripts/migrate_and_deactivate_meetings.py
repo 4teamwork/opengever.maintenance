@@ -151,15 +151,15 @@ class MeetingsContentMigrator(object):
 
                 # Copy documents from submitted proposal into subdossier
                 for doc in agendaitem.get_documents():
-                    self.copy_and_add_to_mapping(doc, dossier)
+                    self.copy_and_add_to_mapping(doc, dossier, meeting_dossier)
 
                 # Move excerpts
                 for doc in agendaitem.get_excerpt_documents():
-                    self.move_and_add_to_mapping(doc, dossier)
+                    self.move_and_add_to_mapping(doc, dossier, meeting_dossier)
 
                 # Move the proposal document
                 document = agendaitem.resolve_document()
-                self.move_and_add_to_mapping(document, dossier)
+                self.move_and_add_to_mapping(document, dossier, meeting_dossier)
 
     def disable_meeting_feature(self):
         api.portal.set_registry_record(
@@ -171,19 +171,19 @@ class MeetingsContentMigrator(object):
             annotations[PATH_MAPPING_KEY] = PersistentMapping()
         return annotations[PATH_MAPPING_KEY]
 
-    def copy_and_add_to_mapping(self, obj, container):
+    def copy_and_add_to_mapping(self, obj, container, meeting_dossier):
         former_path = obj.absolute_url_path()
         copied = api.content.copy(source=obj, target=container)
         new_path = copied.absolute_url_path()
-        mapping = self.get_path_mapping(container)
+        mapping = self.get_path_mapping(meeting_dossier)
         mapping[new_path] = former_path
         return copied
 
-    def move_and_add_to_mapping(self, obj, container):
+    def move_and_add_to_mapping(self, obj, container, meeting_dossier):
         former_path = obj.absolute_url_path()
         moved = api.content.move(obj, container)
         new_path = moved.absolute_url_path()
-        mapping = self.get_path_mapping(container)
+        mapping = self.get_path_mapping(meeting_dossier)
         mapping[new_path] = former_path
         return moved
 
