@@ -31,11 +31,13 @@ from zope.globalrequest import getRequest
 from zope.interface import alsoProvides
 from zope.interface import noLongerProvides
 import logging
+import sys
 import transaction
 
 logger = logging.getLogger('opengever.maintenance')
 logging.root.setLevel(logging.INFO)
-
+handler = logging.StreamHandler(stream=sys.stdout)
+logging.root.addHandler(handler)
 
 PATH_MAPPING_KEY = 'MEETING_MIGRATION_PATH_MAPPING'
 
