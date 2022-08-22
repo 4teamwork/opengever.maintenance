@@ -12,6 +12,7 @@ from opengever.base.transport import BASEDATA_KEY
 from opengever.base.transport import DexterityObjectCreator
 from opengever.base.transport import DexterityObjectDataExtractor
 from opengever.base.transport import FIELDDATA_KEY
+from opengever.dossier.behaviors.dossier import IDossier
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
@@ -142,11 +143,13 @@ class MeetingsContentMigrator(object):
         """
         for meeting in Meeting.query:
             meeting_dossier = meeting.get_dossier()
+            responsible = IDossier(meeting_dossier).responsible
             for agendaitem in meeting.agenda_items:
                 # create a subdossier
                 dossier = api.content.create(
                     type='opengever.dossier.businesscasedossier',
                     title=agendaitem.get_title(include_number=True, formatted=True),
+                    responsible=responsible,
                     container=meeting_dossier)
 
                 # Copy documents from submitted proposal into subdossier
