@@ -108,6 +108,7 @@ class MeetingsContentMigrator(object):
 
     def replace_meeting_dossier_with_normal_dossier(self):
         meeting_dossiers = self.catalog.unrestrictedSearchResults(portal_type="opengever.meeting.meetingdossier")
+        to_delete = []
         for brain in meeting_dossiers:
             meeting_dossier = brain.getObject()
 
@@ -134,8 +135,13 @@ class MeetingsContentMigrator(object):
             query = Favorite.query.by_object(meeting_dossier)
             query.update({'oguid': Oguid.for_object(dossier)})
 
+            # We will delete the dossiers afterwards, as it otherwise seems
+            # to modify meeting_dossiers during iteration.
+            to_delete.append(meeting_dossier)
+
+        for obj in to_delete:
             # delete meeting_dossier
-            api.content.delete(meeting_dossier)
+            api.content.delete(obj)
 
     def migrate_agendaitems_to_subdossiers(self):
         """ We create a subdossier in the meeting dossier for each agendaitem
