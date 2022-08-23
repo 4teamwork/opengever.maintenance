@@ -167,6 +167,7 @@ class MeetingsContentMigrator(object):
             # Save state of the meeting dossier on the new dossier
             migration_annotations = self.get_migration_annotations(dossier)
             migration_annotations['state'] = api.content.get_state(meeting_dossier)
+            migration_annotations['former_path'] = meeting_dossier.absolute_url_path()
 
             # We will delete the dossiers afterwards, as it otherwise seems
             # to modify meeting_dossiers during iteration.
