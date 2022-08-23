@@ -228,6 +228,7 @@ class MeetingsContentMigrator(object):
 
             # Move excerpts
             for doc in agendaitem.get_excerpt_documents():
+                assert doc in meeting_dossier.objectValues(), "Excerpt should be in meeting dossier."
                 self.move_and_add_to_mapping(doc, dossier, meeting_dossier)
 
             # Move the proposal document
