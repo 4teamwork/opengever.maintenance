@@ -28,6 +28,7 @@ from opengever.ogds.base.utils import decode_for_json
 from opengever.ogds.base.utils import encode_after_json
 from persistent.mapping import PersistentMapping
 from plone import api
+from plone.app.uuid.utils import uuidToObject
 from plone.subrequest import subrequest
 from zope.annotation import IAnnotations
 from zope.component import getAdapter
@@ -67,9 +68,7 @@ class MeetingsContentMigrator(object):
             transaction.doom()
 
         self._task_queue = self.setup_task_queue()
-        self.replace_meeting_dossier_with_normal_dossier()
-        self.migrate_agendaitems_to_subdossiers()
-        self.set_meeting_dossier_state()
+        self.migrate_meetings()
         self.disable_meeting_feature()
 
         if not self.dryrun:
@@ -132,96 +131,114 @@ class MeetingsContentMigrator(object):
                 "Dossiers in bad review states",
                 "dossiers_in_bad_state")
 
-        if active_meetings.count() or active_proposals.count() or dossiers_in_bad_state:
+        # All meeting dossiers should be linked to a meeting
+        meeting_dossiers = {dossier.UID for dossier in meeting_dossiers}
+        linked_dossiers = set()
+        for meeting in Meeting.query:
+            linked_dossiers.add(meeting.get_dossier().UID())
+        unhealthy_links = meeting_dossiers.symmetric_difference(linked_dossiers)
+
+        if unhealthy_links:
+            unhealthy_links_table = TextTable()
+            unhealthy_links_table.add_row(
+                (u"Path", u"Title", u"State"))
+
+            for uid in unhealthy_links:
+                obj = uuidToObject(uid)
+                unhealthy_links_table.add_row((
+                    obj.absolute_url_path(),
+                    obj.Title().replace(",", ""),
+                    api.content.get_state(obj)))
+
+            self.log_and_write_table(
+                unhealthy_links_table,
+                "Meeting dossiers with unhealthy links to meeting",
+                "unhealthy_links")
+
+        if active_meetings.count() or active_proposals.count() or dossiers_in_bad_state or unhealthy_links:
             raise PreconditionsError("Preconditions not satisfied")
 
-    def replace_meeting_dossier_with_normal_dossier(self):
-        meeting_dossiers = self.catalog.unrestrictedSearchResults(portal_type="opengever.meeting.meetingdossier")
-        to_delete = []
-        for brain in meeting_dossiers:
-            meeting_dossier = brain.getObject()
+    def migrate_meetings(self):
+        for meeting in Meeting.query:
+            meeting_dossier = meeting.get_dossier()
+            dossier = self.replace_meeting_dossier_with_normal_dossier(meeting_dossier)
+            self.migrate_agendaitems_to_subdossiers(meeting, dossier)
+            self.set_meeting_dossier_state(dossier)
 
-            # create simple dossier
-            parent = aq_parent(meeting_dossier)
-            data = DexterityObjectDataExtractor(meeting_dossier).extract()
-            data = encode_after_json(data)
-            data[BASEDATA_KEY][u'portal_type'] = u'opengever.dossier.businesscasedossier'
-            del data[FIELDDATA_KEY][u'IMeetingDossier']
-            data[FIELDDATA_KEY][u'IBusinessCaseDossier'] = {}
-            data[FIELDDATA_KEY][u'IProtectDossier'] = {}
-            data = decode_for_json(data)
-            dossier = DexterityObjectCreator(data).create_in(parent)
+    def replace_meeting_dossier_with_normal_dossier(self, meeting_dossier):
+        # create simple dossier
+        parent = aq_parent(meeting_dossier)
+        data = DexterityObjectDataExtractor(meeting_dossier).extract()
+        data = encode_after_json(data)
+        data[BASEDATA_KEY][u'portal_type'] = u'opengever.dossier.businesscasedossier'
+        del data[FIELDDATA_KEY][u'IMeetingDossier']
+        data[FIELDDATA_KEY][u'IBusinessCaseDossier'] = {}
+        data[FIELDDATA_KEY][u'IProtectDossier'] = {}
+        data = decode_for_json(data)
+        dossier = DexterityObjectCreator(data).create_in(parent)
 
-            # Move all content of meeting dossier to normal dossier
-            for obj in meeting_dossier.contentValues():
-                api.content.move(obj, dossier)
+        # Move all content of meeting dossier to normal dossier
+        for obj in meeting_dossier.contentValues():
+            api.content.move(obj, dossier)
 
-            # update reference in meeting
-            meeting = meeting_dossier.get_meeting()
-            meeting.dossier_oguid = Oguid.for_object(dossier)
+        # update reference in meeting
+        meeting = meeting_dossier.get_meeting()
+        meeting.dossier_oguid = Oguid.for_object(dossier)
 
-            # update favorites
-            query = Favorite.query.by_object(meeting_dossier)
-            query.update({'oguid': Oguid.for_object(dossier)})
+        # update favorites
+        query = Favorite.query.by_object(meeting_dossier)
+        query.update({'oguid': Oguid.for_object(dossier)})
 
-            # Save state of the meeting dossier on the new dossier
-            migration_annotations = self.get_migration_annotations(dossier)
-            migration_annotations['state'] = api.content.get_state(meeting_dossier)
-            migration_annotations['former_path'] = meeting_dossier.absolute_url_path()
+        # Save state of the meeting dossier on the new dossier
+        migration_annotations = self.get_migration_annotations(dossier)
+        migration_annotations['state'] = api.content.get_state(meeting_dossier)
+        migration_annotations['former_path'] = meeting_dossier.absolute_url_path()
 
-            # We will delete the dossiers afterwards, as it otherwise seems
-            # to modify meeting_dossiers during iteration.
-            to_delete.append(meeting_dossier)
+        # delete meeting_dossier
+        assert not meeting_dossier.contentValues(), "Will not delete non-empty meeting dossier!"
+        api.content.delete(meeting_dossier)
+        return dossier
 
-        for obj in to_delete:
-            # delete meeting_dossier
-            assert not obj.contentValues(), "Will not delete non-empty meeting dossier!"
-            api.content.delete(obj)
-
-    def migrate_agendaitems_to_subdossiers(self):
+    def migrate_agendaitems_to_subdossiers(self, meeting, meeting_dossier):
         """ We create a subdossier in the meeting dossier for each agendaitem
         and copy or move its documents into that subdossier.
         """
-        for meeting in Meeting.query:
-            meeting_dossier = meeting.get_dossier()
-            responsible = IDossier(meeting_dossier).responsible
-            for agendaitem in meeting.agenda_items:
-                # create a subdossier
-                dossier = api.content.create(
-                    type='opengever.dossier.businesscasedossier',
-                    title=agendaitem.get_title(include_number=True, formatted=True),
-                    responsible=responsible,
-                    container=meeting_dossier)
+        responsible = IDossier(meeting_dossier).responsible
+        for agendaitem in meeting.agenda_items:
+            # create a subdossier
+            dossier = api.content.create(
+                type='opengever.dossier.businesscasedossier',
+                title=agendaitem.get_title(include_number=True, formatted=True),
+                responsible=responsible,
+                container=meeting_dossier)
 
-                # Copy documents from submitted proposal into subdossier
-                for doc in agendaitem.get_documents():
-                    self.copy_and_add_to_mapping(doc, dossier, meeting_dossier)
+            # Copy documents from submitted proposal into subdossier
+            for doc in agendaitem.get_documents():
+                self.copy_and_add_to_mapping(doc, dossier, meeting_dossier)
 
-                # Move excerpts
-                for doc in agendaitem.get_excerpt_documents():
-                    self.move_and_add_to_mapping(doc, dossier, meeting_dossier)
+            # Move excerpts
+            for doc in agendaitem.get_excerpt_documents():
+                self.move_and_add_to_mapping(doc, dossier, meeting_dossier)
 
-                # Move the proposal document
-                document = agendaitem.resolve_document()
-                self.move_and_add_to_mapping(document, dossier, meeting_dossier)
+            # Move the proposal document
+            document = agendaitem.resolve_document()
+            self.move_and_add_to_mapping(document, dossier, meeting_dossier)
 
-    def set_meeting_dossier_state(self):
-        for meeting in Meeting.query:
-            meeting_dossier = meeting.get_dossier()
-            migration_annotations = self.get_migration_annotations(meeting_dossier)
-            state = migration_annotations['state']
-            if state == 'dossier-state-active':
-                continue
-            elif state == 'dossier-state-resolved':
-                resolver = getAdapter(meeting_dossier, IDossierResolver, name="lenient")
-                resolver.raise_on_failed_preconditions()
-                resolver.resolve()
-            elif state == 'dossier-state-inactive':
-                DossierDeactivator(meeting_dossier).deactivate()
-            else:
-                logger.info("Could not set state {} for {}".format(
-                                state, meeting_dossier.absolute_url_path()))
-            api.content.transition(meeting_dossier, to_state=migration_annotations['state'])
+    def set_meeting_dossier_state(self, meeting_dossier):
+        migration_annotations = self.get_migration_annotations(meeting_dossier)
+        state = migration_annotations['state']
+        if state == 'dossier-state-active':
+            return
+        elif state == 'dossier-state-resolved':
+            resolver = getAdapter(meeting_dossier, IDossierResolver, name="lenient")
+            resolver.raise_on_failed_preconditions()
+            resolver.resolve()
+        elif state == 'dossier-state-inactive':
+            DossierDeactivator(meeting_dossier).deactivate()
+        else:
+            logger.info("Could not set state {} for {}".format(
+                            state, meeting_dossier.absolute_url_path()))
+        api.content.transition(meeting_dossier, to_state=migration_annotations['state'])
 
     def disable_meeting_feature(self):
         api.portal.set_registry_record(
