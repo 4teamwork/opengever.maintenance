@@ -175,6 +175,7 @@ class MeetingsContentMigrator(object):
 
         for obj in to_delete:
             # delete meeting_dossier
+            assert not obj.contentValues(), "Will not delete non-empty meeting dossier!"
             api.content.delete(obj)
 
     def migrate_agendaitems_to_subdossiers(self):
