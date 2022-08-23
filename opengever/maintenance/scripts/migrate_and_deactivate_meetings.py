@@ -6,6 +6,7 @@ from Acquisition import aq_parent
 from collective.taskqueue.interfaces import ITaskQueue
 from collective.taskqueue.interfaces import ITaskQueueLayer
 from collective.taskqueue.taskqueue import LocalVolatileTaskQueue
+from ftw.upgrade.progresslogger import ProgressLogger
 from opengever.base.interfaces import IOpengeverBaseLayer
 from opengever.base.model.favorite import Favorite
 from opengever.base.oguid import Oguid
@@ -43,6 +44,8 @@ import transaction
 logger = logging.getLogger('opengever.maintenance')
 logging.root.setLevel(logging.INFO)
 handler = logging.StreamHandler(stream=sys.stdout)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
 logging.root.addHandler(handler)
 
 MEETING_MIGRATION_KEY = 'MEETING_MIGRATION_DATA'
@@ -72,9 +75,11 @@ class MeetingsContentMigrator(object):
         self.disable_meeting_feature()
 
         if not self.dryrun:
+            logger.info("Committing...")
             transaction.commit()
 
         self.process_task_queue()
+        logger.info("Done!")
 
     def check_preconditions(self):
         # There should be no active meetings
@@ -159,7 +164,8 @@ class MeetingsContentMigrator(object):
             raise PreconditionsError("Preconditions not satisfied")
 
     def migrate_meetings(self):
-        for meeting in Meeting.query:
+        message = "Migrating meetings."
+        for meeting in ProgressLogger(message, Meeting.query.all(), logger):
             meeting_dossier = meeting.get_dossier()
             dossier = self.replace_meeting_dossier_with_normal_dossier(meeting_dossier)
             self.migrate_agendaitems_to_subdossiers(meeting, dossier)
@@ -178,6 +184,8 @@ class MeetingsContentMigrator(object):
         dossier = DexterityObjectCreator(data).create_in(parent)
 
         # Move all content of meeting dossier to normal dossier
+        logger.info("Moving content from meeting dossier {} to {}".format(
+            meeting_dossier.absolute_url_path(), dossier.absolute_url_path()))
         for obj in meeting_dossier.contentValues():
             api.content.move(obj, dossier)
 
@@ -195,6 +203,7 @@ class MeetingsContentMigrator(object):
         migration_annotations['former_path'] = meeting_dossier.absolute_url_path()
 
         # delete meeting_dossier
+        logger.info("Deleting {}".format(meeting_dossier.absolute_url_path()))
         assert not meeting_dossier.contentValues(), "Will not delete non-empty meeting dossier!"
         api.content.delete(meeting_dossier)
         return dossier
@@ -204,7 +213,8 @@ class MeetingsContentMigrator(object):
         and copy or move its documents into that subdossier.
         """
         responsible = IDossier(meeting_dossier).responsible
-        for agendaitem in meeting.agenda_items:
+        message = "Migrating agendaitems for {}".format(meeting.physical_path)
+        for agendaitem in ProgressLogger(message, meeting.agenda_items, logger):
             # create a subdossier
             dossier = api.content.create(
                 type='opengever.dossier.businesscasedossier',
@@ -225,6 +235,7 @@ class MeetingsContentMigrator(object):
             self.move_and_add_to_mapping(document, dossier, meeting_dossier)
 
     def set_meeting_dossier_state(self, meeting_dossier):
+        logger.info("Setting state for {}\n".format(meeting_dossier.absolute_url_path()))
         migration_annotations = self.get_migration_annotations(meeting_dossier)
         state = migration_annotations['state']
         if state == 'dossier-state-active':
