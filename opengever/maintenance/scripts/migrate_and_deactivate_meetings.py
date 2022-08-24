@@ -22,6 +22,7 @@ from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
+from opengever.meeting.interfaces import IDuringMeetingMigration
 from opengever.meeting.interfaces import IMeetingSettings
 from opengever.meeting.model import Meeting
 from opengever.meeting.model import Proposal
@@ -70,6 +71,9 @@ class MeetingsContentMigrator(object):
             logger.info('Performing dryrun!\n')
             transaction.doom()
 
+        # Mark the request
+        alsoProvides(self.request, IDuringMeetingMigration)
+
         self._task_queue = self.setup_task_queue()
         self.migrate_meetings()
         self.disable_meeting_feature()
@@ -79,6 +83,8 @@ class MeetingsContentMigrator(object):
             transaction.commit()
 
         self.process_task_queue()
+
+        noLongerProvides(self.request, IDuringMeetingMigration)
         logger.info("Done!")
 
     def check_preconditions(self):
