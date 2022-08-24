@@ -14,9 +14,12 @@ from opengever.base.transport import BASEDATA_KEY
 from opengever.base.transport import DexterityObjectCreator
 from opengever.base.transport import DexterityObjectDataExtractor
 from opengever.base.transport import FIELDDATA_KEY
+from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossier
 from opengever.dossier.deactivate import DossierDeactivator
 from opengever.dossier.interfaces import IDossierResolver
+from opengever.locking.lock import LOCK_TYPE_MEETING_EXCERPT_LOCK
+from opengever.locking.lock import MEETING_EXCERPT_LOCK
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
@@ -31,6 +34,7 @@ from opengever.ogds.base.utils import encode_after_json
 from persistent.mapping import PersistentMapping
 from plone import api
 from plone.app.uuid.utils import uuidToObject
+from plone.locking.interfaces import ILockable
 from plone.subrequest import subrequest
 from zope.annotation import IAnnotations
 from zope.component import getAdapter
@@ -193,7 +197,16 @@ class MeetingsContentMigrator(object):
         logger.info("Moving content from meeting dossier {} to {}".format(
             meeting_dossier.absolute_url_path(), dossier.absolute_url_path()))
         for obj in meeting_dossier.contentValues():
+            unlocked = False
+
+            if IBaseDocument.providedBy(obj) and ILockable(obj).locked():
+                if ILockable(obj)._locks(False).get(LOCK_TYPE_MEETING_EXCERPT_LOCK):
+                    ILockable(obj).unlock(MEETING_EXCERPT_LOCK)
+                    unlocked = True
+
             api.content.move(obj, dossier)
+            if unlocked:
+                ILockable(obj).lock(MEETING_EXCERPT_LOCK)
 
         # update reference in meeting
         meeting = meeting_dossier.get_meeting()
