@@ -297,6 +297,11 @@ class MeetingsContentMigrator(object):
         moved = api.content.move(obj, container)
         new_path = moved.absolute_url_path()
         migration_annotations = self.get_migration_annotations(meeting_dossier)
+
+        # obj might already have been moved from meeting dossier to normal dossier
+        # so we correct its former path accordingly.
+        former_path = former_path.replace(meeting_dossier.absolute_url_path(),
+                                          migration_annotations['former_path'])
         migration_annotations['moved'][new_path] = former_path
         return moved
 
