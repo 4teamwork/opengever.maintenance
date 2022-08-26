@@ -29,6 +29,7 @@ from opengever.meeting.interfaces import IDuringMeetingMigration
 from opengever.meeting.interfaces import IMeetingSettings
 from opengever.meeting.model import Meeting
 from opengever.meeting.model import Proposal
+from opengever.meeting.utils import disable_meeting_feature
 from opengever.ogds.base.utils import decode_for_json
 from opengever.ogds.base.utils import encode_after_json
 from persistent.mapping import PersistentMapping
@@ -273,8 +274,7 @@ class MeetingsContentMigrator(object):
         api.content.transition(meeting_dossier, to_state=migration_annotations['state'])
 
     def disable_meeting_feature(self):
-        api.portal.set_registry_record(
-            'is_feature_enabled', False, interface=IMeetingSettings)
+        disable_meeting_feature()
 
     def get_migration_annotations(self, obj):
         annotations = IAnnotations(obj)
