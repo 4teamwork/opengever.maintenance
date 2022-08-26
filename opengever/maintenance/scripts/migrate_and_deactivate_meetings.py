@@ -254,7 +254,12 @@ class MeetingsContentMigrator(object):
             # Move the proposal document
             document = agendaitem.resolve_document()
             if document:
-                self.move_and_add_to_mapping(document, dossier, meeting_dossier)
+                if agendaitem.has_proposal:
+                    # document is in the submitted proposal, copy it
+                    self.copy_and_add_to_mapping(document, dossier, meeting_dossier)
+                else:
+                    # document is in the meeting dossier, move it
+                    self.move_and_add_to_mapping(document, dossier, meeting_dossier)
 
     def set_meeting_dossier_state(self, meeting_dossier):
         logger.info("Setting state for {}\n".format(meeting_dossier.absolute_url_path()))
