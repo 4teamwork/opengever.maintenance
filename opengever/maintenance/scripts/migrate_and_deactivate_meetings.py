@@ -7,6 +7,7 @@ from collective.taskqueue.interfaces import ITaskQueue
 from collective.taskqueue.interfaces import ITaskQueueLayer
 from collective.taskqueue.taskqueue import LocalVolatileTaskQueue
 from ftw.upgrade.progresslogger import ProgressLogger
+from opengever.base.command import BaseObjectCreatorCommand
 from opengever.base.interfaces import IOpengeverBaseLayer
 from opengever.base.model.favorite import Favorite
 from opengever.base.oguid import Oguid
@@ -59,6 +60,11 @@ MEETING_MIGRATION_KEY = 'MEETING_MIGRATION_DATA'
 
 class PreconditionsError(Exception):
     """Raised when preconditions for the migration are not satisfied"""
+
+
+class CreateDossierCommand(BaseObjectCreatorCommand):
+
+    portal_type = 'opengever.dossier.businesscasedossier'
 
 
 class MeetingsContentMigrator(object):
@@ -236,11 +242,10 @@ class MeetingsContentMigrator(object):
         message = "Migrating agendaitems for {}".format(meeting.physical_path)
         for agendaitem in ProgressLogger(message, meeting.agenda_items, logger):
             # create a subdossier
-            dossier = api.content.create(
-                type='opengever.dossier.businesscasedossier',
-                title=agendaitem.get_title(include_number=True, formatted=True),
-                responsible=responsible,
-                container=meeting_dossier)
+            dossier = CreateDossierCommand(
+                meeting_dossier,
+                agendaitem.get_title(include_number=True, formatted=True),
+                responsible=responsible).execute()
 
             # Copy documents from submitted proposal into subdossier
             for doc in agendaitem.get_documents():
