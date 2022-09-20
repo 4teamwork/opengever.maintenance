@@ -49,6 +49,9 @@ class DossierExporter(object):
         self.context = context
         self.catalog = api.portal.get_tool("portal_catalog")
 
+        # create output directory
+        os.mkdir(self.output_directory)
+
     @property
     def dossiers(self):
         return self.catalog.unrestrictedSearchResults(
@@ -64,8 +67,6 @@ class DossierExporter(object):
         if not self.dont_close_dossiers:
             self.resolve_dossiers()
 
-        # create output directory
-        os.mkdir(self.output_directory)
         self.export_dossiers()
 
     def check_preconditions(self):
@@ -211,6 +212,12 @@ def main():
         options.output_directory,
         check_only=options.check_only,
         dont_close_dossiers=options.dont_close_dossiers)
+
+    # setup logging to file in dossier export directory
+    fileh = logging.FileHandler(os.path.join(options.output_directory, "export_dossier.log"), 'w')
+    fileh.setFormatter(formatter)
+    logging.root.addHandler(fileh)
+
     exporter()
 
     if not options.dryrun:
