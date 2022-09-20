@@ -42,9 +42,10 @@ class DossierExporter(object):
     allowed_final_states = ['dossier-state-resolved', 'dossier-state-inactive']
     states_to_resolve = ['dossier-state-active']
 
-    def __init__(self, context, output_directory, check_only=False):
+    def __init__(self, context, output_directory, check_only=False, dont_close_dossiers=False):
         self.check_only = check_only
         self.output_directory = output_directory
+        self.dont_close_dossiers = dont_close_dossiers
         self.context = context
         self.catalog = api.portal.get_tool("portal_catalog")
 
@@ -60,7 +61,8 @@ class DossierExporter(object):
         if self.check_only:
             return
 
-        self.resolve_dossiers()
+        if not self.dont_close_dossiers:
+            self.resolve_dossiers()
 
         # create output directory
         os.mkdir(self.output_directory)
@@ -68,6 +70,11 @@ class DossierExporter(object):
 
     def check_preconditions(self):
         logger.info("Checking preconditions...")
+
+        if self.dont_close_dossiers:
+            logger.info("dont_close_dossiers: Skip checking dossier state and resolvability")
+            return
+
         # All dossiers should be either inactive, resolved or active and resolvable.
         unresolvable_dossiers = []
         dossiers_in_bad_state = []
@@ -117,7 +124,7 @@ class DossierExporter(object):
     def export_dossiers(self):
         message = "Exporting dossiers."
         for brain in ProgressLogger(message, self.dossiers, logger):
-            if brain.review_state not in self.allowed_final_states:
+            if brain.review_state not in self.allowed_final_states and not self.dont_close_dossiers:
                 raise DisallowedReviewState("Dossier in disallowed review state")
             self._export_dossier(brain.getObject())
 
@@ -171,6 +178,8 @@ def main():
     parser.add_option("--check-preconditions-only", dest="check_only", action="store_true", default=False)
     parser.add_option("-n", "--dry-run", action="store_true",
                       dest="dryrun", default=False)
+    parser.add_option("--dont-close-dossiers", action="store_true",
+                      dest="dont_close_dossiers", default=False)
     parser.add_option(
         '-o', dest='output_directory',
         default='var/dossier_export-{}'.format(TIMESTAMP),
@@ -197,8 +206,11 @@ def main():
     path = args[0]
     context = app.unrestrictedTraverse(path)
 
-    exporter = DossierExporter(context, options.output_directory,
-                               options.check_only)
+    exporter = DossierExporter(
+        context,
+        options.output_directory,
+        check_only=options.check_only,
+        dont_close_dossiers=options.dont_close_dossiers)
     exporter()
 
     if not options.dryrun:
