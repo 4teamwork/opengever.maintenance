@@ -42,9 +42,8 @@ class DossierExporter(object):
     allowed_final_states = ['dossier-state-resolved', 'dossier-state-inactive']
     states_to_resolve = ['dossier-state-active']
 
-    def __init__(self, context, output_directory, check_only=False, dryrun=False):
+    def __init__(self, context, output_directory, check_only=False):
         self.check_only = check_only
-        self.dryrun = dryrun
         self.output_directory = output_directory
         self.context = context
         self.catalog = api.portal.get_tool("portal_catalog")
@@ -61,21 +60,11 @@ class DossierExporter(object):
         if self.check_only:
             return
 
-        if self.dryrun:
-            logger.info('Performing dryrun!\n')
-            transaction.doom()
-
         self.resolve_dossiers()
 
         # create output directory
         os.mkdir(self.output_directory)
         self.export_dossiers()
-
-        if not self.dryrun:
-            logger.info("Committing...")
-            transaction.commit()
-
-        logger.info("Done!")
 
     def check_preconditions(self):
         logger.info("Checking preconditions...")
@@ -201,12 +190,22 @@ def main():
         logger.info("Invalid output directory")
         sys.exit(1)
 
+    if options.dryrun:
+        logger.info('Performing dryrun!\n')
+        transaction.doom()
+
     path = args[0]
     context = app.unrestrictedTraverse(path)
 
     exporter = DossierExporter(context, options.output_directory,
-                               options.check_only, options.dryrun)
+                               options.check_only)
     exporter()
+
+    if not options.dryrun:
+        logger.info("Committing...")
+        transaction.commit()
+
+    logger.info("Done!")
 
 
 if __name__ == '__main__':
