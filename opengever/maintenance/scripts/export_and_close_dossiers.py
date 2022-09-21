@@ -15,6 +15,7 @@ from plone import api
 from zope.component import getAdapter
 import logging
 import os
+import shutil
 import sys
 import time
 import transaction
@@ -148,8 +149,7 @@ class DossierExporter(object):
             doc = brain.getObject()
             filename, ext = os.path.splitext(doc.get_filename())
             file_path = self._get_output_path(folder_path, filename, ext)
-            with open(file_path, "w") as fout:
-                fout.write(doc.get_file().data)
+            shutil.copy2(doc.file._blob.committed(), file_path)
 
     def log_and_write_table(self, brains, title, filename):
         table = TextTable()
