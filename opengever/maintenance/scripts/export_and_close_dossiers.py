@@ -207,6 +207,8 @@ def main():
     path = args[0]
     context = app.unrestrictedTraverse(path)
 
+    logger.info("Writing output to {}".format(options.output_directory))
+
     exporter = DossierExporter(
         context,
         options.output_directory,
