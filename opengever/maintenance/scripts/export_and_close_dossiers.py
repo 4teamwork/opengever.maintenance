@@ -131,6 +131,7 @@ class DossierExporter(object):
             self._export_dossier(brain.getObject())
 
     def _get_output_path(self, basedir, name, ext='', i=0):
+        name = name.replace(u'/', u'_')
         if i > 0:
             output_path = os.path.join(basedir, u"{}_{}{}".format(name, i, ext))
         else:
