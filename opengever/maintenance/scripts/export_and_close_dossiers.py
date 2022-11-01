@@ -11,6 +11,8 @@ from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
+from opengever.workspaceclient.interfaces import IWorkspaceClientSettings
+from plone import api
 from plone import api
 from zope.component import getAdapter
 import logging
@@ -61,6 +63,15 @@ class DossierExporter(object):
             is_subdossier=False)
 
     def __call__(self):
+        # Temporary disable the workspaceclient, because zopemaster can not
+        # use the workspaceclient.
+        workspaceclient_flag = api.portal.get_registry_record(
+            interface=IWorkspaceClientSettings, name='is_feature_enabled')
+        if workspaceclient_flag:
+            api.portal.set_registry_record(
+                interface=IWorkspaceClientSettings, name='is_feature_enabled',
+                value=False)
+
         self.check_preconditions()
         if self.check_only:
             return
@@ -69,6 +80,11 @@ class DossierExporter(object):
             self.resolve_dossiers()
 
         self.export_dossiers()
+
+        if workspaceclient_flag:
+            api.portal.set_registry_record(
+                interface=IWorkspaceClientSettings, name='is_feature_enabled',
+                value=True)
 
     def check_preconditions(self):
         logger.info("Checking preconditions...")
@@ -131,6 +147,7 @@ class DossierExporter(object):
             self._export_dossier(brain.getObject())
 
     def _get_output_path(self, basedir, name, ext='', i=0):
+        name = name.replace(u'/', u'_')
         if i > 0:
             output_path = os.path.join(basedir, u"{}_{}{}".format(name, i, ext))
         else:
