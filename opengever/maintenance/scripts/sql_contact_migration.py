@@ -40,7 +40,7 @@ from opengever.contact.models.url import URL
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.dossier.participations import KuBParticipationHandler
 from opengever.dossier.participations import SQLParticipationHandler
-from opengever.journal.entry import MANUAL_JOURNAL_ENTRY
+from opengever.journal.manager import MANUAL_JOURNAL_ENTRY
 from opengever.kub.interfaces import IKuBSettings
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
