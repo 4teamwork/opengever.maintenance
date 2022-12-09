@@ -5,6 +5,8 @@ Changelog
 1.0 (unreleased)
 ----------------
 
+- Fix NightlyArchivalFileConversion for gever versions > 2021.18.0. [njohner]
+
 - Set Metadata when creating new positions in repository migration. [njohner]
 
 - Handle new argument "graceful" of task syncer in ObjectIDUpdater. [njohner]
