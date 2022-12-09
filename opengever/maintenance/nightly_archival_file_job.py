@@ -20,6 +20,13 @@ except ImportError:
     class INightlyJobProvider(Interface):
         pass
 
+try:
+    from opengever.nightlyjobs.provider import NightlyJobProviderBase
+except:
+    # older og.core version, base class does not exist yet. In that case
+    # it is not needed either, as the base class provides the newly required
+    # methods (maybe_commit)
+    NightlyJobProviderBase = object
 
 MISSING_ARCHIVAL_FILE_KEY = 'DOCS_WITH_MISSING_ARCHIVAL_FILE'
 MAX_CONVERSION_REQUESTS_PER_NIGHT = 10000
@@ -30,7 +37,7 @@ sent_conversion_requests = 0
 
 @implementer(INightlyJobProvider)
 @adapter(IPloneSiteRoot, IBrowserRequest, logging.Logger)
-class NightlyArchivalFileConversion(object):
+class NightlyArchivalFileConversion(NightlyJobProviderBase):
     """Trigger conversion of archival files for documents that have been put
     in the persistent queue (by the `ArchivalFileChecker`).
     """
