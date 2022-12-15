@@ -28,6 +28,9 @@ from opengever.ogds.base.actor import ContactActor
 from plone import api
 from uuid import uuid4
 from zope.annotation.interfaces import IAnnotations
+from zope.globalrequest import getRequest
+from zope.interface import alsoProvides
+from zope.interface import noLongerProvides
 import argparse
 import json
 import logging
@@ -36,6 +39,11 @@ import re
 import sys
 import time
 import transaction
+
+try:
+    from opengever.contact.interfaces import IDuringContactMigration
+except ImportError:
+    raise Exception("Migration requires opengever.core version > 2022.24")
 
 logger = logging.getLogger('opengever.maintenance')
 logger.setLevel(logging.INFO)
@@ -47,6 +55,7 @@ stream_handler.setLevel(logging.INFO)
 class PloneContactExporter(object):
 
     def __init__(self, bundle_directory):
+        self.request = getRequest()
         self.bundle_directory = bundle_directory
         self.contact_mapping = {}
         self.kub_url = None
@@ -60,6 +69,7 @@ class PloneContactExporter(object):
 
     def run(self, skip_participations=False, kub_url=None,
             reindex_participations=False, delete_contacts=False):
+        alsoProvides(self.request, IDuringContactMigration)
 
         self.kub_url = kub_url
         os.mkdir(self.bundle_directory)
@@ -74,6 +84,8 @@ class PloneContactExporter(object):
 
         if delete_contacts:
             self.delete_contacts()
+
+        noLongerProvides(self.request, IDuringContactMigration)
 
     def export(self):
         contacts = list(self.get_contacts())
