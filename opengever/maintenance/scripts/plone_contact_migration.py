@@ -156,8 +156,8 @@ class PloneContactExporter(object):
         data.update(unmapped_fields)
         if any(unmapped_fields.values()):
             self.unmapped_table.add_row([
-                contact.contactid(), contact.company,
-                contact.department, contact.function])
+                contact.contactid(), contact.company or '',
+                contact.department or '', contact.function or ''])
 
         self._serialize_mail_addresses(data, contact)
         self._serialize_url(data, contact)
@@ -287,7 +287,7 @@ class PloneContactExporter(object):
             self.addresses_table.add_row(
                 [data["third_party_id"], 'x' if skipped else '',
                  unmapped_country, default_country,
-                 address.get("street"), address.get("house_number", '')])
+                 address.get("street", ""), address.get("house_number", "")])
 
             if not skipped:
                 data["addresses"] = [address]
