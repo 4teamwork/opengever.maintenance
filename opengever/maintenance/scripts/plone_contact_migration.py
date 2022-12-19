@@ -174,27 +174,32 @@ class PloneContactExporter(object):
             mails.append({"email": contact.email})
         if contact.email2:
             mails.append({"email": contact.email2})
-        data["email_addresses"] = mails
+        if mails:
+            mails[0]["is_default"] = True
+            data["email_addresses"] = mails
 
     def _serialize_url(self, data, contact):
         if contact.url:
-            data["urls"] = [{"url": contact.url}]
+            data["urls"] = [{"url": contact.url,
+                             "is_default": True}]
 
     def _serialize_phone_numbers(self, data, contact):
-        phone_mapping = {
-            "phone_office": 6,
-            "phone_fax": 3,
-            "phone_mobile": 2,
-            "phone_home": 1
-        }
+        phone_mapping = (
+            ("phone_office", 6),
+            ("phone_mobile", 2),
+            ("phone_home", 1),
+            ("phone_fax", 3),
+        )
         numbers = []
-        for attr_name, category in phone_mapping.items():
+        for attr_name, category in phone_mapping:
             if getattr(contact, attr_name):
                 numbers.append(
                     {"phone_number": getattr(contact, attr_name),
                      "phone_category": category}
                     )
-        data["phone_numbers"] = numbers
+        if numbers:
+            numbers[0]["is_default"] = True
+            data["phone_numbers"] = numbers
 
     def _get_country_code(self, country):
         if country in KUB_COUNTRY_CHOICES:
@@ -290,6 +295,7 @@ class PloneContactExporter(object):
                  address.get("street", ""), address.get("house_number", "")])
 
             if not skipped:
+                address["is_default"] = True
                 data["addresses"] = [address]
 
     def get_contacts(self):
