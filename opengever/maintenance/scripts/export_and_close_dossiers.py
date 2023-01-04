@@ -11,6 +11,7 @@ from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
+from opengever.repository.interfaces import IRepositoryFolder
 from opengever.workspaceclient.interfaces import IWorkspaceClientSettings
 from plone import api
 from zope.component import getAdapter
@@ -44,22 +45,27 @@ class DossierExporter(object):
     allowed_final_states = ['dossier-state-resolved', 'dossier-state-inactive']
     states_to_resolve = ['dossier-state-active']
 
-    def __init__(self, context, output_directory, check_only=False, dont_close_dossiers=False):
+    def __init__(self, context, output_directory, check_only=False,
+                 dont_close_dossiers=False, export_structure=False):
         self.check_only = check_only
         self.output_directory = output_directory
         self.dont_close_dossiers = dont_close_dossiers
+        self.export_structure = export_structure
         self.context = context
         self.catalog = api.portal.get_tool("portal_catalog")
+
+        self.dossier_path_mapping = {}
 
         # create output directory
         os.mkdir(self.output_directory)
 
-    @property
-    def dossiers(self):
-        return self.catalog.unrestrictedSearchResults(
-            path=self.context.absolute_url_path(),
-            object_provides=IDossierMarker.__identifier__,
-            is_subdossier=False)
+    def dossiers(self, include_subdossiers=False):
+        query = {"path": self.context.absolute_url_path(),
+                 "object_provides": IDossierMarker.__identifier__,
+                 "sort_on": "path"}
+        if not include_subdossiers:
+            query["is_subdossier"] = False
+        return self.catalog.unrestrictedSearchResults(**query)
 
     def __call__(self):
         # Temporary disable the workspaceclient, because zopemaster can not
@@ -95,7 +101,7 @@ class DossierExporter(object):
         # All dossiers should be either inactive, resolved or active and resolvable.
         unresolvable_dossiers = []
         dossiers_in_bad_state = []
-        for brain in self.dossiers:
+        for brain in self.dossiers():
             if brain.review_state in self.allowed_final_states:
                 continue
             elif brain.review_state not in self.states_to_resolve:
@@ -126,7 +132,7 @@ class DossierExporter(object):
 
     def resolve_dossiers(self):
         message = "Closing dossiers..."
-        for brain in ProgressLogger(message, self.dossiers, logger):
+        for brain in ProgressLogger(message, self.dossiers(), logger):
             if brain.review_state not in self.states_to_resolve:
                 continue
 
@@ -140,7 +146,8 @@ class DossierExporter(object):
 
     def export_dossiers(self):
         message = "Exporting dossiers."
-        for brain in ProgressLogger(message, self.dossiers, logger):
+        dossiers = self.dossiers(include_subdossiers=self.export_structure)
+        for brain in ProgressLogger(message, dossiers, logger):
             if brain.review_state not in self.allowed_final_states and not self.dont_close_dossiers:
                 raise DisallowedReviewState("Dossier in disallowed review state")
             self._export_dossier(brain.getObject())
@@ -155,12 +162,31 @@ class DossierExporter(object):
             return self._get_output_path(basedir, name, ext, i=i+1)
         return output_path
 
+    def _get_folder_path(self, dossier):
+        if not self.export_structure:
+            return self._get_output_path(self.output_directory, dossier.title)
+
+        if dossier.is_subdossier():
+            parent_path = self.dossier_path_mapping[dossier.absolute_url_path().rsplit("/", 1)[0]]
+        else:
+            segments = [el.id for el in dossier.aq_parent.aq_chain
+                        if IRepositoryFolder.providedBy(el)]
+            segments.append(self.output_directory)
+            parent_path = os.path.join(*reversed(segments))
+
+        path = self._get_output_path(parent_path, dossier.title)
+        self.dossier_path_mapping[dossier.absolute_url_path()] = path
+        return path
+
     def _export_dossier(self, dossier):
-        folder_path = self._get_output_path(self.output_directory, dossier.title)
-        os.mkdir(folder_path)
-        res = self.catalog.unrestrictedSearchResults(
-            path=dossier.absolute_url_path(),
-            object_provides=IBaseDocument.__identifier__)
+        folder_path = self._get_folder_path(dossier)
+        os.makedirs(folder_path)
+        if self.export_structure:
+            res = dossier.get_contained_documents(unrestricted=True)
+        else:
+            res = self.catalog.unrestrictedSearchResults(
+                path=dossier.absolute_url_path(),
+                object_provides=IBaseDocument.__identifier__)
         for brain in res:
             doc = brain.getObject()
             filename, ext = os.path.splitext(doc.get_filename())
@@ -197,6 +223,9 @@ def main():
                       dest="dryrun", default=False)
     parser.add_option("--dont-close-dossiers", action="store_true",
                       dest="dont_close_dossiers", default=False)
+    parser.add_option("--export-structure", action="store_true",
+                      dest="export_structure", default=False,
+                      help='Export structure will contain repository folders and subdossiers.')
     parser.add_option(
         '-o', dest='output_directory',
         default='var/dossier_export-{}'.format(TIMESTAMP),
@@ -229,7 +258,8 @@ def main():
         context,
         options.output_directory,
         check_only=options.check_only,
-        dont_close_dossiers=options.dont_close_dossiers)
+        dont_close_dossiers=options.dont_close_dossiers,
+        export_structure=options.export_structure)
 
     # setup logging to file in dossier export directory
     fileh = logging.FileHandler(os.path.join(options.output_directory, "export_dossier.log"), 'w')
