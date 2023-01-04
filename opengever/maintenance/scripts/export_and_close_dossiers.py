@@ -13,7 +13,6 @@ from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
 from opengever.workspaceclient.interfaces import IWorkspaceClientSettings
 from plone import api
-from plone import api
 from zope.component import getAdapter
 import logging
 import os
