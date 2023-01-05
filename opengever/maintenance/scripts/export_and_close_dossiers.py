@@ -189,9 +189,12 @@ class DossierExporter(object):
                 object_provides=IBaseDocument.__identifier__)
         for brain in res:
             doc = brain.getObject()
-            filename, ext = os.path.splitext(doc.get_filename())
-            file_path = self._get_output_path(folder_path, filename, ext)
-            shutil.copy2(doc.file._blob.committed(), file_path)
+            if doc.has_file():
+                filename, ext = os.path.splitext(doc.get_filename())
+                file_path = self._get_output_path(folder_path, filename, ext)
+                shutil.copy2(doc.file._blob.committed(), file_path)
+            else:
+                logger.info("Skipping document without file {}".format(doc))
 
     def log_and_write_table(self, brains, title, filename):
         table = TextTable()
