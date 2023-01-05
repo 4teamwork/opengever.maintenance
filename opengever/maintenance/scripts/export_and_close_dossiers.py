@@ -192,7 +192,7 @@ class DossierExporter(object):
             if doc.has_file():
                 filename, ext = os.path.splitext(doc.get_filename())
                 file_path = self._get_output_path(folder_path, filename, ext)
-                shutil.copy2(doc.file._blob.committed(), file_path)
+                shutil.copy2(doc.get_file()._blob.committed(), file_path)
             else:
                 logger.info("Skipping document without file {}".format(doc))
 
