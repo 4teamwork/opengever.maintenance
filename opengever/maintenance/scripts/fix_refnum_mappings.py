@@ -34,6 +34,13 @@ def mapping_needs_update(obj):
         if not prefix_mapping.get(intid) == IReferenceNumber(child).get_local_number():
             return True
 
+    # If there are intids in the prefix mapping that are not children,
+    # they should be of objects that were deleted
+    for intid in set(prefix_mapping.keys()) - children_intids:
+        obj = intids.queryObject(intid)
+        if obj is not None:
+            return True
+
     mapping_intids = set()
     for intid in ref_adapter.get_child_mapping().values():
         # if the object has been deleted, then it can remain in the mapping
