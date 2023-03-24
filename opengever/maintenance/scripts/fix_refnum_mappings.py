@@ -34,6 +34,13 @@ def mapping_needs_update(obj):
         if not prefix_mapping.get(intid) == IReferenceNumber(child).get_local_number():
             return True
 
+    # If there are intids in the prefix mapping that are not children,
+    # they should be of objects that were deleted
+    for intid in set(prefix_mapping.keys()) - children_intids:
+        obj = intids.queryObject(intid)
+        if obj is not None:
+            return True
+
     mapping_intids = set()
     for intid in ref_adapter.get_child_mapping().values():
         # if the object has been deleted, then it can remain in the mapping
@@ -92,14 +99,39 @@ def fix_refnum_mappings(plone):
     print 'Updated a total of {} mappings'.format(n_updated)
 
 
+def reindex_repository_folders(plone):
+    catalog = api.portal.get_tool('portal_catalog')
+    brains = catalog.unrestrictedSearchResults(
+        portal_type=['opengever.repository.repositoryroot',
+                     'opengever.repository.repositoryfolder']
+    )
+
+    n_tot = len(brains)
+    logger.info('\n\nReindexing {} reference numbers\n'.format(n_tot))
+
+    for i, brain in enumerate(brains, 1):
+        if i % 100 == 0:
+            logger.info(u'Done {} / {}'.format(i, n_tot))
+        obj = brain.getObject()
+        obj.reindexObject()
+
+    print 'Reindexed {} reference numbers'.format(n_tot)
+
+
 def main():
     parser = setup_option_parser()
     parser.add_option("-n", "--dry-run", action="store_true",
                       dest="dryrun", default=False)
+    parser.add_option("-r", "--reindex", action="store_true",
+                      dest="reindex", default=False)
     (options, args) = parser.parse_args()
 
     plone = setup_plone(setup_app())
     fix_refnum_mappings(plone)
+
+    if options.reindex:
+        logger.info("reindexing...")
+        reindex_repository_folders(plone)
 
     if not options.dryrun:
         logger.info("Committing...")
