@@ -167,7 +167,12 @@ def migrate_document_types(portal):
         document_type_title = voc.getTerm(document_type).title
 
         new_title = TYPES_MAPPING[document_type_title]
-        IDocumentMetadata(obj).document_type = title_by_token[new_title]
+
+        if new_title == u'L\xf6schen':
+            IDocumentMetadata(obj).document_type = None
+        else:
+            IDocumentMetadata(obj).document_type = title_by_token[new_title]
+
         obj.reindexObject(idxs=['document_type'])
 
 
