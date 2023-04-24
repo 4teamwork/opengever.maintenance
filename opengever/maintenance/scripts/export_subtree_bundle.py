@@ -23,6 +23,7 @@ from opengever.bundle.loader import PORTAL_TYPES_TO_JSON_NAME
 from opengever.dossier.behaviors.participation import IParticipationAware
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.trash.trash import ITrashed
 from operator import itemgetter
 from os.path import join as pjoin
 from os.path import splitext
@@ -433,6 +434,13 @@ class SubtreeBundleSerializer(object):
         review_state = api.content.get_state(child)
         if review_state == 'dossier-state-inactive':
             self.skipped_data['Inactive Dossiers'].append(
+                '/'.join(child.getPhysicalPath()))
+            return True
+
+        # Don't export trashed objects
+        review_state = api.content.get_state(child)
+        if ITrashed.providedBy(child):
+            self.skipped_data['Trashed objects'].append(
                 '/'.join(child.getPhysicalPath()))
             return True
 
