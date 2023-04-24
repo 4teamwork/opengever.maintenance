@@ -409,14 +409,8 @@ class SubtreeBundleSerializer(object):
             # parent_guid, so the children get parented to it.
             for child_id in sorted(node.objectIds()):
                 child = node[child_id]
-
-                # Don't export inactive dossiers
-                review_state = api.content.get_state(child)
-                if review_state == 'dossier-state-inactive':
-                    self.skipped_data['Inactive Dossiers'].append(
-                        '/'.join(child.getPhysicalPath()))
+                if self.should_skip_child(child):
                     continue
-
                 self.serialize_node(child, serialized_nodes_by_type, parent_guid=guid)
 
         else:
@@ -430,7 +424,19 @@ class SubtreeBundleSerializer(object):
             self.skipped_data['Tasks (except contained docs)'].append(path)
             for child_id in sorted(node.objectIds()):
                 child = node[child_id]
+                if self.should_skip_child(child):
+                    continue
                 self.serialize_node(child, serialized_nodes_by_type, parent_guid=parent_guid)
+
+    def should_skip_child(self, child):
+        # Don't export inactive dossiers
+        review_state = api.content.get_state(child)
+        if review_state == 'dossier-state-inactive':
+            self.skipped_data['Inactive Dossiers'].append(
+                '/'.join(child.getPhysicalPath()))
+            return True
+
+        return False
 
     def serialize_review_state(self, obj):
         if obj.portal_type == 'ftw.mail.mail':
