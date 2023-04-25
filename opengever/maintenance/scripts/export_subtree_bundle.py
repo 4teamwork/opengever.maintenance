@@ -23,6 +23,7 @@ from opengever.bundle.loader import PORTAL_TYPES_TO_JSON_NAME
 from opengever.dossier.behaviors.participation import IParticipationAware
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.trash.trash import ITrashed
 from operator import itemgetter
 from os.path import join as pjoin
 from os.path import splitext
@@ -409,14 +410,8 @@ class SubtreeBundleSerializer(object):
             # parent_guid, so the children get parented to it.
             for child_id in sorted(node.objectIds()):
                 child = node[child_id]
-
-                # Don't export inactive dossiers
-                review_state = api.content.get_state(child)
-                if review_state == 'dossier-state-inactive':
-                    self.skipped_data['Inactive Dossiers'].append(
-                        '/'.join(child.getPhysicalPath()))
+                if self.should_skip_child(child):
                     continue
-
                 self.serialize_node(child, serialized_nodes_by_type, parent_guid=guid)
 
         else:
@@ -430,7 +425,26 @@ class SubtreeBundleSerializer(object):
             self.skipped_data['Tasks (except contained docs)'].append(path)
             for child_id in sorted(node.objectIds()):
                 child = node[child_id]
+                if self.should_skip_child(child):
+                    continue
                 self.serialize_node(child, serialized_nodes_by_type, parent_guid=parent_guid)
+
+    def should_skip_child(self, child):
+        # Don't export inactive dossiers
+        review_state = api.content.get_state(child)
+        if review_state == 'dossier-state-inactive':
+            self.skipped_data['Inactive Dossiers'].append(
+                '/'.join(child.getPhysicalPath()))
+            return True
+
+        # Don't export trashed objects
+        review_state = api.content.get_state(child)
+        if ITrashed.providedBy(child):
+            self.skipped_data['Trashed objects'].append(
+                '/'.join(child.getPhysicalPath()))
+            return True
+
+        return False
 
     def serialize_review_state(self, obj):
         if obj.portal_type == 'ftw.mail.mail':
