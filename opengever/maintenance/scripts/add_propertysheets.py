@@ -46,6 +46,7 @@ def add_propertysheets(filepath, clear_storage=False):
 
             description = field_data.get("description", u"")
             required = field_data.get("required", False)
+            available_as_docproperty = field_data.get("available_as_docproperty", False)
             default = field_data.get("default", None)
             if default:
                 if not isinstance(default, unicode):
@@ -61,7 +62,9 @@ def add_propertysheets(filepath, clear_storage=False):
 
             schema_definition.add_field(
                 field_type, name, label, description, required,
-                values, default=default)
+                values=values,
+                available_as_docproperty=available_as_docproperty,
+                default=default)
 
         storage.save(schema_definition)
 
