@@ -51,7 +51,7 @@ def add_propertysheets(filepath, clear_storage=False):
             available_as_docproperty = field_data.get("available_as_docproperty", False)
             default = field_data.get("default", None)
             if default:
-                if not isinstance(default, unicode):
+                if isinstance(default, str):
                     value = default.decode('utf-8')
 
             values = []
