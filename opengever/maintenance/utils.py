@@ -194,3 +194,47 @@ class LogFilePathFinder(object):
         assert eventlog_path.endswith('.log')
         log_dir = os.path.dirname(eventlog_path)
         return log_dir
+
+
+class JsonReferencesResolver(object):
+
+    def __init__(self, data):
+        self.data = data
+
+    def __call__(self):
+        self._recursive_resolve_references(self.data)
+        return self.data
+
+    def _recursive_resolve_references(self, subobject):
+        if isinstance(subobject, dict):
+            for key, value in subobject.items():
+                if self._is_reference(value):
+                    subobject[key] = self._resolve_reference(value)
+                else:
+                    self._recursive_resolve_references(value)
+        elif isinstance(subobject, list):
+            for i, value in enumerate(subobject):
+                if self._is_reference(value):
+                    subobject[i] = self._resolve_reference(value)
+                else:
+                    self._recursive_resolve_references(value)
+
+    @staticmethod
+    def _is_reference(obj):
+        if isinstance(obj, dict) and tuple(obj.keys()) == ("$ref",):
+            return True
+        return False
+
+    def _resolve_reference(self, obj):
+        path = obj["$ref"]
+        if not path.startswith("#/"):
+            raise Exception("Unsupported reference path {}".format(path))
+        path = path.split("#/", 1)[1]
+
+        referenced_object = self.data
+        for el in path.split("/"):
+            if isinstance(referenced_object, list):
+                referenced_object = referenced_object[int(el)]
+            else:
+                referenced_object = referenced_object[el]
+        return referenced_object

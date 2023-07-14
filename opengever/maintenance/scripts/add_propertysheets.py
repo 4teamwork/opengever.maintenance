@@ -9,12 +9,13 @@
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_option_parser
 from opengever.maintenance.debughelpers import setup_plone
+from opengever.maintenance.utils import JsonReferencesResolver
 from opengever.propertysheets.definition import PropertySheetSchemaDefinition
 from opengever.propertysheets.storage import PropertySheetSchemaStorage
+import json
 import logging
 import sys
 import transaction
-import json
 
 
 logger = logging.getLogger('opengever.maintenance')
@@ -31,6 +32,7 @@ def add_propertysheets(filepath, clear_storage=False):
 
     with open(filepath) as sheets_file:
         sheets = json.load(sheets_file)
+        sheets = JsonReferencesResolver(sheets)()
 
     for sheet in sheets:
         schema_definition = PropertySheetSchemaDefinition.create(
@@ -46,9 +48,10 @@ def add_propertysheets(filepath, clear_storage=False):
 
             description = field_data.get("description", u"")
             required = field_data.get("required", False)
+            available_as_docproperty = field_data.get("available_as_docproperty", False)
             default = field_data.get("default", None)
             if default:
-                if not isinstance(default, unicode):
+                if isinstance(default, str):
                     value = default.decode('utf-8')
 
             values = []
@@ -61,7 +64,9 @@ def add_propertysheets(filepath, clear_storage=False):
 
             schema_definition.add_field(
                 field_type, name, label, description, required,
-                values, default=default)
+                values=values,
+                available_as_docproperty=available_as_docproperty,
+                default=default)
 
         storage.save(schema_definition)
 
