@@ -523,6 +523,7 @@ class RepositoryExcelAnalyser(MigratorBase):
         self.reporoot, self.reporoot_guid = self.get_reporoot_and_guid()
 
         self.new_positions = set()
+        self.logged_metadata_mismatch = False
 
     def check_preconditions(self):
         logger.info(u"\n\nChecking preconditions...\n")
@@ -953,9 +954,12 @@ class RepositoryExcelAnalyser(MigratorBase):
                     persisted_value = None
                 assert(persisted_value == metadata.get(field.getName()))
         except AssertionError:
-            logger.warning("\nMetadata mismatch. Metadata will not be "
-                           "updated during migration! {}\n".format(operation))
             operation['metadata_mismatch'] = True
+            if not self.logged_metadata_mismatch:
+                logger.warning("\nMetadata mismatch. At least one operation has"
+                               " a metadata mismatch. Metadata will not be "
+                               "updated during migration!")
+                self.logged_metadata_mismatch = True
 
     def export_to_excel(self):
         analyse_xlsx_path = os.path.join(self.output_directory, 'analysis.xlsx')
