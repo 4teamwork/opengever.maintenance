@@ -594,7 +594,7 @@ class RepositoryExcelAnalyser(MigratorBase):
 
             # Skip positions that should be deleted
             if not new_repo_pos.position:
-                logger.info("\nSkipping, we do not support deletion: {}\n".format(row))
+                logger.info("\nSkipping, we do not support deletion: {}\n".format(row.old_position))
                 self.skipped.append(old_repo_pos.position)
                 continue
 
