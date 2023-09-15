@@ -474,12 +474,12 @@ class PositionsMapping(object):
         for operation in moves_or_merges:
             self._add_move(operation)
 
-    def is_complete(self):
+    def is_complete(self, ignored):
         """Now we make sure that the excel was complete, i.e. there was a row
         for each existing repository folder"""
         complete = True
         for ref_num in self.reference_repository_mapping:
-            if ref_num not in self.old_pos_guid:
+            if ref_num not in self.old_pos_guid and ref_num not in ignored:
                 logger.warning("\nExcel is incomplete. No operation defined for "
                                "position {}\n".format(ref_num))
                 complete = False
@@ -524,6 +524,7 @@ class RepositoryExcelAnalyser(MigratorBase):
 
         self.new_positions = set()
         self.logged_metadata_mismatch = False
+        self.skipped = []
 
     def check_preconditions(self):
         logger.info(u"\n\nChecking preconditions...\n")
@@ -594,6 +595,7 @@ class RepositoryExcelAnalyser(MigratorBase):
             # Skip positions that should be deleted
             if not new_repo_pos.position:
                 logger.info("\nSkipping, we do not support deletion: {}\n".format(row))
+                self.skipped.append(old_repo_pos.position)
                 continue
 
             permissions = self.extract_permissions(row)
@@ -614,7 +616,7 @@ class RepositoryExcelAnalyser(MigratorBase):
         # add the repository root to the mapping
         self.positions_mapping.old_pos_guid[''] = self.reporoot_guid
         self.positions_mapping.new_pos_guid[''] = self.reporoot_guid
-        if not self.positions_mapping.is_complete():
+        if not self.positions_mapping.is_complete(ignored=self.skipped):
             self.is_valid = False
 
         for operation in data:
