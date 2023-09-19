@@ -1193,7 +1193,7 @@ class RepositoryMigrator(MigratorBase):
                     with_children=True)
 
             deleter = RepositoryDeleter(repo)
-            if not deleter.is_deletion_allowed():
+            if not deleter.is_delete_allowed():
                 raise Exception('Trying to delete not empty object {}'.format(item))
             deleter.delete()
 
