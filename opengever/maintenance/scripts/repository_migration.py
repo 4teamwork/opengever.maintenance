@@ -920,7 +920,7 @@ class RepositoryExcelAnalyser(MigratorBase):
                 permissions['block_inheritance'] = True
 
         for key in managed_roles_shortnames:
-            groups = [group.strip() for group in getattr(row, key).split(',')]
+            groups = [group.strip() for group in getattr(row, key).replace("\n", ",").split(',')]
             groups = [group for group in groups if group]
 
             permissions[key] = groups
