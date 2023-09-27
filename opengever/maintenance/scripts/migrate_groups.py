@@ -344,7 +344,10 @@ def main():
         updater.write_update_table()
 
     if not options.dryrun:
+        logger.info('Committing...')
         transaction.commit()
+
+    logger.info("All done")
 
 
 if __name__ == '__main__':
