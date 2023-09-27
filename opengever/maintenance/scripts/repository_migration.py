@@ -474,12 +474,12 @@ class PositionsMapping(object):
         for operation in moves_or_merges:
             self._add_move(operation)
 
-    def is_complete(self):
+    def is_complete(self, ignored):
         """Now we make sure that the excel was complete, i.e. there was a row
         for each existing repository folder"""
         complete = True
         for ref_num in self.reference_repository_mapping:
-            if ref_num not in self.old_pos_guid:
+            if ref_num not in self.old_pos_guid and ref_num not in ignored:
                 logger.warning("\nExcel is incomplete. No operation defined for "
                                "position {}\n".format(ref_num))
                 complete = False
@@ -523,6 +523,8 @@ class RepositoryExcelAnalyser(MigratorBase):
         self.reporoot, self.reporoot_guid = self.get_reporoot_and_guid()
 
         self.new_positions = set()
+        self.logged_metadata_mismatch = False
+        self.skipped = []
 
     def check_preconditions(self):
         logger.info(u"\n\nChecking preconditions...\n")
@@ -592,7 +594,8 @@ class RepositoryExcelAnalyser(MigratorBase):
 
             # Skip positions that should be deleted
             if not new_repo_pos.position:
-                logger.info("\nSkipping, we do not support deletion: {}\n".format(row))
+                logger.info("\nSkipping, we do not support deletion: {}\n".format(row.old_position))
+                self.skipped.append(old_repo_pos.position)
                 continue
 
             permissions = self.extract_permissions(row)
@@ -613,7 +616,7 @@ class RepositoryExcelAnalyser(MigratorBase):
         # add the repository root to the mapping
         self.positions_mapping.old_pos_guid[''] = self.reporoot_guid
         self.positions_mapping.new_pos_guid[''] = self.reporoot_guid
-        if not self.positions_mapping.is_complete():
+        if not self.positions_mapping.is_complete(ignored=self.skipped):
             self.is_valid = False
 
         for operation in data:
@@ -693,7 +696,7 @@ class RepositoryExcelAnalyser(MigratorBase):
                     logger.warning("\nInvalid operation: incorrect position."
                                    "{}\n".format(operation))
                     operation['is_valid'] = False
-                if (obj.description or old_repo_pos.description) and obj.description.strip() != old_repo_pos.description.strip():
+                if (obj.description or old_repo_pos.description) and (obj.description or '').strip() != (old_repo_pos.description or '').strip():
                     logger.warning("\nInvalid operation: incorrect description."
                                    "{}\n".format(operation))
                     operation['is_valid'] = False
@@ -917,7 +920,7 @@ class RepositoryExcelAnalyser(MigratorBase):
                 permissions['block_inheritance'] = True
 
         for key in managed_roles_shortnames:
-            groups = [group.strip() for group in getattr(row, key).split(',')]
+            groups = [group.strip() for group in getattr(row, key).replace("\n", ",").split(',')]
             groups = [group for group in groups if group]
 
             permissions[key] = groups
@@ -953,9 +956,12 @@ class RepositoryExcelAnalyser(MigratorBase):
                     persisted_value = None
                 assert(persisted_value == metadata.get(field.getName()))
         except AssertionError:
-            logger.warning("\nMetadata mismatch. Metadata will not be "
-                           "updated during migration! {}\n".format(operation))
             operation['metadata_mismatch'] = True
+            if not self.logged_metadata_mismatch:
+                logger.warning("\nMetadata mismatch. At least one operation has"
+                               " a metadata mismatch. Metadata will not be "
+                               "updated during migration!")
+                self.logged_metadata_mismatch = True
 
     def export_to_excel(self):
         analyse_xlsx_path = os.path.join(self.output_directory, 'analysis.xlsx')
@@ -1187,7 +1193,7 @@ class RepositoryMigrator(MigratorBase):
                     with_children=True)
 
             deleter = RepositoryDeleter(repo)
-            if not deleter.is_deletion_allowed():
+            if not deleter.is_delete_allowed():
                 raise Exception('Trying to delete not empty object {}'.format(item))
             deleter.delete()
 
