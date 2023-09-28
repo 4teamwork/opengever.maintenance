@@ -209,8 +209,6 @@ class LocalRolesUpdater(object):
             self.log.append(('/'.join(obj.getPhysicalPath()), changes))
             logger.info("updating {}".format(self.log[-1][0]))
             manager._update_local_roles()
-            if ITask.providedBy(obj):
-                obj.sync()
             if self.options.immediate_commits and not self.options.dryrun:
                 transaction.commit()
 
