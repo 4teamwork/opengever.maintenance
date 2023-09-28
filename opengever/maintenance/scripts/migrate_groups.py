@@ -20,6 +20,8 @@ optional arguments:
 """
 from Acquisition import aq_base
 from collections import Counter
+from ftw.solr.converters import CONVERTERS
+from ftw.solr.interfaces import ISolrConnectionManager
 from ftw.upgrade.progresslogger import ProgressLogger
 from opengever.base.role_assignments import RoleAssignmentManager
 from opengever.contact.interfaces import IContactFolder
@@ -44,6 +46,7 @@ from opengever.task.task import ITask
 from opengever.tasktemplates.content.tasktemplate import ITaskTemplate
 from opengever.tasktemplates.content.templatefoldersschema import ITaskTemplateFolderSchema
 from plone import api
+from zope.component import queryUtility
 import argparse
 import json
 import logging
@@ -71,6 +74,7 @@ class LocalRolesUpdater(object):
         self.log = []
         self.orgunits_with_modified_inbox_group = []
         self.catalog = api.portal.get_tool('portal_catalog')
+        self.sm = queryUtility(ISolrConnectionManager)
 
     def check_preconditions(self):
         for org_unit in OrgUnit.query:
@@ -208,11 +212,46 @@ class LocalRolesUpdater(object):
 
             self.log.append(('/'.join(obj.getPhysicalPath()), changes))
             logger.info("updating {}".format(self.log[-1][0]))
-            manager._update_local_roles()
+            manager._update_local_roles(reindex=False)
             if self.options.immediate_commits and not self.options.dryrun:
                 transaction.commit()
 
         self.sync_tasks()
+        self.update_indexes()
+
+    def update_indexes(self):
+        """Instead of reindexing the object security for all concerned objects
+        and their children, we directly modify the catalog and solr indexes.
+        """
+        index = self.catalog._catalog.indexes["allowedRolesAndUsers"]
+        uid_index = self.catalog._catalog.indexes['UID']
+
+        schema = self.sm.schema
+        field = schema.fields['allowedRolesAndUsers']
+        field_class = schema.field_types[field[u'type']][u'class']
+        multivalued = field.get(u'multiValued', False)
+        converter = CONVERTERS.get(field_class)
+
+        principal_mapping = {"user:{}".format(key): "user:{}".format(value)
+                             for key, value in self.group_mapping.items()}
+        old_principal_ids = set(principal_mapping.keys())
+
+        # Forward index is of the form _index[principal] = [docid1, docid2]
+        for old_group, new_group in principal_mapping.items():
+            if old_group in index._index:
+                index._index[new_group] = index._index.pop(old_group)
+
+        # Backward index is of the form _unindex[docid] = [principal1, principal2]
+        # Solr index contains the same data as this backward index
+        for docid, principals in index._unindex.items():
+            if any([old_group in principals for old_group in old_principal_ids]):
+                # Update the catalog index
+                index._unindex[docid] = [principal_mapping.get(principal, principal)
+                                         for principal in principals]
+                # Update the solr index
+                uid = uid_index.getEntryForObject(docid)
+                value = converter(index._unindex[docid], multivalued)
+                self.sm.connection.add({'allowedRolesAndUsers': {'set': value}, 'UID': uid})
 
     def sync_tasks(self):
         if self.options.tasks_only:
@@ -301,6 +340,10 @@ class LocalRolesUpdater(object):
         with open(log_filename, "w") as logfile:
             update_table.write_csv(logfile)
 
+    def commit(self):
+        transaction.commit()
+        self.sm.connection.commit(soft_commit=False, after_commit=False)
+
 
 def main():
 
@@ -343,7 +386,7 @@ def main():
 
     if not options.dryrun:
         logger.info('Committing...')
-        transaction.commit()
+        updater.commit()
 
     logger.info("All done")
 
