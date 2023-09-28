@@ -70,6 +70,7 @@ class LocalRolesUpdater(object):
             self.include_tasks = False
         self.log = []
         self.orgunits_with_modified_inbox_group = []
+        self.catalog = api.portal.get_tool('portal_catalog')
 
     def check_preconditions(self):
         for org_unit in OrgUnit.query:
@@ -103,7 +104,6 @@ class LocalRolesUpdater(object):
     def analyse(self):
         self.check_preconditions()
 
-        self.catalog = api.portal.get_tool('portal_catalog')
         # We only need to check repositoryroots, -folders, dossiers,
         # tasktemplates, tasktemplatefolders, proposals and dispositions.
         # Because all these groups are not used as a org_unit group or inbox_group,
