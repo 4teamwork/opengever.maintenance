@@ -45,6 +45,8 @@ from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task.task import ITask
 from opengever.tasktemplates.content.tasktemplate import ITaskTemplate
 from opengever.tasktemplates.content.templatefoldersschema import ITaskTemplateFolderSchema
+from opengever.workspace.interfaces import IWorkspace
+from opengever.workspace.interfaces import IWorkspaceFolder
 from plone import api
 from zope.component import queryUtility
 import argparse
@@ -130,6 +132,8 @@ class LocalRolesUpdater(object):
                 IContactFolder.__identifier__,
                 IInboxContainer.__identifier__,
                 IInbox.__identifier__,
+                IWorkspace.__identifier__,
+                IWorkspaceFolder.__identifier__,
                 ]
         if self.include_tasks:
             interfaces_to_update.append(ITask.__identifier__)
