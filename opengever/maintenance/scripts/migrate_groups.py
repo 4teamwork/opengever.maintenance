@@ -243,7 +243,10 @@ class LocalRolesUpdater(object):
         # Forward index is of the form _index[principal] = [docid1, docid2]
         for old_group, new_group in principal_mapping.items():
             if old_group in index._index:
-                index._index[new_group] = index._index.pop(old_group)
+                if new_group in index._index:
+                    index._index[new_group].update(index._index.pop(old_group))
+                else:
+                    index._index[new_group] = index._index.pop(old_group)
 
         # Backward index is of the form _unindex[docid] = [principal1, principal2]
         # Solr index contains the same data as this backward index
