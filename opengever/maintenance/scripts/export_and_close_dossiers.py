@@ -12,6 +12,7 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.maintenance.utils import LogFilePathFinder
 from opengever.maintenance.utils import TextTable
 from opengever.repository.interfaces import IRepositoryFolder
+from opengever.trash.trash import ITrashed
 from opengever.workspaceclient.interfaces import IWorkspaceClientSettings
 from plone import api
 from zope.component import getAdapter
@@ -189,9 +190,18 @@ class DossierExporter(object):
                 object_provides=IBaseDocument.__identifier__)
         for brain in res:
             doc = brain.getObject()
+            if ITrashed.providedBy(doc):
+                logger.info("Skipped trashed document: {}".format(doc.absolute_url_path()))
+                continue
+
+            file_ = doc.get_file()
+            if not file_:
+                logger.info("Skipped document without file: {}".format(doc.absolute_url_path()))
+                continue
+
             filename, ext = os.path.splitext(doc.get_filename())
             file_path = self._get_output_path(folder_path, filename, ext)
-            shutil.copy2(doc.file._blob.committed(), file_path)
+            shutil.copy2(file_._blob.committed(), file_path)
 
     def log_and_write_table(self, brains, title, filename):
         table = TextTable()
