@@ -173,6 +173,8 @@ EXPECTED_CATALOG_METADATA_FIELDS = set([
     'trashed',
     'Type',
     'UID',
+    'predecessor',
+    'issuer',
 ])
 
 CATALOG_METADATA_TO_UPDATE = set([
@@ -452,32 +454,32 @@ class ExcelDataExtractor(object):
         'old_position': Column(0, '', u'Ordnungs-\npositions-\nnummer'),  # A
         'old_title': Column(1, '', u'Titel der Ordnungsposition'),  # B
         'old_description': Column(2, '', u'Beschreibung (optional)'),  # C
-        'new_position': Column(5, 'reference_number',
+        'new_position': Column(3, 'reference_number',
                                u'Ordnungs-\npositions-\nnummer'),  # F
-        'new_title': Column(6, 'effective_title', u'Titel der Ordnungsposition'),  # G
-        'new_description': Column(8, 'description', u'Beschreibung (optional)'),  # I
-        'classification': Column(11, 'classification', u'Klassifikation'),  # L
-        'privacy_layer': Column(12, 'privacy_layer', u'Datenschutz'),  # M
-        'retention_period': Column(13, 'retention_period',
+        'new_title': Column(4, 'effective_title', u'Titel der Ordnungsposition'),  # G
+        'new_description': Column(6, 'description', u'Beschreibung (optional)'),  # I
+        'classification': Column(9, 'classification', u'Klassifikation'),  # L
+        'privacy_layer': Column(10, 'privacy_layer', u'Datenschutz'),  # M
+        'retention_period': Column(11, 'retention_period',
                                    u'Aufbewahrung in Verwaltung'),  # N
-        'retention_period_annotation': Column(14, 'retention_period_annotation',
+        'retention_period_annotation': Column(12, 'retention_period_annotation',
                                               u'Kommentar zur Aufbewahrungsdauer\n(optional)'),  # O
-        'archival_value': Column(15, 'archival_value', u'Archiv-\nw\xfcrdigkeit'),  # P
-        'archival_value_annotation': Column(16, 'archival_value_annotation',
+        'archival_value': Column(13, 'archival_value', u'Archiv-\nw\xfcrdigkeit'),  # P
+        'archival_value_annotation': Column(14, 'archival_value_annotation',
                                             u'Kommentar zur Archivw\xfcrdigkeit\n(optional)'),  # Q
-        'custody_period': Column(17, 'custody_period', u'Archivische Schutzfrist'),  # R
-        'block_inheritance': Column(22, 'block_inheritance', ''),  # W
-        'read': Column(23, 'read_dossiers_access', ''),  # X
-        'add': Column(24, 'add_dossiers_access', ''),  # Y
-        'edit': Column(25, 'edit_dossiers_access', ''),  # Z
-        'close': Column(26, 'close_dossiers_access', ''),  # AA
-        'reactivate': Column(27, 'reactivate_dossiers_access', ''),  # AB
-        'manage_dossiers': Column(28, 'manage_dossiers_access', ''),  # AC
+        'custody_period': Column(15, 'custody_period', u'Archivische Schutzfrist'),  # R
+        'block_inheritance': Column(18, 'block_inheritance', ''),  # W
+        'read': Column(19, 'read_dossiers_access', ''),  # X
+        'add': Column(20, 'add_dossiers_access', ''),  # Y
+        'edit': Column(21, 'edit_dossiers_access', ''),  # Z
+        'close': Column(22, 'close_dossiers_access', ''),  # AA
+        'reactivate': Column(23, 'reactivate_dossiers_access', ''),  # AB
+        'manage_dossiers': Column(24, 'manage_dossiers_access', ''),  # AC
     }
 
     def __init__(self, diff_xlsx_path):
         sheets = xlrd_xls2array(diff_xlsx_path)
-        self.data = sheets[0]['sheet_data']
+        self.data = sheets[1]['sheet_data']
         self.n_data = len(self.data) - self.first_data_row
         self.validate_format()
 
