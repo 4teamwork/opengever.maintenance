@@ -119,6 +119,71 @@ MAPPED_FIELDS["archival_value"].update({
     u'sa': u'archival worthy with sampling',
                                        })
 
+EXPECTED_CATALOG_METADATA_FIELDS = set([
+    'title_de',
+    'bumblebee_checksum',
+    'has_sametype_children',
+    'reference',
+    'Title',
+    'css_icon_class',
+    'file_extension',
+    'retention_expiration',
+    'is_subdossier',
+    'getContentType',
+    'changed',
+    'exclude_from_nav',
+    'Type',
+    'id',
+    'document_date',
+    'cmf_uid',
+    'receipt_date',
+    'end',
+    'UID',
+    'listCreators',
+    'document_author',
+    'is_folderish',
+    'responsible',
+    'getId',
+    'filename',
+    'start',
+    'contactid',
+    'filesize',
+    'public_trial',
+    'lastname',
+    'review_state',
+    'email',
+    'trashed',
+    'title_fr',
+    'firstname',
+    'checked_out',
+    'portal_type',
+    'phone_office',
+    'title_en',
+    'task_type',
+    'Description',
+    'created',
+    'getIcon',
+    'gever_doc_uid',
+    'Creator',
+    'modified',
+    'email2',
+    'preselected',
+    'sequence_number',
+    'is_subtask',
+    'in_response_to',
+    'delivery_date',
+    'Subject',
+])
+
+CATALOG_METADATA_TO_UPDATE = set([
+    'has_sametype_children'
+    'changed',
+    'modified,'
+    'reference,'
+    'retention_expiration,'
+    'sequence_number',
+])
+
 
 def log_progress(i, tot, step=100):
     if i % step == 0:
@@ -217,6 +282,55 @@ class PatchDisableLDAP(MonkeyPatch):
             # transaction.commit()
 
         self.patch_refs(DisabledLDAP, '__exit__', __exit__)
+
+
+class PatchCatalogMetadataUpdate(MonkeyPatch):
+    """The ZCatalog will always update all available metadata if reindexing an
+    object with 'update_metadata' enabled. There is no way to update only specific
+    metadata values of an object. Updating metadata means, that all metadata
+    will be recalcuated for an objects. This process takes a lot of time and is mostly
+    unnecessary. In addition, it requires to have access to the blobs of documents
+    because some of the metadata properties are relying on blob information (filesize).
+
+    To speed up the migration and to be able to run the migration without the
+    existence of blobs, we'll patch the catalog to only update the relevant
+    metadata items.
+    """
+
+    def __call__(self):
+        from Products.ZCatalog.Catalog import Catalog
+        from Products.ZCatalog.Catalog import safe_callable
+        from Products.ZCatalog.Catalog import MV
+
+        def recordify(self, obj):
+            # --- Patch ---
+            existing_metadata = None
+            rid = self.uids.get('/'.join(obj.getPhysicalPath()))
+            if rid:
+                existing_metadata = self.getMetadataForRID(rid)
+            # --- End Patch ---
+
+            record = []
+            # the unique id is always the first element
+            for x in self.names:
+                # --- Patch ---
+                if existing_metadata and x not in CATALOG_METADATA_TO_UPDATE:
+                    record.append(existing_metadata.get(x, MV))
+                    continue
+                # --- End Patch ---
+
+                attr = getattr(object, x, MV)
+                if (attr is not MV and safe_callable(attr)):
+                    attr = attr()
+                record.append(attr)
+            return tuple(record)
+
+        assert set(self.names) == EXPECTED_CATALOG_METADATA_FIELDS, \
+            "Metadata fields have been changed. Are you sure, that only the " \
+            "following metadata properties needs to be updated during the " \
+            "migration? {}".format(', '.join(CATALOG_METADATA_TO_UPDATE))
+
+        self.patch_refs(Catalog, 'recordify', recordify)
 
 
 class SkipTaskSyncWith(MonkeyPatch):
@@ -1505,6 +1619,7 @@ def main():
     PatchDisableLDAP()()
     SkipDocPropsUpdate()()
     SkipSearchableTextExtraction()()
+    PatchCatalogMetadataUpdate()()
 
     logger.info('\n\nstarting analysis...\n')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output_directory)
