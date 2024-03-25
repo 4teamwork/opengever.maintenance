@@ -119,6 +119,76 @@ MAPPED_FIELDS["archival_value"].update({
     u'sa': u'archival worthy with sampling',
                                        })
 
+EXPECTED_CATALOG_METADATA_FIELDS = set([
+    'bumblebee_checksum',
+    'changed',
+    'checked_out',
+    'cmf_uid',
+    'contactid',
+    'created',
+    'Creator',
+    'css_icon_class',
+    'delivery_date',
+    'Description',
+    'document_author',
+    'document_date',
+    'email',
+    'email2',
+    'end',
+    'exclude_from_nav',
+    'file_extension',
+    'filename',
+    'filesize',
+    'firstname',
+    'getContentType',
+    'getIcon',
+    'getId',
+    'gever_doc_uid',
+    'has_sametype_children',
+    'id',
+    'in_response_to',
+    'is_folderish',
+    'is_subdossier',
+    'is_subtask',
+    'lastname',
+    'listCreators',
+    'modified',
+    'phone_office',
+    'portal_type',
+    'preselected',
+    'public_trial',
+    'receipt_date',
+    'reference',
+    'responsible',
+    'retention_expiration',
+    'review_state',
+    'sequence_number',
+    'start',
+    'Subject',
+    'task_type',
+    'Title',
+    'title_de',
+    'title_en',
+    'title_fr',
+    'trashed',
+    'Type',
+    'UID',
+])
+
+CATALOG_METADATA_TO_UPDATE = set([
+    'changed',
+    'has_sametype_children',
+    'modified',
+    'reference',
+    'retention_expiration',
+    'sequence_number',
+    'Title',
+    'title_de',
+    'title_en',
+    'title_fr',
+    'Description',
+])
+
 
 def log_progress(i, tot, step=100):
     if i % step == 0:
@@ -217,6 +287,58 @@ class PatchDisableLDAP(MonkeyPatch):
             # transaction.commit()
 
         self.patch_refs(DisabledLDAP, '__exit__', __exit__)
+
+
+class PatchCatalogMetadataUpdate(MonkeyPatch):
+    """The ZCatalog will always update all available metadata if reindexing an
+    object with 'update_metadata' enabled. There is no way to update only specific
+    metadata values of an object. Updating metadata means, that all metadata
+    will be recalcuated for an objects. This process takes a lot of time and is mostly
+    unnecessary. In addition, it requires to have access to the blobs of documents
+    because some of the metadata properties are relying on blob information (filesize).
+
+    To speed up the migration and to be able to run the migration without the
+    existence of blobs, we'll patch the catalog to only update the relevant
+    metadata items.
+    """
+
+    def __call__(self):
+        from Products.ZCatalog.Catalog import Catalog
+        from Products.ZCatalog.Catalog import safe_callable
+        from Products.ZCatalog.Catalog import MV
+
+        def recordify(self, object):
+            # --- Patch ---
+            existing_metadata = None
+            rid = self.uids.get('/'.join(object.getPhysicalPath()))
+            if rid:
+                existing_metadata = self.getMetadataForRID(rid)
+            # --- End Patch ---
+
+            record = []
+            # the unique id is always the first element
+            for x in self.names:
+                # --- Patch ---
+                if existing_metadata and x not in CATALOG_METADATA_TO_UPDATE:
+                    record.append(existing_metadata.get(x, MV))
+                    continue
+                # --- End Patch ---
+
+                attr = getattr(object, x, MV)
+                if (attr is not MV and safe_callable(attr)):
+                    attr = attr()
+                record.append(attr)
+            return tuple(record)
+
+        existing_metadata_names = set(api.portal.get_tool('portal_catalog')._catalog.names)
+        assert existing_metadata_names == EXPECTED_CATALOG_METADATA_FIELDS, \
+            "Metadata fields have been changed. Missing metadata-fields: {}. Are you sure, that only the " \
+            "following metadata properties needs to be updated during the " \
+            "migration? {}".format(
+                existing_metadata_names.difference(EXPECTED_CATALOG_METADATA_FIELDS),
+                ', '.join(CATALOG_METADATA_TO_UPDATE))
+
+        self.patch_refs(Catalog, 'recordify', recordify)
 
 
 class SkipTaskSyncWith(MonkeyPatch):
@@ -1505,6 +1627,7 @@ def main():
     PatchDisableLDAP()()
     SkipDocPropsUpdate()()
     SkipSearchableTextExtraction()()
+    PatchCatalogMetadataUpdate()()
 
     logger.info('\n\nstarting analysis...\n')
     analyser = RepositoryExcelAnalyser(mapping_path, options.output_directory)
