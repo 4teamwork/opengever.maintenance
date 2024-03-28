@@ -1428,7 +1428,10 @@ class RepositoryMigrator(MigratorBase):
             if not obj:
                 logger.error("Could not find {} to reindex. Skipping".format(uid))
                 continue
-            obj.reindexObject(idxs=idxs)
+
+            # WARNING! idxs needs to be a tuple, otherwise solr will always update all attributes
+            # See: https://github.com/plone/collective.indexing/blob/2.0/src/collective/indexing/queue.py#L142
+            obj.reindexObject(idxs=tuple(idxs))
             if obj.portal_type == 'opengever.task.task':
                 # make sure that the model is up to date.
                 TaskSqlSyncer(obj, None).sync()
