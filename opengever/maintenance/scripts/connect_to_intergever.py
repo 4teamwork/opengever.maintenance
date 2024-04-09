@@ -32,7 +32,7 @@ CLUSTERS = {
     },
     "sgprod": {
         "gever_base_url": "https://gever.sg.ch",
-        "intergever_url": "https://gever.sg.ch/intergever",
+        "intergever_url": "https://intergever.sg.ch/",
     },
     "oggdev": {
         "gever_base_url": "https://dev.onegovgever.ch/",
