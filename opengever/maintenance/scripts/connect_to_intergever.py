@@ -30,6 +30,10 @@ CLUSTERS = {
         "gever_base_url": "https://gevertest.sg.ch",
         "intergever_url": "https://gevertest.sg.ch/intergever",
     },
+    "sgprod": {
+        "gever_base_url": "https://gever.sg.ch",
+        "intergever_url": "https://gever.sg.ch/intergever",
+    },
     "oggdev": {
         "gever_base_url": "https://dev.onegovgever.ch/",
         "intergever_url": "https://igdev.onegovgever.ch/intergever",
