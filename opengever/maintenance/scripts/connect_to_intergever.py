@@ -13,6 +13,7 @@ from opengever.maintenance.debughelpers import setup_plone
 from opengever.webactions.exceptions import ActionAlreadyExists
 from opengever.webactions.schema import IWebActionSchema
 from opengever.webactions.storage import get_storage
+from opengever.webactions.storage import WebActionsStorage
 from plone import api
 from random import SystemRandom
 import argparse
@@ -81,7 +82,13 @@ def register_webaction(plone, options):
         new_action_id = storage.add(action_data)
         print("Webaction created with ID %s" % new_action_id)
     except ActionAlreadyExists:
-        print("Webaction with unique_name %r already exists, skipped." % unique_name)
+        if args.update_webaction:
+            unique_name = action_data.pop('unique_name')
+            existing_action_id = storage._indexes[WebActionsStorage.IDX_UNIQUE_NAME][unique_name]
+            storage.update(existing_action_id, action_data)
+            print("Webaction with ID %s has been updated" % existing_action_id)
+        else:
+            print("Webaction with unique_name %r already exists, skipped." % unique_name)
 
 
 def random_password():
@@ -127,6 +134,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("cluster", choices=CLUSTERS.keys(), help="Cluster")
+    parser.add_argument('--update-webaction', action='store_true')
 
     args = parser.parse_args(sys.argv[3:])
 
