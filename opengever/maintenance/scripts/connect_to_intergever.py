@@ -35,6 +35,22 @@ CLUSTERS = {
         "gever_base_url": "https://gever.sg.ch",
         "intergever_url": "https://intergever.sg.ch/",
     },
+    "walenstadtprod": {
+        "gever_base_url": "https://walenstadt.onegovgever.ch",
+        "intergever_url": "https://intergever-walenstadt.onegovgever.ch",
+    },
+    "pfaefersprod": {
+        "gever_base_url": "https://pfaefers.onegovgever.ch",
+        "intergever_url": "https://intergever-pfaefers.onegovgever.ch",
+    },
+    "quartenprod": {
+        "gever_base_url": "https://quarten.onegovgever.ch",
+        "intergever_url": "https://intergever-quarten.onegovgever.ch",
+    },
+    "sevelenprod": {
+        "gever_base_url": "https://sevelen.onegovgever.ch",
+        "intergever_url": "https://intergever-sevelen.onegovgever.ch",
+    },
     "oggdev": {
         "gever_base_url": "https://dev.onegovgever.ch/",
         "intergever_url": "https://igdev.onegovgever.ch/intergever",
