@@ -15,6 +15,7 @@ from opengever.webactions.schema import IWebActionSchema
 from opengever.webactions.storage import get_storage
 from opengever.webactions.storage import WebActionsStorage
 from plone import api
+from Products.CMFPlone.utils import safe_unicode
 from random import SystemRandom
 import argparse
 import string
@@ -68,6 +69,7 @@ def register_webaction(plone, options):
 
     gever_base_url = cluster["gever_base_url"].rstrip("/")
     intergever_url = cluster["intergever_url"].rstrip("/")
+    groups_by_site = cluster.get("groups_by_site", {})
 
     target_url = "%s/ech0147_export/?dossier_url=%s{path}" % (
         intergever_url,
@@ -88,6 +90,11 @@ def register_webaction(plone, options):
         u"unique_name": unique_name,
     }
 
+    groups = groups_by_site.get(api.portal.get().id, [])
+    groups = map(safe_unicode, groups)
+    if groups:
+        action_data.update({"groups": groups})
+
     errors = get_validation_errors(action_data, IWebActionSchema)
     if errors:
         raise Exception("Invalid webaction: %s" % errors)
@@ -97,12 +104,17 @@ def register_webaction(plone, options):
     try:
         new_action_id = storage.add(action_data)
         print("Webaction created with ID %s" % new_action_id)
+        if groups:
+            print("Restricted webaction to groups: %r" % groups)
+
     except ActionAlreadyExists:
         if args.update_webaction:
             unique_name = action_data.pop('unique_name')
             existing_action_id = storage._indexes[WebActionsStorage.IDX_UNIQUE_NAME][unique_name]
             storage.update(existing_action_id, action_data)
             print("Webaction with ID %s has been updated" % existing_action_id)
+            if groups:
+                print("Restricted webaction to groups: %r" % groups)
         else:
             print("Webaction with unique_name %r already exists, skipped." % unique_name)
 
