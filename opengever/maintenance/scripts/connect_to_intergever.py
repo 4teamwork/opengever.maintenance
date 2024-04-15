@@ -15,6 +15,7 @@ from opengever.webactions.schema import IWebActionSchema
 from opengever.webactions.storage import get_storage
 from opengever.webactions.storage import WebActionsStorage
 from plone import api
+from Products.CMFPlone.utils import safe_unicode
 from random import SystemRandom
 import argparse
 import string
@@ -34,6 +35,53 @@ CLUSTERS = {
     "sgprod": {
         "gever_base_url": "https://gever.sg.ch",
         "intergever_url": "https://intergever.sg.ch/",
+        "groups_by_site": {
+            "abb": ["ACL-SVC-GEVER-BLD-ABB-EINGANGSKORB-RW-GS"],
+            "afdl": ["ACL-SVC-GEVER-FD-AFDL-EINGANGSKORB-RW-GS"],
+            "afhn": ["ACL-SVC-GEVER-DI-AFHN-EINGANGSKORB-RW-GS"],
+            "afku": ["ACL-SVC-GEVER-DI-AFKU-EINGANGSKORB-RW-GS"],
+            "afso": ["ACL-SVC-GEVER-DI-AFSO-EINGANGSKORB-RW-GS"],
+            "afu": ["ACL-SVC-GEVER-BUD-AFU-EINGANGSKORB-RW-GS"],
+            "agve": ["ACL-SVC-GEVER-GD-AGVE-EINGANGSKORB-RW-GS"],
+            "agvo": ["ACL-SVC-GEVER-GD-AGVO-EINGANGSKORB-RW-GS"],
+            "ahs": ["ACL-SVC-GEVER-BLD-AHS-EINGANGSKORB-RW-GS"],
+            "ams": ["ACL-SVC-GEVER-BLD-AMS-EINGANGSKORB-RW-GS"],
+            "anjf": ["ACL-SVC-GEVER-VD-ANJF-EINGANGSKORB-RW-GS"],
+            "arch": ["ACL-SVC-GEVER-DI-AFKUARCH-EINGANGSKORB-RW-GS"],
+            "areg": ["ACL-SVC-GEVER-BD-AREG-EINGANGSKORB-RW-GS"],
+            "asp": ["ACL-SVC-GEVER-BLD-ASP-EINGANGSKORB-RW-GS"],
+            "avs": ["ACL-SVC-GEVER-BLD-AVS-EINGANGSKORB-RW-GS"],
+            "avsv": ["ACL-SVC-GEVER-GD-AVSV-EINGANGSKORB-RW-GS"],
+            "vdawa": ["ACL-SVC-GEVER-VD-AWA-EINGANGSKORB-RW-GS"],
+            "awe": ["ACL-SVC-GEVER-BUD-AWE-EINGANGSKORB-RW-GS"],
+            "bdgs": ["ACL-SVC-GEVER-BUD-BUDGS-EINGANGSKORB-BUDGS-RW-GS"],
+            "bldgs": ["ACL-SVC-GEVER-BLD-BLDGS-EINGANGSKORB-GS"],
+            "digs": ["ACL-SVC-GEVER-DI-DIGS-EINGANGSKORB-RW-GS"],
+            "dip": ["ACL-SVC-GEVER-FD-DIP-EINGANGSKORB-RW-GS"],
+            "egov": ["ACL-SVC-GEVER-EGOVSG-EINGANGSKORB-RW-GS"],
+            "fdgs": ["ACL-SVC-GEVER-FD-FDGS-EINGANGSKORB-GS"],
+            "gdgs": ["ACL-SVC-GEVER-GD-GDGS-EINGANGSKORB-GS"],
+            "gergs": ["ACL-SVC-GEVER-GER-GERGS-EINGANGSKORB-RW-GS"],
+            "hba": ["ACL-SVC-GEVER-BUD-HBA-EINGANGSKORB-RW-GS"],
+            "kaa": ["ACL-SVC-GEVER-GD-KAA-EINGANGSKORB-RW-GS"],
+            "kapo": ["ACL-SVC-GEVER-SJD-KAPO-EINGANGSKORB-RW-GS"],
+            "kdp": ["ACL-SVC-GEVER-DI-AFKUKDP-EINGANGSKORB-RW-GS"],
+            "kfk": ["ACL-SVC-GEVER-FD-KFK-EINGANGSKORB-RW-GS"],
+            "ksta": ["ACL-SVC-GEVER-FD-KSTA-EINGANGSKORB-RW-GS"],
+            "kufoe": ["ACL-SVC-GEVER-DI-AFKUKUFOE-EINGANGSKORB-RW-GS"],
+            "lwa": ["ACL-SVC-GEVER-VD-LWA-EINGANGSKORB-RW-GS"],
+            "ma": ["ACL-SVC-GEVER-SJD-MA-EINGANGSKORB-RW-GS"],
+            "pa": ["ACL-SVC-GEVER-FD-PA-EINGANGSKORB-RW-GS"],
+            "sjdgs": ["ACL-SVC-GEVER-SJD-SJDGS-EINGANGSKORB-GS"],
+            "sksk": ["ACL-SVC-GEVER-SK-SK-EINGANGSKORB-RW-GS"],
+            "sta": ["ACL-SVC-GEVER-SJD-STA-EINGANGSKORB-RW-GS"],
+            "stasg": ["ACL-SVC-GEVER-DI-AFKUSTASG-EINGANGSKORB-RW-GS"],
+            "stia": ["ACL-SVC-GEVER-DI-STIA-EINGANGSKORB-RW-GS"],
+            "stva": ["ACL-SVC-GEVER-SJD-STVA-EINGANGSKORB-RW-GS"],
+            "tba": ["ACL-SVC-GEVER-BUD-TBA-EINGANGSKORB-RW-GS"],
+            "tbagevi": ["ACL-SVC-GEVER-BD-TBAGEVI-EINGANGSKORB-RW-GS"],
+            "vdgs": ["ACL-SVC-GEVER-VD-VDGS-EINGANGSKORB-GS"],
+        },
     },
     "walenstadtprod": {
         "gever_base_url": "https://walenstadt.onegovgever.ch",
@@ -42,14 +90,23 @@ CLUSTERS = {
     "pfaefersprod": {
         "gever_base_url": "https://pfaefers.onegovgever.ch",
         "intergever_url": "https://intergever-pfaefers.onegovgever.ch",
+        "groups_by_site": {
+            "pfaefers": ["Eingangskorb Gemeinderatskanzlei"],
+        },
     },
     "quartenprod": {
         "gever_base_url": "https://quarten.onegovgever.ch",
         "intergever_url": "https://intergever-quarten.onegovgever.ch",
+        "groups_by_site": {
+            "quarten": ["quarten_users"],
+        },
     },
     "sevelenprod": {
         "gever_base_url": "https://sevelen.onegovgever.ch",
         "intergever_url": "https://intergever-sevelen.onegovgever.ch",
+        "groups_by_site": {
+            "sevelen": ["sevelen_admins"],
+        },
     },
     "oggdev": {
         "gever_base_url": "https://dev.onegovgever.ch/",
@@ -68,6 +125,7 @@ def register_webaction(plone, options):
 
     gever_base_url = cluster["gever_base_url"].rstrip("/")
     intergever_url = cluster["intergever_url"].rstrip("/")
+    groups_by_site = cluster.get("groups_by_site", {})
 
     target_url = "%s/ech0147_export/?dossier_url=%s{path}" % (
         intergever_url,
@@ -88,6 +146,11 @@ def register_webaction(plone, options):
         u"unique_name": unique_name,
     }
 
+    groups = groups_by_site.get(api.portal.get().id, [])
+    groups = map(safe_unicode, groups)
+    if groups:
+        action_data.update({"groups": groups})
+
     errors = get_validation_errors(action_data, IWebActionSchema)
     if errors:
         raise Exception("Invalid webaction: %s" % errors)
@@ -97,12 +160,17 @@ def register_webaction(plone, options):
     try:
         new_action_id = storage.add(action_data)
         print("Webaction created with ID %s" % new_action_id)
+        if groups:
+            print("Restricted webaction to groups: %r" % groups)
+
     except ActionAlreadyExists:
         if args.update_webaction:
             unique_name = action_data.pop('unique_name')
             existing_action_id = storage._indexes[WebActionsStorage.IDX_UNIQUE_NAME][unique_name]
             storage.update(existing_action_id, action_data)
             print("Webaction with ID %s has been updated" % existing_action_id)
+            if groups:
+                print("Restricted webaction to groups: %r" % groups)
         else:
             print("Webaction with unique_name %r already exists, skipped." % unique_name)
 
