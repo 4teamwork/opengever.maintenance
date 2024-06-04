@@ -81,6 +81,10 @@ CLUSTERS = {
             "tba": ["ACL-SVC-GEVER-BUD-TBA-EINGANGSKORB-RW-GS"],
             "tbagevi": ["ACL-SVC-GEVER-BD-TBAGEVI-EINGANGSKORB-RW-GS"],
             "vdgs": ["ACL-SVC-GEVER-VD-VDGS-EINGANGSKORB-GS"],
+            "sjdajv": ["ACL-SVC-GEVER-SJD-AJV-EINGANGSKORB-RW-GS"],
+            "vdkfa":  ["ACL-SVC-GEVER-VD-KFA-EINGANGSKORB-RW-GS"],
+            "dikonk":  ["ACL-SVC-GEVER-DI-KONK-EINGANGSKORB-RW-GS"],
+
         },
     },
     "walenstadtprod": {
