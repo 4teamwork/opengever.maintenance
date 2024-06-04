@@ -6,22 +6,27 @@ Connects a GEVER deployment to InterGEVER:
 Example Usage:
 
     bin/instance run connect_to_intergever.py sgtest
+
+    # To update webactions only
+    bin/instance run connect_to_intergever.py sgtest --jobs webactions
+
+    # To ensure the service user is present without updating webactions:
+    bin/instance run connect_to_intergever.py sgtest --jobs service_user
 """
-from opengever.api.validation import get_validation_errors
-from opengever.maintenance.debughelpers import setup_app
-from opengever.maintenance.debughelpers import setup_plone
-from opengever.webactions.exceptions import ActionAlreadyExists
-from opengever.webactions.schema import IWebActionSchema
-from opengever.webactions.storage import get_storage
-from opengever.webactions.storage import WebActionsStorage
-from plone import api
-from Products.CMFPlone.utils import safe_unicode
-from random import SystemRandom
 import argparse
 import string
 import sys
-import transaction
+from random import SystemRandom
 
+import transaction
+from opengever.api.validation import get_validation_errors
+from opengever.webactions.exceptions import ActionAlreadyExists
+from opengever.webactions.schema import IWebActionSchema
+from opengever.webactions.storage import WebActionsStorage, get_storage
+from plone import api
+from Products.CMFPlone.utils import safe_unicode
+
+from opengever.maintenance.debughelpers import setup_app, setup_plone
 
 SERVICE_USER_ID = "intergever.app"
 
@@ -30,11 +35,11 @@ NOTIFICATION_ROLE = "PrivilegedNotificationDispatcher"
 CLUSTERS = {
     "sgtest": {
         "gever_base_url": "https://gevertest.sg.ch",
-        "intergever_url": "https://gevertest.sg.ch/intergever",
+        "intergever_url": "https://intergevertest.sg.ch",
     },
     "sgprod": {
         "gever_base_url": "https://gever.sg.ch",
-        "intergever_url": "https://intergever.sg.ch/",
+        "intergever_url": "https://intergevertest.sg.ch",
         "groups_by_site": {
             "abb": ["ACL-SVC-GEVER-BLD-ABB-EINGANGSKORB-RW-GS"],
             "afdl": ["ACL-SVC-GEVER-FD-AFDL-EINGANGSKORB-RW-GS"],
@@ -119,7 +124,7 @@ CLUSTERS = {
 }
 
 
-def register_webaction(plone, options):
+def register_webactions(plone, options):
     cluster_id = options.cluster
     cluster = CLUSTERS[cluster_id]
 
@@ -127,52 +132,63 @@ def register_webaction(plone, options):
     intergever_url = cluster["intergever_url"].rstrip("/")
     groups_by_site = cluster.get("groups_by_site", {})
 
-    target_url = "%s/ech0147_export/?dossier_url=%s{path}" % (
-        intergever_url,
-        gever_base_url,
-    )
+    actions = [
+        {
+            "title": u"Export eCH-0147/Inter-GEVER",
+            "unique_name": u"intergever-export",
+            "target_url": "%s/ech0147_export/?dossier_url=%s{path}" % (intergever_url, gever_base_url),
+            "types": [u"opengever.dossier.businesscasedossier"],
+        },
+        {
+            "title": u"Import eCH-0147",
+            "unique_name": u"intergever-import",
+            "target_url": "%s/inbox" % intergever_url,
+            "types": [
+                u"opengever.repository.repositoryfolder",
+                u"opengever.dossier.businesscasedossier"
+            ],
+        }
+    ]
 
-    title = u"eCH-0147 Export via InterGEVER"
-    unique_name = u"intergever-export"
+    for action in actions:
+        action_data = {
+            u"display": "actions-menu",
+            u"mode": "blank",
+            u"order": 0,
+            u"scope": "global",
+            u"target_url": action["target_url"],
+            u"title": action["title"],
+            u"types": action["types"],
+            u"unique_name": action["unique_name"],
+        }
 
-    action_data = {
-        u"display": "actions-menu",
-        u"mode": "blank",
-        u"order": 0,
-        u"scope": "global",
-        u"target_url": target_url,
-        u"title": title,
-        u"types": [u"opengever.dossier.businesscasedossier"],
-        u"unique_name": unique_name,
-    }
-
-    groups = groups_by_site.get(api.portal.get().id, [])
-    groups = map(safe_unicode, groups)
-    if groups:
-        action_data.update({"groups": groups})
-
-    errors = get_validation_errors(action_data, IWebActionSchema)
-    if errors:
-        raise Exception("Invalid webaction: %s" % errors)
-
-    storage = get_storage()
-
-    try:
-        new_action_id = storage.add(action_data)
-        print("Webaction created with ID %s" % new_action_id)
+        groups = groups_by_site.get(api.portal.get().id, [])
+        groups = map(safe_unicode, groups)
         if groups:
-            print("Restricted webaction to groups: %r" % groups)
+            action_data.update({"groups": groups})
 
-    except ActionAlreadyExists:
-        if args.update_webaction:
-            unique_name = action_data.pop('unique_name')
-            existing_action_id = storage._indexes[WebActionsStorage.IDX_UNIQUE_NAME][unique_name]
-            storage.update(existing_action_id, action_data)
-            print("Webaction with ID %s has been updated" % existing_action_id)
+        errors = get_validation_errors(action_data, IWebActionSchema)
+        if errors:
+            raise Exception("Invalid webaction: %s" % errors)
+
+        storage = get_storage()
+
+        try:
+            new_action_id = storage.add(action_data)
+            print("Webaction created with ID %s" % new_action_id)
             if groups:
                 print("Restricted webaction to groups: %r" % groups)
-        else:
-            print("Webaction with unique_name %r already exists, skipped." % unique_name)
+
+        except ActionAlreadyExists:
+            if options.update_webaction:
+                unique_name = action_data.pop('unique_name')
+                existing_action_id = storage._indexes[WebActionsStorage.IDX_UNIQUE_NAME][unique_name]
+                storage.update(existing_action_id, action_data)
+                print("Webaction with ID %s has been updated" % existing_action_id)
+                if groups:
+                    print("Restricted webaction to groups: %r" % groups)
+            else:
+                print("Webaction with unique_name %r already exists, skipped." % action["unique_name"])
 
 
 def random_password():
@@ -219,11 +235,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("cluster", choices=CLUSTERS.keys(), help="Cluster")
     parser.add_argument('--update-webaction', action='store_true')
+    parser.add_argument(
+        '--jobs', nargs='+',
+        default=['webactions', 'service_user'],
+        help="Jobs to execute (options: webactions, service_user)")
 
     args = parser.parse_args(sys.argv[3:])
 
     plone = setup_plone(setup_app())
 
-    register_webaction(plone, args)
-    ensure_service_user_present(plone, args)
+    if 'webactions' in args.jobs:
+        register_webactions(plone, args)
+
+    if 'service_user' in args.jobs:
+        ensure_service_user_present(plone, args)
+
     transaction.commit()
