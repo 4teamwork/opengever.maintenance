@@ -41,7 +41,7 @@ CLUSTERS = {
     },
     "sgprod": {
         "gever_base_url": "https://gever.sg.ch",
-        "intergever_url": "https://intergevertest.sg.ch",
+        "intergever_url": "https://intergever.sg.ch",
         "groups_by_site": {
             "abb": ["ACL-SVC-GEVER-BLD-ABB-EINGANGSKORB-RW-GS"],
             "afdl": ["ACL-SVC-GEVER-FD-AFDL-EINGANGSKORB-RW-GS"],
