@@ -22,11 +22,13 @@ import transaction
 from opengever.api.validation import get_validation_errors
 from opengever.webactions.exceptions import ActionAlreadyExists
 from opengever.webactions.schema import IWebActionSchema
-from opengever.webactions.storage import WebActionsStorage, get_storage
+from opengever.webactions.storage import WebActionsStorage
+from opengever.webactions.storage import get_storage
 from plone import api
 from Products.CMFPlone.utils import safe_unicode
 
-from opengever.maintenance.debughelpers import setup_app, setup_plone
+from opengever.maintenance.debughelpers import setup_app
+from opengever.maintenance.debughelpers import setup_plone
 
 SERVICE_USER_ID = "intergever.app"
 
@@ -39,7 +41,7 @@ CLUSTERS = {
     },
     "sgprod": {
         "gever_base_url": "https://gever.sg.ch",
-        "intergever_url": "https://intergevertest.sg.ch",
+        "intergever_url": "https://intergever.sg.ch",
         "groups_by_site": {
             "abb": ["ACL-SVC-GEVER-BLD-ABB-EINGANGSKORB-RW-GS"],
             "afdl": ["ACL-SVC-GEVER-FD-AFDL-EINGANGSKORB-RW-GS"],
@@ -202,6 +204,13 @@ def random_password():
     return pw
 
 
+def has_service_user():
+    uf = api.portal.get_tool("acl_users")
+    user_manager = uf["source_users"]
+
+    return SERVICE_USER_ID in user_manager.getUserIds()
+
+
 def ensure_service_user_present(plone, options):
     uf = api.portal.get_tool("acl_users")
     user_manager = uf["source_users"]
@@ -249,7 +258,10 @@ if __name__ == "__main__":
     plone = setup_plone(setup_app())
 
     if 'webactions' in args.jobs:
-        register_webactions(plone, args)
+        if 'service_user' not in args.jobs and not has_service_user():
+            print("No service user registered for this deployment: %s" % api.portal.get().id)
+        else:
+            register_webactions(plone, args)
 
     if 'service_user' in args.jobs:
         ensure_service_user_present(plone, args)
