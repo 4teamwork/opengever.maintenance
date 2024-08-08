@@ -129,7 +129,7 @@ CLUSTERS = {
     },
     "local": {
         "gever_base_url": "http://localhost:8080/",
-        "intergever_url": "http://localhost:3000/intergever",
+        "intergever_url": "http://localhost:3333/",
     },
 }
 
@@ -250,6 +250,7 @@ if __name__ == "__main__":
     app = setup_app()
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--site-root')
     parser.add_argument("cluster", choices=CLUSTERS.keys(), help="Cluster")
     parser.add_argument('--update-webaction', action='store_true')
     parser.add_argument(
@@ -259,7 +260,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args(sys.argv[3:])
 
-    plone = setup_plone(setup_app())
+    plone = setup_plone(setup_app(), options=args)
 
     if 'webactions' in args.jobs:
         if 'service_user' not in args.jobs and not has_service_user():
