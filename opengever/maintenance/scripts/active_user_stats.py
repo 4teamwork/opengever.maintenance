@@ -4,23 +4,26 @@ a logfile.
 
 bin/instance0 run src/opengever.maintenance/opengever/maintenance/scripts/active_user_stats.py
 """
+import json
+import logging
+from datetime import date
 from datetime import datetime
-from ftw.contentstats.logger import get_log_dir_path
+from datetime import timedelta
 from logging import FileHandler
+from os.path import join
+
+import pytz
+from ftw.contentstats.logger import get_log_dir_path
 from opengever.maintenance import dm
 from opengever.maintenance.debughelpers import setup_option_parser
+from tzlocal import get_localzone
+
 from opengever.meeting import is_meeting_feature_enabled
 from opengever.meeting.model import Committee
 from opengever.ogds.models.group import Group
 from opengever.ogds.models.group import groups_users
 from opengever.ogds.models.org_unit import OrgUnit
 from opengever.ogds.models.user import User
-from opengever.workspace import is_workspace_feature_enabled
-from os.path import join
-from tzlocal import get_localzone
-import json
-import logging
-import pytz
 
 logger = logging.getLogger('opengever.maintenance')
 LOG_TZ = get_localzone()
@@ -31,16 +34,12 @@ class UserStatsCalculator(object):
     """
     def get_stats(self):
         stats = {
-            'total_active_unique_gever_users': 0,
-            'total_active_unique_teamraum_users': 0,
+            'total_active_unique_users': self.calc_total_active_unique_users(),
+            'total_active_users_logged_in_last_30_days': self.calc_total_users_logged_in_last_x_days(30),
+            'total_active_users_logged_in_last_365_days': self.calc_total_users_logged_in_last_x_days(365),
+            'total_active_users_never_logged_in': self.calc_total_users_never_logged_in(),
             'total_active_unique_spv_users': 0,
         }
-
-        unique_users = self.calc_total_active_unique_users()
-        if not is_workspace_feature_enabled():
-            stats['total_active_unique_gever_users'] = unique_users
-        else:
-            stats['total_active_unique_teamraum_users'] = unique_users
 
         if is_meeting_feature_enabled():
             stats['total_active_unique_spv_users'] = self.calc_total_active_unique_spv_users()
@@ -51,13 +50,24 @@ class UserStatsCalculator(object):
         query = User.query.join(groups_users).join(Group)
         return query.filter(Group.groupid.in_(group_ids)).filter_by(active=True)
 
-    def calc_total_active_unique_users(self):
+    def active_unique_users_query(self):
         group_ids = [
             org_unit.users_group_id for org_unit in
             OrgUnit.query.filter_by(enabled=True).all()]
 
-        query = self.get_active_users_by_groups_query(group_ids)
-        return query.count()
+        return self.get_active_users_by_groups_query(group_ids)
+
+    def calc_total_active_unique_users(self):
+        return self.active_unique_users_query().distinct().count()
+
+    def calc_total_users_logged_in_last_x_days(self, days):
+        last_x_days = date.today() - timedelta(days=days)
+        return self.active_unique_users_query().filter(
+            User.last_login > last_x_days).distinct().count()
+
+    def calc_total_users_never_logged_in(self):
+        return self.active_unique_users_query().filter(
+            User.last_login == None).distinct().count()
 
     def calc_total_active_unique_spv_users(self):
         group_ids = [
@@ -65,7 +75,7 @@ class UserStatsCalculator(object):
             Committee.query.filter_by(workflow_state='active')]
 
         query = self.get_active_users_by_groups_query(group_ids)
-        return query.count()
+        return query.distinct().count()
 
 
 if __name__ == '__main__':
