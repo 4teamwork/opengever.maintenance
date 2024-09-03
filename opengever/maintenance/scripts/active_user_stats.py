@@ -37,11 +37,8 @@ class UserStatsCalculator(object):
             'total_active_users_logged_in_last_30_days': self.calc_total_users_logged_in_last_x_days(30),
             'total_active_users_logged_in_last_365_days': self.calc_total_users_logged_in_last_x_days(365),
             'total_active_users_never_logged_in': self.calc_total_users_never_logged_in(),
-            'total_active_spv_users': 0,
+            'total_active_spv_users': self.calc_total_active_unique_spv_users(),
         }
-
-        if is_meeting_feature_enabled():
-            stats['total_active_unique_spv_users'] = self.calc_total_active_unique_spv_users()
 
         return stats
 
