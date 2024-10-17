@@ -2,6 +2,11 @@
 This script is used to prepare deletion of the meetings from
 Gever and use RIS in its stead.
 """
+import logging
+import sys
+from datetime import date
+
+import transaction
 from Acquisition import aq_parent
 from collective.taskqueue.interfaces import ITaskQueue
 from collective.taskqueue.interfaces import ITaskQueueLayer
@@ -12,20 +17,15 @@ from opengever.base.interfaces import IOpengeverBaseLayer
 from opengever.base.model.favorite import Favorite
 from opengever.base.oguid import Oguid
 from opengever.base.transport import BASEDATA_KEY
+from opengever.base.transport import FIELDDATA_KEY
 from opengever.base.transport import DexterityObjectCreator
 from opengever.base.transport import DexterityObjectDataExtractor
-from opengever.base.transport import FIELDDATA_KEY
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossier
 from opengever.dossier.deactivate import DossierDeactivator
 from opengever.dossier.interfaces import IDossierResolver
 from opengever.locking.lock import LOCK_TYPE_MEETING_EXCERPT_LOCK
 from opengever.locking.lock import MEETING_EXCERPT_LOCK
-from opengever.maintenance.debughelpers import setup_app
-from opengever.maintenance.debughelpers import setup_option_parser
-from opengever.maintenance.debughelpers import setup_plone
-from opengever.maintenance.utils import LogFilePathFinder
-from opengever.maintenance.utils import TextTable
 from opengever.meeting.interfaces import IDuringMeetingMigration
 from opengever.meeting.interfaces import IMeetingSettings
 from opengever.meeting.model import Meeting
@@ -44,9 +44,12 @@ from zope.component import provideUtility
 from zope.globalrequest import getRequest
 from zope.interface import alsoProvides
 from zope.interface import noLongerProvides
-import logging
-import sys
-import transaction
+
+from opengever.maintenance.debughelpers import setup_app
+from opengever.maintenance.debughelpers import setup_option_parser
+from opengever.maintenance.debughelpers import setup_plone
+from opengever.maintenance.utils import LogFilePathFinder
+from opengever.maintenance.utils import TextTable
 
 logger = logging.getLogger('opengever.maintenance')
 logging.root.setLevel(logging.INFO)
@@ -184,6 +187,8 @@ class MeetingsContentMigrator(object):
         message = "Migrating meetings."
         for meeting in ProgressLogger(message, Meeting.query.all(), logger):
             meeting_dossier = meeting.get_dossier()
+            if meeting.physical_path != 'sitzungen/committee-1/meeting-43':
+                continue
             dossier = self.replace_meeting_dossier_with_normal_dossier(meeting_dossier)
             self.migrate_agendaitems_to_subdossiers(meeting, dossier)
             self.set_meeting_dossier_state(dossier)
@@ -199,6 +204,7 @@ class MeetingsContentMigrator(object):
         data[FIELDDATA_KEY][u'IProtectDossier'] = {}
         data = decode_for_json(data)
         dossier = DexterityObjectCreator(data).create_in(parent)
+        IDossier(dossier).end = date.today()
 
         # Move all content of meeting dossier to normal dossier
         logger.info("Moving content from meeting dossier {} to {}".format(
