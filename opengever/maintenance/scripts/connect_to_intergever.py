@@ -144,13 +144,19 @@ def register_webactions(plone, options):
 
     actions = [
         {
-            "title": u"Export eCH-0147/Inter-GEVER",
+            "title": u"eCH-0147 Export via Inter-GEVER",
             "unique_name": u"intergever-export",
-            "target_url": "%s/ech0147_export/?dossier_url=%s{path}" % (intergever_url, gever_base_url),
+            "target_url": "%s/ech0147_export/connector?dossier_url=%s{path}" % (intergever_url, gever_base_url),
             "types": [u"opengever.dossier.businesscasedossier"],
         },
         {
-            "title": u"Import eCH-0147",
+            "title": u"eCH-0147 Export",
+            "unique_name": u"intergever-manual-export",
+            "target_url": "%s/ech0147_export/manual?dossier_url=%s{path}" % (intergever_url, gever_base_url),
+            "types": [u"opengever.dossier.businesscasedossier"],
+        },
+        {
+            "title": u"eCH-0147 Import",
             "unique_name": u"intergever-import",
             "target_url": "%s/inbox" % intergever_url,
             "types": [
