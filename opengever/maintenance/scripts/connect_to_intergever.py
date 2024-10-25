@@ -469,9 +469,15 @@ CLUSTERS = {
     "sevelenprod": {
         "gever_base_url": "https://sevelen.onegovgever.ch",
         "intergever_url": "https://intergever-sevelen.onegovgever.ch",
-        "groups_by_site": {
-            "sevelen": ["sevelen_admins"],
-        },
+        "administrator_group": "sevelen_admins",
+        "connected_admin_units": [
+            {
+                "plone_site_id": "sevelen",
+                "intergever_group": "sevelen_admins",
+                "manual_export_group": "sevelen_admins",
+                "notification_group": "sevelen_admins",
+            },
+        ],
     },
     "oggdev": {
         "gever_base_url": "https://dev.onegovgever.ch/",
