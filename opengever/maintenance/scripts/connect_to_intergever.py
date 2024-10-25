@@ -482,6 +482,21 @@ CLUSTERS = {
     "oggdev": {
         "gever_base_url": "https://dev.onegovgever.ch/",
         "intergever_url": "https://igdev.onegovgever.ch/intergever",
+        "administrator_group": "administratoren",
+        "connected_admin_units": [
+            {
+                "plone_site_id": "fd",
+                "intergever_group": "afi_sekretariat",
+                "manual_export_group": "afi_sekretariat",
+                "notification_group": "intergever_inbox",
+            },
+            {
+                "plone_site_id": "rk",
+                "intergever_group": "rk_sekretariat",
+                "manual_export_group": "rk_sekretariat",
+                "notification_group": "intergever_inbox",
+            },
+        ],
     },
     "local": {
         "gever_base_url": "http://localhost:8080/",
