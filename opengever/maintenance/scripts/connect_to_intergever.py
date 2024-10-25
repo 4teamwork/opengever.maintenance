@@ -38,6 +38,23 @@ CLUSTERS = {
     "sgtest": {
         "gever_base_url": "https://gevertest.sg.ch",
         "intergever_url": "https://intergevertest.sg.ch",
+        "administrator_group": "ACL-SVC-GEVER-KTSG-TESTGEVERADMIN-RW-GS",
+        "connected_admin_units": [
+            {
+                "plone_site_id": "digs",
+                "limited_admin_group": "ACL-SVC-GEVER-TestDIGS-Administratoren-GS",
+                "intergever_group": "ACL-SVC-GEVER-TestDIGS-INTER-GEVER-RW-GS",
+                "manual_export_group": "ACL-SVC-GEVER-TestDIGS-Benutzer-GS",
+                "notification_group": "ACL-SVC-GEVER-TestDIGS-INTER-GEVER-RW-GS",
+            },
+            {
+                "plone_site_id": "stasg",
+                "limited_admin_group": "ACL-SVC-GEVER-TestSTASG-Administratoren-GS",
+                "intergever_group": "ACL-SVC-GEVER-TestSTASG-INTER-GEVER-RW-GS",
+                "manual_export_group": "ACL-SVC-GEVER-TestSTASG-Benutzer-GS",
+                "notification_group": "ACL-SVC-GEVER-TestSTASG-INTER-GEVER-RW-GS",
+            },
+        ],
     },
     "sgprod": {
         "gever_base_url": "https://gever.sg.ch",
