@@ -456,9 +456,15 @@ CLUSTERS = {
     "quartenprod": {
         "gever_base_url": "https://quarten.onegovgever.ch",
         "intergever_url": "https://intergever-quarten.onegovgever.ch",
-        "groups_by_site": {
-            "quarten": ["quarten_users"],
-        },
+        "administrator_group": "quarten_admins",
+        "connected_admin_units": [
+            {
+                "plone_site_id": "quarten",
+                "intergever_group": "quarten_users",
+                "manual_export_group": "quarten_users",
+                "notification_group": "quarten_users",
+            },
+        ],
     },
     "sevelenprod": {
         "gever_base_url": "https://sevelen.onegovgever.ch",
