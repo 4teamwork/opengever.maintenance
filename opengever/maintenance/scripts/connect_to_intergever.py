@@ -443,9 +443,15 @@ CLUSTERS = {
     "pfaefersprod": {
         "gever_base_url": "https://pfaefers.onegovgever.ch",
         "intergever_url": "https://intergever-pfaefers.onegovgever.ch",
-        "groups_by_site": {
-            "pfaefers": ["Eingangskorb Gemeinderatskanzlei"],
-        },
+        "administrator_group": "Administratoren",
+        "connected_admin_units": [
+            {
+                "plone_site_id": "pfaefers",
+                "intergever_group": "Eingangskorb Gemeinderatskanzlei",
+                "manual_export_group": "Eingangskorb Gemeinderatskanzlei",
+                "notification_group": "Eingangskorb Gemeinderatskanzlei",
+            },
+        ],
     },
     "quartenprod": {
         "gever_base_url": "https://quarten.onegovgever.ch",
