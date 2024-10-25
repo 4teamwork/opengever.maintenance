@@ -130,8 +130,36 @@ CLUSTERS = {
     "local": {
         "gever_base_url": "http://localhost:8080/",
         "intergever_url": "http://localhost:3333/",
+        "administrators_group": "gever_admins",
+        "connected_admin_units": [
+            {
+                "plone_site_id": "fd",
+                "intergever_group": "FD-Alle",
+                "manual_export_group": "FD-Alle",
+                "limited_admin_group": "FD-Admin",
+                "notification_group": "FD-Alle",
+            },
+            {
+                "plone_site_id": "ska",
+                "intergever_group": "SKA-Alle",
+                "manual_export_group": "SKA-Alle",
+                "limited_admin_group": "SKA-Alle",
+                "notification_group": "SKA-Alle",
+            },
+        ],
     },
 }
+
+
+def get_unit_config(connected_admin_units, plone_site_id):
+    try:
+        unit_config = [
+            au for au in connected_admin_units
+            if au["plone_site_id"] == plone_site_id
+        ][0]
+    except IndexError:
+        raise Exception("No connected admin unit found for site %r" % plone_site_id)
+    return unit_config
 
 
 def register_webactions(plone, options):
@@ -140,7 +168,7 @@ def register_webactions(plone, options):
 
     gever_base_url = cluster["gever_base_url"].rstrip("/")
     intergever_url = cluster["intergever_url"].rstrip("/")
-    groups_by_site = cluster.get("groups_by_site", {})
+    connected_admin_units = cluster.get("connected_admin_units", {})
 
     actions = [
         {
@@ -148,12 +176,14 @@ def register_webactions(plone, options):
             "unique_name": u"intergever-export",
             "target_url": "%s/ech0147_export/connector?dossier_url=%s{path}" % (intergever_url, gever_base_url),
             "types": [u"opengever.dossier.businesscasedossier"],
+            "order": 0,
         },
         {
             "title": u"eCH-0147 Export",
             "unique_name": u"intergever-manual-export",
             "target_url": "%s/ech0147_export/manual?dossier_url=%s{path}" % (intergever_url, gever_base_url),
             "types": [u"opengever.dossier.businesscasedossier"],
+            "order": 1,
         },
         {
             "title": u"eCH-0147 Import",
@@ -163,25 +193,46 @@ def register_webactions(plone, options):
                 u"opengever.repository.repositoryfolder",
                 u"opengever.dossier.businesscasedossier"
             ],
+            "order": 2,
         }
     ]
 
     for action in actions:
+        action_name = action["unique_name"]
         action_data = {
             u"display": "actions-menu",
             u"mode": "blank",
-            u"order": 0,
+            u"order": action["order"],
             u"scope": "global",
             u"target_url": action["target_url"],
             u"title": action["title"],
             u"types": action["types"],
-            u"unique_name": action["unique_name"],
+            u"unique_name": action_name,
         }
 
-        groups = groups_by_site.get(api.portal.get().id, [])
+        plone_site_id = api.portal.get().id
+        unit_config = get_unit_config(connected_admin_units, plone_site_id)
+
+        if action_name == "intergever-export":
+            groups = [unit_config["intergever_group"]]
+
+        elif action_name == "intergever-manual-export":
+            groups = [unit_config["manual_export_group"]]
+
+        elif action_name == "intergever-import":
+            groups = [
+                unit_config["intergever_group"],
+                unit_config["manual_export_group"],
+            ]
+
+        groups.append(unit_config.get("limited_admin_group", []))
+        groups.append(cluster.get("administrators_group", []))
+
+        groups = list(set(groups))
         groups = map(safe_unicode, groups)
-        if groups:
-            action_data.update({"groups": groups})
+        groups.sort()
+
+        action_data.update({"groups": groups})
 
         errors = get_validation_errors(action_data, IWebActionSchema)
         if errors:
@@ -191,18 +242,18 @@ def register_webactions(plone, options):
 
         try:
             new_action_id = storage.add(action_data)
-            print("Webaction created with ID %s" % new_action_id)
+            print("Webaction %s created with ID %s" % (action_name, new_action_id))
             if groups:
-                print("Restricted webaction to groups: %r" % groups)
+                print("Restricted webaction %r to groups: %r" % (action_name, groups))
 
         except ActionAlreadyExists:
             if options.update_webaction:
                 unique_name = action_data.pop('unique_name')
                 existing_action_id = storage._indexes[WebActionsStorage.IDX_UNIQUE_NAME][unique_name]
                 storage.update(existing_action_id, action_data)
-                print("Webaction with ID %s has been updated" % existing_action_id)
+                print("Webaction %r with ID %s has been updated" % (action_name, existing_action_id))
                 if groups:
-                    print("Restricted webaction to groups: %r" % groups)
+                    print("Restricted webaction %r to groups: %r" % (action_name, groups))
             else:
                 print("Webaction with unique_name %r already exists, skipped." % action["unique_name"])
 
