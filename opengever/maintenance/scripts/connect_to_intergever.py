@@ -430,6 +430,15 @@ CLUSTERS = {
     "walenstadtprod": {
         "gever_base_url": "https://walenstadt.onegovgever.ch",
         "intergever_url": "https://intergever-walenstadt.onegovgever.ch",
+        "administrator_group": "administratoren",
+        "connected_admin_units": [
+            {
+                "plone_site_id": "walenstadt",
+                "intergever_group": "benutzer",
+                "manual_export_group": "benutzer",
+                "notification_group": "benutzer",
+            },
+        ],
     },
     "pfaefersprod": {
         "gever_base_url": "https://pfaefers.onegovgever.ch",
