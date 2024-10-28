@@ -596,8 +596,13 @@ def register_webactions(plone, options):
                 unit_config["manual_export_group"],
             ]
 
-        groups.append(unit_config.get("limited_admin_group", []))
-        groups.append(cluster.get("administrators_group", []))
+        limited_admin_group = unit_config.get("limited_admin_group")
+        if limited_admin_group:
+            groups.append(limited_admin_group)
+
+        administrators_group = cluster.get("administrators_group")
+        if administrators_group:
+            groups.append(administrators_group)
 
         groups = list(set(groups))
         groups = map(safe_unicode, groups)
