@@ -481,7 +481,7 @@ CLUSTERS = {
     },
     "oggdev": {
         "gever_base_url": "https://dev.onegovgever.ch/",
-        "intergever_url": "https://igdev.onegovgever.ch/intergever",
+        "intergever_url": "https://igdev.onegovgever.ch/",
         "administrator_group": "administratoren",
         "connected_admin_units": [
             {
