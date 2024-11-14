@@ -220,7 +220,7 @@ class LocalRolesUpdater(object):
                 org_unit.inbox_group_id = self.group_mapping[org_unit.inbox_group_id]
 
         # Update objects
-        for obj in ProgressLogger('Update role mappings', self.objs_to_update):
+        for i, obj in enumerate(ProgressLogger('Update role mappings', self.objs_to_update)):
             changes = []
             manager = RoleAssignmentManager(obj)
 
@@ -242,8 +242,10 @@ class LocalRolesUpdater(object):
             logger.info("updating {}".format(self.log[-1][0]))
             manager._update_local_roles(reindex=False)
 
-            if self.options.immediate_commits and not self.options.dryrun:
-                transaction.commit()
+            if self.options.intermediate_commits and not self.options.dryrun:
+                if i % self.options.intermediate_commits == 0:
+                    logger.info('Committing after {} items...'.format(i))
+                    transaction.commit()
 
         self.sync_tasks()
         self.update_indexes()
@@ -406,10 +408,10 @@ def main():
         help='Dry run',
     )
     parser.add_argument(
-        '-i', dest='immediate_commits',
-        action='store_true',
-        default=False,
-        help='Immediate commits',
+        '-i', dest='intermediate_commits',
+        type=int,
+        default=None,
+        help='Intermediate commits',
     )
     parser.add_argument(
         '-t', dest='tasks_only',
