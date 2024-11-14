@@ -19,6 +19,7 @@ optional arguments:
        assume that the groups are only used for permissions on tasks (remote tasks).
 """
 import argparse
+import gc
 import json
 import logging
 import os
@@ -54,6 +55,8 @@ from opengever.workspace.interfaces import IWorkspace
 from opengever.workspace.interfaces import IWorkspaceFolder
 from plone import api
 from zope.component import queryUtility
+from zope.component.hooks import getSite
+from zope.component.hooks import setSite
 
 from opengever.maintenance.debughelpers import setup_app
 from opengever.maintenance.debughelpers import setup_plone
@@ -159,7 +162,8 @@ class LocalRolesUpdater(object):
         )
 
         self.objs_to_update = []
-        for brain in ProgressLogger('Analysing objects...', brains, logger=logger):
+        for i, brain in enumerate(ProgressLogger(
+                'Analysing objects...', brains, logger=logger)):
             obj = brain.getObject()
             if self.needs_update(obj):
                 self.objs_to_update.append(obj)
@@ -179,6 +183,12 @@ class LocalRolesUpdater(object):
                         dossier = obj.get_containing_dossier()
                         if dossier and self.needs_update(dossier) and dossier not in self.objs_to_update:
                             self.objs_to_update.append(dossier)
+
+            # GC every 500 items proved a happy medium between memory
+            # high watermark and slowdown in runtime
+            if i % 500 == 0:
+                # Trigger GC to keep memory usage in check
+                self.collect_garbage(getSite())
 
         logger.info(
             '{} Plone objects have to be uptated'.format(
@@ -410,6 +420,26 @@ class LocalRolesUpdater(object):
         transaction.commit()
         self.sm.connection.commit(soft_commit=False, after_commit=False)
 
+    def collect_garbage(self, site):
+        # In order to get rid of leaking references, the Plone site needs to be
+        # re-set in regular intervals using the setSite() hook. This reassigns
+        # it to the SiteInfo() module global in zope.component.hooks, and
+        # therefore allows the Python garbage collector to cut loose references
+        # it was previously holding on to.
+        setSite(getSite())
+
+        # Trigger garbage collection for the cPickleCache
+        site._p_jar.cacheGC()
+
+        # Also trigger Python garbage collection.
+        gc.collect()
+
+        # (These two don't seem to affect the memory high-water-mark a lot,
+        # but result in a more stable / predictable growth over time.
+        #
+        # But should this cause problems at some point, it's safe
+        # to remove these without affecting the max memory consumed too much.)
+
 
 def main():
     app = setup_app()
@@ -450,7 +480,11 @@ def main():
 
     options = parser.parse_args(sys.argv[3:])
 
-    setup_plone(app, options)
+    plone = setup_plone(app, options)
+
+    # Set pickle cache size to zero to avoid unbounded memory growth
+    plone._p_jar._cache.cache_size = 0
+
     logger.info('Migrating groups...')
 
     if options.dryrun:
