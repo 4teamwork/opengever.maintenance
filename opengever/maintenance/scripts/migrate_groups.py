@@ -43,6 +43,7 @@ from opengever.meeting.proposal import IBaseProposal
 from opengever.ogds.base.utils import get_current_admin_unit
 from opengever.ogds.models.group import Group
 from opengever.ogds.models.org_unit import OrgUnit
+from opengever.ogds.models.team import Team
 from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task.task import ITask
@@ -195,8 +196,18 @@ class LocalRolesUpdater(object):
             ).all()
         logger.info('DONE Checking remote tasks.')
 
+        self.teams = []
+        if not self.options.tasks_only:
+            # Check for teams that might need to have their group updated.
+            logger.info('Checking teams...')
+            self.teams = Team.query.filter(
+                Team.groupid.in_(self.old_group_ids)
+            ).all()
+            logger.info('DONE Checking teams.')
+
         self.write_obj_paths()
         self.write_remote_tasks_paths()
+        self.write_team_ids()
         self.print_analysis_stats()
 
     def _is_inside_a_proposal(self, maybe_document):
@@ -246,6 +257,11 @@ class LocalRolesUpdater(object):
                 if i % self.options.intermediate_commits == 0:
                     logger.info('Committing after {} items...'.format(i))
                     transaction.commit()
+
+        # Update teams
+        for team in self.teams:
+            logger.info("Updating team {!r}".format(team))
+            team.groupid = self.group_mapping[team.groupid]
 
         self.sync_tasks()
         self.update_indexes()
@@ -333,6 +349,7 @@ class LocalRolesUpdater(object):
             self.stats_table.add_row(row)
         self.stats_table.add_row(["Total", sum(obj_stats.values())])
         self.stats_table.add_row(["Remote tasks", len(self.remote_tasks)])
+        self.stats_table.add_row(["Teams", len(self.teams)])
 
         logger.info("\n\nAnalysis statistics:\n\n" + self.stats_table.generate_output())
 
@@ -362,6 +379,17 @@ class LocalRolesUpdater(object):
             'group_migration_remote_tasks_paths', extension="csv")
         with open(log_filename, "w") as logfile:
             paths_table.write_csv(logfile)
+
+    def write_team_ids(self):
+        ids_table = TextTable()
+        ids_table.add_row(["team_id"])
+        for team in self.teams:
+            ids_table.add_row([team.team_id])
+
+        log_filename = LogFilePathFinder().get_logfile_path(
+            'group_migration_team_ids', extension="csv")
+        with open(log_filename, "w") as logfile:
+            ids_table.write_csv(logfile)
 
     def write_update_table(self):
         update_table = TextTable()
