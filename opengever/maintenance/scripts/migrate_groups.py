@@ -1,12 +1,12 @@
 """
-A scripts wich update all local_roles for a given group_mapping (old:new).
+A script which updates all local_roles for a given group_mapping (old:new).
 Used for service requests from SG, e.g. https://4teamwork.atlassian.net/browse/CA-5829
 
 Usage:
 
-bin/instance0 run migrate_groups.py command mapping
+bin/instance0 run migrate_groups.py mode mapping
 
-  - command is one of 'analyse' or 'update'
+  - mode is one of 'analyse' or 'update'
   - mapping is a path to a json file containing the group mapping (dictionary
     with old group names as keys and new group names as values).
 
@@ -18,8 +18,15 @@ optional arguments:
        deployments than the one where the groups were modified. We can therefore
        assume that the groups are only used for permissions on tasks (remote tasks).
 """
-from Acquisition import aq_base
+import argparse
+import json
+import logging
+import os
+import sys
 from collections import Counter
+
+import transaction
+from Acquisition import aq_base
 from ftw.solr.converters import CONVERTERS
 from ftw.solr.interfaces import ISolrConnectionManager
 from ftw.upgrade.progresslogger import ProgressLogger
@@ -32,10 +39,6 @@ from opengever.dossier.templatefolder.interfaces import ITemplateFolder
 from opengever.globalindex.model.task import Task
 from opengever.inbox.container import IInboxContainer
 from opengever.inbox.inbox import IInbox
-from opengever.maintenance.debughelpers import setup_app
-from opengever.maintenance.debughelpers import setup_plone
-from opengever.maintenance.utils import LogFilePathFinder
-from opengever.maintenance.utils import TextTable
 from opengever.meeting.proposal import IBaseProposal
 from opengever.ogds.base.utils import get_current_admin_unit
 from opengever.ogds.models.group import Group
@@ -44,19 +47,19 @@ from opengever.repository.interfaces import IRepositoryFolder
 from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task.task import ITask
 from opengever.tasktemplates.content.tasktemplate import ITaskTemplate
-from opengever.tasktemplates.content.templatefoldersschema import ITaskTemplateFolderSchema
+from opengever.tasktemplates.content.templatefoldersschema import \
+    ITaskTemplateFolderSchema
 from opengever.workspace.interfaces import IWorkspace
 from opengever.workspace.interfaces import IWorkspaceFolder
 from plone import api
 from zope.component import queryUtility
-import argparse
-import json
-import logging
-import os
-import sys
-import transaction
 
-logger = logging.getLogger('awe_groups_migration')
+from opengever.maintenance.debughelpers import setup_app
+from opengever.maintenance.debughelpers import setup_plone
+from opengever.maintenance.utils import LogFilePathFinder
+from opengever.maintenance.utils import TextTable
+
+logger = logging.getLogger()
 logging.getLogger().setLevel(logging.INFO)
 for handler in logging.getLogger().handlers:
     handler.setLevel(logging.INFO)
@@ -69,10 +72,12 @@ class LocalRolesUpdater(object):
         with open(options.mapping, "r") as fin:
             self.group_mapping = json.load(fin)
         self.old_group_ids = set(self.group_mapping.keys())
+
         if self.options.tasks_only:
             self.include_tasks = True
         else:
             self.include_tasks = False
+
         self.log = []
         self.orgunits_with_modified_inbox_group = []
         self.catalog = api.portal.get_tool('portal_catalog')
@@ -89,6 +94,7 @@ class LocalRolesUpdater(object):
                     'portal_role_manager'.format(
                         org_unit.users_group_id, org_unit))
                 raw_input("Press Enter to continue...")
+
             if org_unit.inbox_group_id in self.old_group_ids:
                 logger.warning(
                     'The group {} is defined as inbox_group of OrgUnit {}. '
@@ -103,6 +109,7 @@ class LocalRolesUpdater(object):
             if Group.query.filter(Group.groupid == old_principal).count() != 1:
                 raise Exception(
                     'The group {} not found in the OGDS'.format(old_principal))
+
             if Group.query.filter(Group.groupid == new_principal).count() != 1:
                 raise Exception(
                     'The group {} not found in the OGDS'.format(new_principal))
@@ -134,17 +141,24 @@ class LocalRolesUpdater(object):
                 IInbox.__identifier__,
                 IWorkspace.__identifier__,
                 IWorkspaceFolder.__identifier__,
-                ]
+            ]
+
         if self.include_tasks:
             interfaces_to_update.append(ITask.__identifier__)
+
+        logger.info(
+            'Object types that will be checked:\n\n{}\n'.format(
+                '\n'.join(interfaces_to_update))
+        )
+
         brains = self.catalog.unrestrictedSearchResults(
             object_provides=interfaces_to_update,
             sort_on="path",
-            sort_order="descending")
+            sort_order="descending",
+        )
+
         self.objs_to_update = []
-        for brain in ProgressLogger(
-                'Analysing repos, dossiers, tasktemplates, proposals and dispositions',
-                brains, logger=logger):
+        for brain in ProgressLogger('Analysing objects...', brains, logger=logger):
             obj = brain.getObject()
             if self.needs_update(obj):
                 self.objs_to_update.append(obj)
@@ -159,20 +173,27 @@ class LocalRolesUpdater(object):
                             proposal = doc.get_proposal()
                             if self.needs_update(proposal):
                                 self.objs_to_update.append(proposal)
+
                     if self.options.tasks_only:
                         dossier = obj.get_containing_dossier()
                         if dossier and self.needs_update(dossier) and dossier not in self.objs_to_update:
                             self.objs_to_update.append(dossier)
 
-        logger.info('{} objects have to be uptated'.format(len(self.objs_to_update)))
+        logger.info(
+            '{} Plone objects have to be uptated'.format(
+                len(self.objs_to_update))
+        )
 
         # Check for remote tasks that might need to be updated.
+        logger.info('Checking remote tasks...')
         self.remote_tasks = []
         if self.orgunits_with_modified_inbox_group:
             self.remote_tasks = Task.query.filter(
                 Task.assigned_org_unit.in_(self.orgunits_with_modified_inbox_group)).filter(
                 Task.admin_unit_id != get_current_admin_unit().id()).filter(
-                Task.review_state.notin_(('task-state-tested-and-closed', 'task-state-cancelled'))).all()
+                Task.review_state.notin_(('task-state-tested-and-closed', 'task-state-cancelled'))
+            ).all()
+        logger.info('DONE Checking remote tasks.')
 
         self.write_obj_paths()
         self.write_remote_tasks_paths()
@@ -194,6 +215,7 @@ class LocalRolesUpdater(object):
         for org_unit in OrgUnit.query:
             if org_unit.users_group_id in self.old_group_ids:
                 org_unit.users_group_id = self.group_mapping[org_unit.users_group_id]
+
             if org_unit.inbox_group_id in self.old_group_ids:
                 org_unit.inbox_group_id = self.group_mapping[org_unit.inbox_group_id]
 
@@ -210,13 +232,16 @@ class LocalRolesUpdater(object):
                     old_principal = assignment['principal']
                     new_principal = self.group_mapping[old_principal]
                     assignment['principal'] = new_principal
-                    changes.append({'old_principal': old_principal,
-                                    'new_principal': new_principal,
-                                    'roles': assignment['roles']})
+                    changes.append({
+                        'old_principal': old_principal,
+                        'new_principal': new_principal,
+                        'roles': assignment['roles'],
+                    })
 
             self.log.append(('/'.join(obj.getPhysicalPath()), changes))
             logger.info("updating {}".format(self.log[-1][0]))
             manager._update_local_roles(reindex=False)
+
             if self.options.immediate_commits and not self.options.dryrun:
                 transaction.commit()
 
@@ -240,6 +265,8 @@ class LocalRolesUpdater(object):
                              for key, value in self.group_mapping.items()}
         old_principal_ids = set(principal_mapping.keys())
 
+        logger.info('Updating indexes...')
+
         # Forward index is of the form _index[principal] = [docid1, docid2]
         for old_group, new_group in principal_mapping.items():
             if old_group in index._index:
@@ -260,6 +287,8 @@ class LocalRolesUpdater(object):
                 value = converter(index._unindex[docid], multivalued)
                 self.sm.connection.add({'allowedRolesAndUsers': {'set': value}, 'UID': uid})
 
+        logger.info('DONE Updating indexes.')
+
     def sync_tasks(self):
         if self.options.tasks_only:
             # When only tasks are updated, we can simply sync the tasks.
@@ -278,7 +307,7 @@ class LocalRolesUpdater(object):
                 if self._needs_syncing(obj):
                     try:
                         obj.sync()
-                    except:
+                    except Exception:
                         logger.warning("Could not sync task {}".format(obj.absolute_url()))
 
     @staticmethod
@@ -300,7 +329,7 @@ class LocalRolesUpdater(object):
         self.stats_table.add_row(["portal_type", "number"])
         for row in obj_stats.items():
             self.stats_table.add_row(row)
-        self.stats_table.add_row(["Tot", sum(obj_stats.values())])
+        self.stats_table.add_row(["Total", sum(obj_stats.values())])
         self.stats_table.add_row(["Remote tasks", len(self.remote_tasks)])
 
         logger.info("\n\nAnalysis statistics:\n\n" + self.stats_table.generate_output())
@@ -334,7 +363,7 @@ class LocalRolesUpdater(object):
 
     def write_update_table(self):
         update_table = TextTable()
-        update_table.add_row(["path", 'old_principal', 'new_principal', 'roles'])
+        update_table.add_row(['path', 'old_principal', 'new_principal', 'roles'])
         for path, changes in self.log:
             for change in changes:
                 roles = ";".join(change['roles'])
@@ -353,39 +382,61 @@ class LocalRolesUpdater(object):
 
 
 def main():
-
     app = setup_app()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('cmd', choices=['analyse', 'update'], help='Command')
-    parser.add_argument('mapping', help='Path to json file containing a '
-                        'mapping from old to new groups.')
-    parser.add_argument('-s', dest='site_root', default=None,
-                        help='Absolute path to the Plone site')
-    parser.add_argument('-n', dest='dryrun', default=False, help='Dryrun')
-    parser.add_argument('-i', dest='immediate_commits',
-                        default=False, help='Immediate commits')
-    parser.add_argument('-t', dest='tasks_only',
-                        default=False, help='Used to update remote tasks on other deployments')
+    parser.add_argument(
+        'mode',
+        choices=['analyse', 'update'],
+        help='Command',
+    )
+    parser.add_argument(
+        'mapping',
+        help='Path to JSON file containing a mapping from old to new groups',
+    )
+    parser.add_argument(
+        '-s', dest='site_root',
+        default=None,
+        help='Absolute path to the Plone site',
+    )
+    parser.add_argument(
+        '-n', dest='dryrun',
+        action='store_true',
+        default=False,
+        help='Dry run',
+    )
+    parser.add_argument(
+        '-i', dest='immediate_commits',
+        action='store_true',
+        default=False,
+        help='Immediate commits',
+    )
+    parser.add_argument(
+        '-t', dest='tasks_only',
+        action='store_true',
+        default=False,
+        help='Used to update remote tasks on other deployments',
+    )
 
     options = parser.parse_args(sys.argv[3:])
 
     setup_plone(app, options)
-    logger.info('Update local roles.')
+    logger.info('Migrating groups...')
 
     if options.dryrun:
         transaction.doom()
-        logger.info('Dryrun enabled')
+        logger.info('Dry run enabled')
 
     if not os.path.isfile(options.mapping):
         raise ValueError("{} is not a file.".format(options.mapping))
 
     updater = LocalRolesUpdater(options)
-    if options.cmd == 'analyse':
+    if options.mode == 'analyse':
         logger.info('Mode: Analyse')
+        options.dryrun = True
         updater.analyse()
 
-    if options.cmd == 'update':
+    if options.mode == 'update':
         logger.info('Mode: Update')
         updater.analyse()
         updater.update()
