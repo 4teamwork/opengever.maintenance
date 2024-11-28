@@ -202,13 +202,6 @@ CLUSTERS = {
                 "notification_group": "ACL-SVC-GEVER-GD-AVSV-INTER-GEVER-RW-GS",
             },
             {
-                "plone_site_id": "awa",
-                "limited_admin_group": "ACL-SVC-GEVER-VD-AWA-ADMIN-RW-GS",
-                "intergever_group": "ACL-SVC-GEVER-VD-AWA-INTER-GEVER-RW-GS",
-                "manual_export_group": "ACL-SVC-GEVER-VD-AWA-ALLE-RW-GS",
-                "notification_group": "ACL-SVC-GEVER-VD-AWA-INTER-GEVER-RW-GS",
-            },
-            {
                 "plone_site_id": "awe",
                 "limited_admin_group": "ACL-SVC-GEVER-BUD-AWE-ADMIN-RW-GS",
                 "intergever_group": "ACL-SVC-GEVER-BUD-AWE-INTER-GEVER-RW-GS",
@@ -417,6 +410,13 @@ CLUSTERS = {
                 "intergever_group": "ACL-SVC-GEVER-BD-TBAGEVI-INTER-GEVER-RW-GS",
                 "manual_export_group": "ACL-SVC-GEVER-BD-TBAGEVI-ALLE-RW-GS",
                 "notification_group": "ACL-SVC-GEVER-BD-TBAGEVI-INTER-GEVER-RW-GS",
+            },
+            {
+                "plone_site_id": "vdawa",
+                "limited_admin_group": "ACL-SVC-GEVER-VD-AWA-ADMIN-RW-GS",
+                "intergever_group": "ACL-SVC-GEVER-VD-AWA-INTER-GEVER-RW-GS",
+                "manual_export_group": "ACL-SVC-GEVER-VD-AWA-ALLE-RW-GS",
+                "notification_group": "ACL-SVC-GEVER-VD-AWA-INTER-GEVER-RW-GS",
             },
             {
                 "plone_site_id": "vdgs",
