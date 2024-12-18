@@ -19,6 +19,9 @@ Notes:
 
 from Acquisition import aq_inner
 from Acquisition import aq_parent
+from collective.taskqueue.interfaces import ITaskQueue
+from collective.taskqueue.interfaces import ITaskQueueLayer
+from collective.taskqueue.taskqueue import LocalVolatileTaskQueue
 from opengever.base.interfaces import IReferenceNumber
 from opengever.globalindex.handlers import task as task_handlers
 from opengever.globalindex.handlers.task import TaskSqlSyncer
@@ -29,13 +32,41 @@ from opengever.repository.interfaces import IRepositoryFolder
 from plone import api
 from plone.app.content.interfaces import INameFromTitle
 from plone.i18n.normalizer.interfaces import IURLNormalizer
+from plone.subrequest import subrequest
+from zope.component import provideUtility
 from zope.component import queryUtility
 from zope.container.interfaces import IContainerModifiedEvent
 from zope.container.interfaces import INameChooser
+from zope.globalrequest import getRequest
+from zope.interface import alsoProvides
+from zope.interface import noLongerProvides
 import argparse
 import inspect
 import sys
 import transaction
+
+
+def setup_task_queue():
+    task_queue = LocalVolatileTaskQueue()
+    provideUtility(task_queue, ITaskQueue, name='default')
+    return task_queue
+
+
+def process_task_queue(task_queue):
+    queue = task_queue.queue
+    print('Processing %d task queue jobs...' % queue.qsize())
+    request = getRequest()
+    alsoProvides(request, ITaskQueueLayer)
+
+    while not queue.empty():
+        job = queue.get()
+
+        # Process job using plone.subrequest
+        response = subrequest(job['url'])
+        assert response.status == 200
+
+    noLongerProvides(request, ITaskQueueLayer)
+    print('All task queue jobs processed.')
 
 
 def marmoset_patch(old, new, extra_globals={}):
@@ -199,8 +230,12 @@ if __name__ == '__main__':
 
     plone = setup_plone(app, options)
 
+    task_queue = setup_task_queue()
+
     fixer = ObjectIDFixer(plone, options)
     fixer.run()
+
+    process_task_queue(task_queue)
 
     if not options.dry_run:
         transaction.commit()
