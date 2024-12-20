@@ -501,7 +501,7 @@ class SubtreeBundleSerializer(object):
         return False
 
     def serialize_review_state(self, obj):
-        if obj.portal_type == 'ftw.mail.mail':
+        if obj.portal_type in ['opengever.document.document', 'ftw.mail.mail']:
             # The WF state 'mail-state-active' is not currently allowed per the
             # JSON schema for documents.json. And since documents and mails
             # have a one-state workflow anyway, any review_state value for them
