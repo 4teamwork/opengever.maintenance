@@ -106,8 +106,10 @@ FIELDS_OMITTED_FROM_EXPORT = {
 
 PROPERTIES_NOT_REQUIRED = {
     'opengever.dossier.businesscasedossier': [
+        '_id',
         '_participations',
         '_old_paths',
+        '_journal_entries',
         'dossier_type',
         'sequence_number',
         'relatedDossier',
@@ -117,15 +119,18 @@ PROPERTIES_NOT_REQUIRED = {
         '_old_paths',
     ],
     'opengever.repository.repositoryfolder': [
+        '_id',
         '_old_paths',
     ],
     'opengever.document.document': [
+        '_id',
         '_old_paths',
         'sequence_number',
         'relatedItems',
         'original_message_path',
     ],
     'ftw.mail.mail': [
+        '_id',
         '_old_paths',
         'relatedItems',  # mails don't have relatedItems
         'sequence_number',
