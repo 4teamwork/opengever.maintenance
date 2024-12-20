@@ -48,6 +48,7 @@ import transaction
 
 
 SUPPORTED_TYPES = [
+    'opengever.repository.repositoryroot',
     'opengever.repository.repositoryfolder',
     'opengever.dossier.businesscasedossier',
     'opengever.task.task',  # partially supported - check implementation
@@ -96,6 +97,10 @@ PROPERTIES_NOT_REQUIRED = {
         'dossier_type',
         'sequence_number',
         'relatedDossier',
+    ],
+    'opengever.repository.repositoryroot': [
+        '_id',
+        '_old_paths',
     ],
     'opengever.repository.repositoryfolder': [
         '_old_paths',
@@ -381,6 +386,10 @@ class SubtreeBundleSerializer(object):
                 # Add a fake parent_guid to root node in order to pass
                 # validation. Needs to be replaced before importing bundle.
                 data['parent_guid'] = 'TO_BE_DEFINED'
+
+            if portal_type == 'opengever.repository.repositoryroot':
+                # This field does not exist for the repositoryroot
+                del data['parent_guid']
 
         data.update(self.serialize_review_state(node))
         data.update(self.serialize_creator(node))
