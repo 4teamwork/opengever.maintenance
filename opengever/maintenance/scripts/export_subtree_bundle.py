@@ -6,6 +6,20 @@ export_subtree_bundle.py
   (--with-local-roles | --without-local-roles)
   (--dossiers-with-parent-reference | --dossiers-with-parent-guid)
   <path>
+
+Export specific objects along with all their parent and child objects.
+
+Example:
+To export two specific objects and include their parent and child objects,
+use the following command:
+
+    export_subtree_bundle.py
+      --branch /fd/ordnungssystem/fuehrung/kommunikation/allgemeines
+      --branch /fd/ordnungssystem/allgemeines/dossier-1
+      fd/ordnungssystem
+
+This command exports the specified objects, along with all related parent and
+child objects in the hierarchy.
 """
 
 from Acquisition import aq_inner
@@ -444,6 +458,13 @@ class SubtreeBundleSerializer(object):
                 self.serialize_node(child, serialized_nodes_by_type, parent_guid=parent_guid)
 
     def should_skip_child(self, child):
+        # Don't export non-whitelisted subtrees
+        if self.options.branches:
+            path = '/'.join(child.getPhysicalPath())
+            if not self.is_parent_or_child_of(path, self.options.branches):
+                self.skipped_data['Skipped due to subtree filter'].append(path)
+                return True
+
         # Don't export inactive dossiers
         review_state = api.content.get_state(child)
         if review_state == 'dossier-state-inactive':
@@ -458,6 +479,20 @@ class SubtreeBundleSerializer(object):
                 '/'.join(child.getPhysicalPath()))
             return True
 
+        return False
+
+    def is_parent_or_child_of(self, context_path, paths):
+        context_path = context_path.strip('/') + '/'
+        for path in paths:
+            path = path.strip('/') + '/'
+
+            # context is child of path or is path
+            if context_path in path:
+                return True
+
+            # context is a parent of path
+            if path in context_path:
+                return True
         return False
 
     def serialize_review_state(self, obj):
@@ -614,6 +649,14 @@ if __name__ == '__main__':
         '--dossiers-with-parent-guid',
         dest='dossiers_with_parent_reference', action='store_false',
         help="Reference dossier's repofolder parent via bundle GUID",
+    )
+
+    parser.add_argument(
+        '--branch',
+        action='append',
+        dest='branches',
+        help='Path of an object whos parents and children should be exported. '
+             'All other objects will be skipped.'
     )
 
     options = parser.parse_args(sys.argv[3:])
