@@ -348,6 +348,11 @@ class SubtreeBundleSerializer(object):
         portal_type = node.portal_type
 
         if node.portal_type not in SUPPORTED_TYPES:
+            if self.options.skip_unsupported_types:
+                self.skipped_data['Skipped unsupported type'].append(
+                    '{} ({})'.format(path, portal_type)
+                )
+                return
             raise Exception('Unable to export object %r. Export of type %r is not '
                             'supported.' % (path, portal_type))
         data = {}
@@ -577,6 +582,8 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output-dir', default='var/bundles/',
                         help='Path to output directory in which to create '
                              'exported bundle')
+    parser.add_argument('--skip-unsupported-types', action='store_true',
+                        help='Wether to skip unsupported types or raise an error.')
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
