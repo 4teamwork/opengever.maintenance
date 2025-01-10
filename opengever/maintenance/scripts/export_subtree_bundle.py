@@ -22,35 +22,6 @@ This command exports the specified objects, along with all related parent and
 child objects in the hierarchy.
 """
 
-from Acquisition import aq_inner
-from Acquisition import aq_parent
-from collections import defaultdict
-from collections import OrderedDict
-from datetime import datetime
-from jsonschema import FormatChecker
-from jsonschema import validate
-from opengever.base.interfaces import IOpengeverBaseLayer
-from opengever.base.interfaces import IReferenceNumber
-from opengever.base.schemadump.config import SHORTNAMES_BY_ROLE
-from opengever.bundle.loader import BUNDLE_JSON_TYPES
-from opengever.bundle.loader import PORTAL_TYPES_TO_JSON_NAME
-from opengever.dossier.behaviors.participation import IParticipationAware
-from opengever.maintenance.debughelpers import setup_app
-from opengever.maintenance.debughelpers import setup_plone
-from opengever.trash.trash import ITrashed
-from operator import itemgetter
-from os.path import join as pjoin
-from os.path import splitext
-from pkg_resources import resource_filename as rf
-from plone import api
-from plone.dexterity.utils import iterSchemata
-from plone.namedfile.field import NamedBlobFile
-from z3c.relationfield.schema import RelationList
-from zope.globalrequest import getRequest
-from zope.interface import alsoProvides
-from zope.schema import Date
-from zope.schema import Datetime
-from zope.schema import getFieldsInOrder
 import argparse
 import codecs
 import errno
@@ -58,8 +29,31 @@ import json
 import os
 import shutil
 import sys
-import transaction
+from collections import OrderedDict, defaultdict
+from datetime import datetime
+from operator import itemgetter
+from os.path import join as pjoin
+from os.path import splitext
 
+import transaction
+from Acquisition import aq_inner, aq_parent
+from jsonschema import FormatChecker, validate
+from opengever.base.interfaces import IOpengeverBaseLayer, IReferenceNumber
+from opengever.base.schemadump.config import SHORTNAMES_BY_ROLE
+from opengever.bundle.loader import (BUNDLE_JSON_TYPES,
+                                     PORTAL_TYPES_TO_JSON_NAME)
+from opengever.dossier.behaviors.participation import IParticipationAware
+from opengever.trash.trash import ITrashed
+from pkg_resources import resource_filename as rf
+from plone import api
+from plone.dexterity.utils import iterSchemata
+from plone.namedfile.field import NamedBlobFile
+from z3c.relationfield.schema import RelationList
+from zope.globalrequest import getRequest
+from zope.interface import alsoProvides
+from zope.schema import Date, Datetime, getFieldsInOrder
+
+from opengever.maintenance.debughelpers import setup_app, setup_plone
 
 SUPPORTED_TYPES = [
     'opengever.repository.repositoryroot',
@@ -434,6 +428,7 @@ class SubtreeBundleSerializer(object):
         if portal_type == 'opengever.dossier.businesscasedossier':
             old_reference = node.get_reference_number()
             data['former_reference_number'] = old_reference
+            data['responsible'] = 'iah8148'
 
         if portal_type != 'opengever.task.task':
             # Regular case - include the node in list of serialized nodes...
