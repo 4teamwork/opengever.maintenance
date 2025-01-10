@@ -6,6 +6,20 @@ export_subtree_bundle.py
   (--with-local-roles | --without-local-roles)
   (--dossiers-with-parent-reference | --dossiers-with-parent-guid)
   <path>
+
+Export specific objects along with all their parent and child objects.
+
+Example:
+To export two specific objects and include their parent and child objects,
+use the following command:
+
+    export_subtree_bundle.py
+      --branch /fd/ordnungssystem/fuehrung/kommunikation/allgemeines
+      --branch /fd/ordnungssystem/allgemeines/dossier-1
+      fd/ordnungssystem
+
+This command exports the specified objects, along with all related parent and
+child objects in the hierarchy.
 """
 
 from Acquisition import aq_inner
@@ -48,6 +62,7 @@ import transaction
 
 
 SUPPORTED_TYPES = [
+    'opengever.repository.repositoryroot',
     'opengever.repository.repositoryfolder',
     'opengever.dossier.businesscasedossier',
     'opengever.task.task',  # partially supported - check implementation
@@ -91,22 +106,31 @@ FIELDS_OMITTED_FROM_EXPORT = {
 
 PROPERTIES_NOT_REQUIRED = {
     'opengever.dossier.businesscasedossier': [
+        '_id',
         '_participations',
         '_old_paths',
+        '_journal_entries',
         'dossier_type',
         'sequence_number',
         'relatedDossier',
     ],
+    'opengever.repository.repositoryroot': [
+        '_id',
+        '_old_paths',
+    ],
     'opengever.repository.repositoryfolder': [
+        '_id',
         '_old_paths',
     ],
     'opengever.document.document': [
+        '_id',
         '_old_paths',
         'sequence_number',
         'relatedItems',
         'original_message_path',
     ],
     'ftw.mail.mail': [
+        '_id',
         '_old_paths',
         'relatedItems',  # mails don't have relatedItems
         'sequence_number',
@@ -348,6 +372,11 @@ class SubtreeBundleSerializer(object):
         portal_type = node.portal_type
 
         if node.portal_type not in SUPPORTED_TYPES:
+            if self.options.skip_unsupported_types:
+                self.skipped_data['Skipped unsupported type'].append(
+                    '{} ({})'.format(path, portal_type)
+                )
+                return
             raise Exception('Unable to export object %r. Export of type %r is not '
                             'supported.' % (path, portal_type))
         data = {}
@@ -376,6 +405,10 @@ class SubtreeBundleSerializer(object):
                 # Add a fake parent_guid to root node in order to pass
                 # validation. Needs to be replaced before importing bundle.
                 data['parent_guid'] = 'TO_BE_DEFINED'
+
+            if portal_type == 'opengever.repository.repositoryroot':
+                # This field does not exist for the repositoryroot
+                del data['parent_guid']
 
         data.update(self.serialize_review_state(node))
         data.update(self.serialize_creator(node))
@@ -430,6 +463,13 @@ class SubtreeBundleSerializer(object):
                 self.serialize_node(child, serialized_nodes_by_type, parent_guid=parent_guid)
 
     def should_skip_child(self, child):
+        # Don't export non-whitelisted subtrees
+        if self.options.branches:
+            path = '/'.join(child.getPhysicalPath())
+            if not self.is_parent_or_child_of(path, self.options.branches):
+                self.skipped_data['Skipped due to subtree filter'].append(path)
+                return True
+
         # Don't export inactive dossiers
         review_state = api.content.get_state(child)
         if review_state == 'dossier-state-inactive':
@@ -446,8 +486,22 @@ class SubtreeBundleSerializer(object):
 
         return False
 
+    def is_parent_or_child_of(self, context_path, paths):
+        context_path = context_path.strip('/') + '/'
+        for path in paths:
+            path = path.strip('/') + '/'
+
+            # context is child of path or is path
+            if context_path in path:
+                return True
+
+            # context is a parent of path
+            if path in context_path:
+                return True
+        return False
+
     def serialize_review_state(self, obj):
-        if obj.portal_type == 'ftw.mail.mail':
+        if obj.portal_type in ['opengever.document.document', 'ftw.mail.mail']:
             # The WF state 'mail-state-active' is not currently allowed per the
             # JSON schema for documents.json. And since documents and mails
             # have a one-state workflow anyway, any review_state value for them
@@ -577,6 +631,8 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output-dir', default='var/bundles/',
                         help='Path to output directory in which to create '
                              'exported bundle')
+    parser.add_argument('--skip-unsupported-types', action='store_true',
+                        help='Wether to skip unsupported types or raise an error.')
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
@@ -598,6 +654,14 @@ if __name__ == '__main__':
         '--dossiers-with-parent-guid',
         dest='dossiers_with_parent_reference', action='store_false',
         help="Reference dossier's repofolder parent via bundle GUID",
+    )
+
+    parser.add_argument(
+        '--branch',
+        action='append',
+        dest='branches',
+        help='Path of an object whos parents and children should be exported. '
+             'All other objects will be skipped.'
     )
 
     options = parser.parse_args(sys.argv[3:])
