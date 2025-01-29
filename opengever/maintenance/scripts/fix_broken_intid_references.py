@@ -37,22 +37,33 @@ logging.root.setLevel(logging.INFO)
 
 class IntIdReferenceFixer(object):
 
-    def __init__(self, portal, dry_run, working_dir):
+    def __init__(self, portal, dry_run, working_dir, search_path=None):
         self.portal = portal
         self.dry_run = dry_run
         self.working_dir = working_dir
+        self.search_path = search_path
         self.catalog = api.portal.get_tool('portal_catalog')
         self.intid_utility = getUtility(IIntIds)
         self.objs_to_fix_path = os.path.join(working_dir, 'objs_to_fix.json')
 
     def check(self):
         broken = []
+        query = {}
+        if self.search_path:
+            query['path'] = {'query': self.search_path, 'depth': -1}
+
         for brain in ProgressLogger(
                 'Checking for broken intid references',
-                self.catalog.unrestrictedSearchResults(),
+                self.catalog.unrestrictedSearchResults(**query),
                 logger=logger):
+
             obj = brain.getObject()
-            ref = self.intid_utility.refs.get(self.intid_utility.getId(obj))
+            try:
+                ref = self.intid_utility.refs.get(self.intid_utility.getId(obj))
+            except Exception as e:
+                logger.error("Error processing object {}: {}".format(brain.getPath(), e))
+                continue
+
             obj_path = '/'.join(obj.getPhysicalPath())
             if obj_path != ref.path:
                 broken.append(obj_path)
@@ -81,8 +92,12 @@ class IntIdReferenceFixer(object):
                 'Fixing broken intid references',
                 self.catalog.unrestrictedSearchResults(path={'query': broken, 'depth': 0}),
                 logger=logger)):
+            try:
+                moveIntIdSubscriber(brain.getObject(), None)
+            except Exception as e:
+                logger.error("Error processing object {}: {}".format(brain.getPath(), e))
+                continue
 
-            moveIntIdSubscriber(brain.getObject(), None)
             fixed.append(brain.getPath())
 
             if index > 0 and index % commit_every == 0:
@@ -127,6 +142,8 @@ if __name__ == '__main__':
                       help="Check for broken ids")
     parser.add_option("--fix", action="store_true",
                       help="Fix broken ids")
+    parser.add_option("--path", dest="path", default=None,
+                      help="Restrict operations to a specific path in the catalog")
     parser.add_option(
         '-o', dest='output_directory',
         default='var/maintenance-fix-broken-intid-references-{}'.format(
@@ -157,7 +174,9 @@ if __name__ == '__main__':
     fixer = IntIdReferenceFixer(
         plone,
         dry_run=options.dry_run,
-        working_dir=options.output_directory)
+        working_dir=options.output_directory,
+        search_path=options.path
+    )
 
     if options.check:
         fixer.check()
