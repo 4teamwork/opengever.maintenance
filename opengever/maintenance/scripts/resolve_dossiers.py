@@ -9,6 +9,7 @@ from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.dossier.interfaces import IDossierResolver
 from zope.component import getAdapter
 from plone import api
+import traceback
 
 from opengever.maintenance.debughelpers import setup_app, setup_option_parser, setup_plone
 
@@ -54,6 +55,7 @@ def resolve_active_dossiers(context, dry_run=False):
                 logger.info("Committed changes for dossier: %s", dossier.absolute_url_path())
         except Exception as e:
             logger.error("Error resolving dossier %s: %s", dossier.absolute_url_path(), e)
+            logger.error(traceback.format_exc())
             continue
 
 
