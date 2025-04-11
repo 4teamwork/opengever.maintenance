@@ -10,6 +10,7 @@ from opengever.dossier.interfaces import IDossierResolver
 from zope.component import getAdapter
 from plone import api
 import traceback
+from opengever.dossier.exceptions import PreconditionsViolated
 
 from opengever.maintenance.debughelpers import setup_app, setup_option_parser, setup_plone
 
@@ -82,7 +83,13 @@ def main():
 
     logger.info("Starting resolution of active dossiers in repository: %s", repository_path)
     resolve_active_dossiers(context, dry_run=options.dry_run)
-    logger.info("Completed resolving active dossiers.")
+    try:
+        resolve_active_dossiers()
+    except PreconditionsViolated as e:
+        print("The following preconditions were violated:")
+        for error in e.errors:
+            print(error)
+        logger.info("Completed resolving active dossiers.")
 
 
 if __name__ == '__main__':
