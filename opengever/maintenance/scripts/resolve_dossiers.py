@@ -82,9 +82,8 @@ def main():
         sys.exit(1)
 
     logger.info("Starting resolution of active dossiers in repository: %s", repository_path)
-    resolve_active_dossiers(context, dry_run=options.dry_run)
     try:
-        resolve_active_dossiers()
+        resolve_active_dossiers(context, dry_run=options.dry_run)
     except PreconditionsViolated as e:
         print("The following preconditions were violated:")
         for error in e.errors:
