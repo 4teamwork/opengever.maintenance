@@ -19,7 +19,7 @@ import sys
 import transaction
 
 logger = logging.getLogger(__name__)
-if not logger.hasHandlers():
+if not logger.handlers:
     handler = logging.StreamHandler(sys.stderr)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
