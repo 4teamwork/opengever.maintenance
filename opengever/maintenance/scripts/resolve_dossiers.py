@@ -18,13 +18,16 @@ import logging
 import sys
 import transaction
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+if not logger.hasHandlers():
+    handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 def resolve_active_dossiers(context, dry_run=False):
-
     catalog = api.portal.get_tool("portal_catalog")
     query = {
         "path": context.absolute_url_path(),
@@ -61,6 +64,7 @@ def resolve_active_dossiers(context, dry_run=False):
 
 
 def main():
+    logger.info("START: Script started, initializing Plone environment.")
     app = setup_app()
     setup_plone(app)
 
@@ -71,24 +75,27 @@ def main():
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
+        logger.error("ERROR: Missing path argument! Please provide the repository path as the first argument.")
         print("Bro, you need a path argument as first argument")
         sys.exit(1)
 
     repository_path = args[0]
+    logger.info("Repository path provided: %s", repository_path)
+
     try:
         context = app.unrestrictedTraverse(repository_path)
     except Exception as e:
         logger.error("Cannot traverse to repository at '%s': %s", repository_path, e)
         sys.exit(1)
 
-    logger.info("Starting resolution of active dossiers in repository: %s", repository_path)
+    logger.info("DONE: Starting resolution of active dossiers in repository: %s", repository_path)
     try:
         resolve_active_dossiers(context, dry_run=options.dry_run)
     except PreconditionsViolated as e:
-        print("The following preconditions were violated:")
+        logger.error("ERROR:  Preconditions violated while resolving dossiers:")
         for error in e.errors:
-            print(error)
-        logger.info("Completed resolving active dossiers.")
+            logger.error(error)
+    logger.info("SUCCESS: Completed resolving active dossiers.")
 
 
 if __name__ == '__main__':
