@@ -32,7 +32,8 @@ def resolve_active_dossiers(context, dry_run=False):
     query = {
         "path": context.absolute_url_path(),
         "object_provides": IDossierMarker.__identifier__,
-        "review_state": "dossier-state-active"
+        "review_state": "dossier-state-active",
+        "is_subdossier": False
     }
     active_dossiers = catalog.unrestrictedSearchResults(**query)
 
