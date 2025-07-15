@@ -100,6 +100,13 @@ class TI2036Config(object):
         u"parentordner",
     }
 
+    EXPECTED_SUBDOSSIER_KEYS = {
+        u"guid",
+        u"titel",
+        u"geschaeft",
+        u"parentordner",
+    }
+
     def __init__(self, cmi_bundle_path, output_dir):
         self.cmi_bundle_path = cmi_bundle_path
         self.cmi_bundle_json_path = os.path.join(cmi_bundle_path, self.MAIN_JSON_FILE_NAME)
@@ -207,6 +214,9 @@ class CmiToBundleConverter(object):
         for item in self.data.dossiers:
             self.bundle_data[json_name].append(item.convert())
 
+        for item in self.data.subdossiers:
+            self.bundle_data[json_name].append(item.convert())
+
         self.dump_to_jsonfile(self.bundle_data[json_name],
                               self.config.dossiers_json_file_path)
 
@@ -262,6 +272,7 @@ class CmiExportData(object):
         self.data = data
         self.config = config
         self.dossiers = []
+        self.subdossiers = []
         self.documents = []
         self.is_data_valid = False
 
@@ -274,7 +285,7 @@ class CmiExportData(object):
 
     def flatten_cmi_dossier(self, cmi_dossier):
         for folder in cmi_dossier.folders():
-            raise NotImplemented
+            self.subdossiers.append(folder)
 
         for document in cmi_dossier.documents():
             self.documents.append(document)
@@ -282,6 +293,9 @@ class CmiExportData(object):
     def contents(self):
         for dossier in self.dossiers:
             yield dossier
+
+        for subdossier in self.subdossiers:
+            yield subdossier
 
         for document in self.documents:
             yield document
@@ -291,6 +305,7 @@ class CmiExportData(object):
         print(u"Content stats:")
         print(u"--------------")
         print(u"Total dossiers: %s" % len(self.dossiers))
+        print(u"Total subdossiers: %s" % len(self.subdossiers))
         print(u"Total documents: %s" % len(self.documents))
         print(u"--------------")
         print(u"")
@@ -347,13 +362,17 @@ class CmiDossierData(object):
 
         return datetime.strptime(start_date, '%d.%m.%Y').date().isoformat()
 
+    @property
+    def review_state(self):
+        return self.config.REVIEW_STATE_MAPPING.get(self.data.get(self.REVIEW_STATE_KEY))
+
     def is_valid(self):
         return not self.errors
 
     def validate(self):
         self.errors = []
         if not self.data.get('guid'):
-            self.errors.appned(u'"guid" is missing for item')
+            self.errors.append(u'"guid" is missing for item')
 
         if not set(self.data.keys()) == set(self.config.EXPECTED_DOSSIER_KEYS):
             self.errors.append(u"Expected keys changed: missing: %s, additional %s" % (
@@ -366,9 +385,6 @@ class CmiDossierData(object):
 
         if self.data.get(u'gesch\xe4ftsart') not in self.config.PARENT_REFERENCE_MAPPING:
             self.errors.append(u"Unhandled parent reference: '%s'" % self.data.get(self.PARENT_REFERENCE_KEY))
-
-        if self.data.get(self.FOLDERS_KEY):
-            self.errors.append(u"not implemented '%s'" % self.FOLDERS_KEY)
 
     def print_validation_errors(self):
         if self.is_valid():
@@ -383,13 +399,36 @@ class CmiDossierData(object):
 
     def folders(self):
         # subdossiers
+        folders_by_reference = {}
         for item in self.data.get(self.FOLDERS_KEY, []):
-            raise NotImplemented
-            yield item
+            folder = CmiFolderData(item, self.config, self.path, None)
+            if folder.reference in folders_by_reference:
+                raise NotImplementedError("Duplicated reference")
+            folders_by_reference[folder.reference] = folder
+
+        for folder in folders_by_reference.values():
+            parentfolder_reference = folder.data.get('parentordner')
+            if parentfolder_reference:
+                folder.parent = folders_by_reference.get(parentfolder_reference)
+            else:
+                folder.parent = self
+
+        return folders_by_reference.values()
+
+    def lookup_folder(self, guid):
+        if not guid:
+            return None
+
+        for folder in self.folders():
+            if folder.reference == guid:
+                return folder
+
+        return None
 
     def documents(self):
         for item in self.data.get(self.DOCUMENTS_KEY, []):
-            yield CmiDocumentData(item, self.config, self.path, self)
+            parent = self.lookup_folder(item.get('parentordner')) or self
+            yield CmiDocumentData(item, self.config, self.path, parent)
 
     def convert(self):
         return {
@@ -399,14 +438,13 @@ class CmiDossierData(object):
             u"title": self.data.get('titel'),
             u"end": self.end_date,
             u"start": self.start_date,
-            u"review_state": self.config.REVIEW_STATE_MAPPING.get(self.data.get(self.REVIEW_STATE_KEY)),
+            u"review_state": self.review_state,
             u"parent_reference": self.config.PARENT_REFERENCE_MAPPING.get(self.data.get(self.PARENT_REFERENCE_KEY)),
             u"responsible": self.config.RESPONSIBLE,
         }
 
 
 class CmiDocumentData(object):
-
     def __init__(self, data, config, parent_path, parent):
         self.data = data
         self.config = config
@@ -421,6 +459,10 @@ class CmiDocumentData(object):
     @property
     def file_name(self):
         return self.data.get('fileContent', '')
+
+    @property
+    def parent_reference(self):
+        return self.data.get('parentordner') or self.data.get('geschaeft')
 
     @property
     def file_extension(self):
@@ -446,11 +488,11 @@ class CmiDocumentData(object):
         if not os.path.exists(self.file_path):
             self.errors.append(u'file does not exists: %s' % self.file_path)
 
+        if not self.parent_reference == self.parent.reference:
+            self.errors.append(u'the parent folder seems to be invalid')
+
         if not set(self.data.keys()) == self.config.EXPECTED_DOCUMENT_KEYS:
             self.errors.append(u"Expected keys changed")
-
-        if self.data.get('parentordner'):
-            self.errors.append(u"not implemented 'parentordner'")
 
     def print_validation_errors(self):
         if self.is_valid():
@@ -468,13 +510,76 @@ class CmiDocumentData(object):
 
     def convert(self):
         return {
-            u"_creator": u"zopemaster",
+            u"_creator": self.config.CREATOR,
             u"guid": self.data.get('guid'),
             u"description": self.data.get('bemerkung'),
             u"title": self.data.get('titel'),
             u"review_state": u"document-state-draft",
-            u"parent_guid": self.parent.reference,
+            u"parent_guid": self.parent_reference,
             u"filepath": self.bundle_file_path
+        }
+
+
+class CmiFolderData(object):
+    def __init__(self, data, config, parent_path, parent):
+        self.data = data
+        self.config = config
+        self.parent_path = parent_path
+        self.parent = parent
+        self.errors = []
+
+    @property
+    def path(self):
+        return os.path.join(self.parent_path, self.data.get('guid', ''))
+
+    @property
+    def reference(self):
+        return self.data.get('guid')
+
+    @property
+    def review_state(self):
+        return self.parent.review_state
+
+    @property
+    def parent_reference(self):
+        return self.data.get('parentordner') or self.data.get('geschaeft')
+
+    def is_valid(self):
+        return not self.errors
+
+    def validate(self):
+        self.errors = []
+        if not self.data.get('guid'):
+            self.errors.append(u'"guid" is missing for item')
+
+        if not self.parent_reference == self.parent.reference:
+            self.errors.append(u'the parent folder seems to be invalid')
+
+        if not set(self.data.keys()) == set(self.config.EXPECTED_SUBDOSSIER_KEYS):
+            self.errors.append(u"Expected keys changed: missing: %s, additional %s" % (
+                set(self.config.EXPECTED_SUBDOSSIER_KEYS) - set(self.data.keys()),
+                set(self.data.keys()) - set(self.config.EXPECTED_SUBDOSSIER_KEYS)
+            ))
+
+    def print_validation_errors(self):
+        if self.is_valid():
+            return
+
+        print(u"Validation errors for folder item with guid: '%s':" % self.data.get('guid'))
+        for error in self.errors:
+            print(error)
+
+        print(u"------------------------------------------------")
+        print(u"")
+
+    def convert(self):
+        return {
+            u"_creator": self.config.CREATOR,
+            u"guid": self.reference,
+            u"title": self.data.get('titel'),
+            u"review_state": self.review_state,
+            u"parent_guid": self.parent_reference,
+            u"responsible": self.config.RESPONSIBLE,
         }
 
 
