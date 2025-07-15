@@ -29,6 +29,7 @@ class TI2036Config(object):
     """
     REVIEW_STATE_MAPPING = {
         u'Offen': u"dossier-state-active",
+        u'Restriktiv': u"dossier-state-active",
     }
     PARENT_REFERENCE_MAPPING = {
         u"Auftrag": [[12, 4], ],
@@ -43,28 +44,30 @@ class TI2036Config(object):
         u"FC Kantonsrat": [[10, 2], ],
         u"Fraktionen": [[10, 4], ],
         u"Gerichtsverwaltung": [[14, ], ],
-        u"Gesch\xe4ftspr\xfcfungskommission [Dossiers]": [[2, 2, 1], ],
+        u"Gesch\xe4ftspr\xfcfungskommission (Dossiers)": [[2, 2, 1], ],
         u"Interpellation": [[12, 4], ],
         u"Kleine Anfrage": [[12, 4], ],
         u"Kantonsratsmitglieder": [[10, 1], ],
-        u"Gesch\xe4ftspr\xfcfungskommission [Meldungen]": [[2, 2, 1], ],
+        u"Gesch\xe4ftspr\xfcfungskommission (Meldungen)": [[2, 2, 1], ],
         u"Anl\xe4sse / Ausfl\xfcge / Besuche": [[10, 3], ],
-        u"Parlamentsdienste [interne Dossiers]": [[12, 4], ],
+        u"Parlamentsdienste (interne Dossiers)": [[12, 4], ],
         u"Petition": [[12, 4], ],
         u"KR-Pr\xe4sident/KR-Pr\xe4sidentin": [[6, ], ],
         u"Post Parlamentsdienste": [[10, 4], ],
         u"Rechtsetzungsgesch\xe4ft": [[12, 4], ],
-        u"Ratsleitung [Dossiers]": [[4, 1], ],
+        u"Ratsleitung (Dossiers)": [[4, 1], ],
         u"Session": [[9, 1], ],
         u"Sachgesch\xe4ft / Beschl\xfcsse": [[12, 4], ],
-        u"Smart Parlament [Projekte]": [[12, 2], ],
+        u"Smart Parlament (Projekte)": [[12, 2], ],
         u"Vereidigung": [[12, 4], ],
         u"Volksauftrag": [[12, 4], ],
         u"Vernehmlassungen an Bundesbeh\xf6rden": [[8, 3], ],
         u"Verordnungsveto": [[8, 1], ],
         u"Volksinitiative": [[12, 4], ],
         u"Wahlgesch\xe4ft": [[12, 4], ],
+        u"": [[12, 4], ],
     }
+
     DOCUMENTS_FOLDER_NAME = u"Dokumente"
     MAIN_JSON_FILE_NAME = u"GeschaefteExport.json"
 
