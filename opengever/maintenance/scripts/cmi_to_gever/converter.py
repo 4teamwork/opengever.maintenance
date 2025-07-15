@@ -27,6 +27,9 @@ from pkg_resources import resource_filename as rf
 class TI2036Config(object):
     """Configuration object for https://4teamwork.atlassian.net/browse/TI-2036
     """
+    CREATOR = 'zopemaster'
+    RESPONSIBLE = CREATOR
+
     REVIEW_STATE_MAPPING = {
         u'Offen': u"dossier-state-active",
         u'Restriktiv': u"dossier-state-active",
@@ -390,7 +393,7 @@ class CmiDossierData(object):
 
     def convert(self):
         return {
-            u"_creator": u"zopemaster",
+            u"_creator": self.config.CREATOR,
             u"guid": self.data.get('guid'),
             u"description": self.data.get('bemerkung'),
             u"title": self.data.get('titel'),
@@ -398,7 +401,7 @@ class CmiDossierData(object):
             u"start": self.start_date,
             u"review_state": self.config.REVIEW_STATE_MAPPING.get(self.data.get(self.REVIEW_STATE_KEY)),
             u"parent_reference": self.config.PARENT_REFERENCE_MAPPING.get(self.data.get(self.PARENT_REFERENCE_KEY)),
-            u"responsible": u"zopemaster",
+            u"responsible": self.config.RESPONSIBLE,
         }
 
 
