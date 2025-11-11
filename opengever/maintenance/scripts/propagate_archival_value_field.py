@@ -1,4 +1,10 @@
 """
+====================
+WARNING! This script does not work as expected since it is not possible to change
+the fields of a class which will be used in nightly jobs. Use the follow-up script: propagate_restricted_field_value.py
+instead.
+====================
+
 Propagates archival_value field.
 
     bin/instance run propagate_archival_value_field.py -n <repofolder_path>
