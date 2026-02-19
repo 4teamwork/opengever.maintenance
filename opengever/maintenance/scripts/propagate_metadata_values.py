@@ -30,6 +30,7 @@ FIELD_NAME_CLASSIFICATION = 'classification'
 FIELD_NAME_PRIVACY_LAYER = 'privacy_layer'
 FIELD_NAME_RETENTION_PERIOD = 'retention_period'
 FIELD_NAME_ARCHIVAL_VALUE = 'archival_value'
+FIELD_NAME_ARCHIVAL_VALUE_ANNOTATION = 'archival_value_annotation'
 FIELD_NAME_CUSTODY_PERIOD = 'custody_period'
 
 
@@ -48,6 +49,7 @@ class MetadataUpdater():
         IClassification['privacy_layer'],
         ILifeCycle['retention_period'],
         ILifeCycle['archival_value'],
+        ILifeCycle['archival_value_annotation'],
         ILifeCycle['custody_period']
     ]
 
@@ -153,6 +155,9 @@ def propagate_archival_value(repofolder_path, options):
     if FIELD_NAME_ARCHIVAL_VALUE in options.fields:
         fields.append(ILifeCycle[FIELD_NAME_ARCHIVAL_VALUE])
 
+    if FIELD_NAME_ARCHIVAL_VALUE_ANNOTATION in options.fields:
+        fields.append(ILifeCycle[FIELD_NAME_ARCHIVAL_VALUE_ANNOTATION])
+
     if FIELD_NAME_CUSTODY_PERIOD in options.fields:
         fields.append(ILifeCycle[FIELD_NAME_CUSTODY_PERIOD])
 
@@ -193,6 +198,7 @@ if __name__ == "__main__":
             FIELD_NAME_PRIVACY_LAYER,
             FIELD_NAME_RETENTION_PERIOD,
             FIELD_NAME_ARCHIVAL_VALUE,
+            FIELD_NAME_ARCHIVAL_VALUE_ANNOTATION,
             FIELD_NAME_CUSTODY_PERIOD
         ],
         help="Define which field values should be updated")
