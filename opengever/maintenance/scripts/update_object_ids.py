@@ -15,10 +15,11 @@ Notes:
    directly addressed by the given path. So this script is NOT recursive.
  - Journaling will be disabled for any renames. Therefore there won't be
    any journal entries for this operation.
-"""
 
+"""
 from Acquisition import aq_inner
 from Acquisition import aq_parent
+from five.intid.intid import moveIntIdSubscriber
 from opengever.base.interfaces import IReferenceNumber
 from opengever.globalindex.handlers import task as task_handlers
 from opengever.globalindex.handlers.task import TaskSqlSyncer
@@ -142,6 +143,9 @@ class ObjectIDUpdater(object):
         refnum_after = IReferenceNumber(obj).get_number()
         assert refnum_before == refnum_after
         assert type(refnum_before) is type(refnum_after)
+
+        # Fix broken intid references.
+        moveIntIdSubscriber(obj, None)  # see fix_broken_intid_references.py
 
 
 class ObjectIDFixer(object):
