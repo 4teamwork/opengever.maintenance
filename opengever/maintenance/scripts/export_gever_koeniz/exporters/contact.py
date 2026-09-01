@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from opengever.contact.service import ContactService
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
 
 
@@ -31,3 +32,33 @@ class ContactExporter(BaseExporter):
         u'Land',
         u'Beschreibung',
     ]
+
+    def get_items(self):
+        brains = ContactService().all_contact_brains()
+        contacts = [brain.getObject() for brain in brains]
+        return sorted(contacts, key=lambda c: (c.lastname or u'', c.firstname or u''))
+
+    def row_for_item(self, item):
+        return [
+            unicode(item.UID()),
+            item.salutation or u'',
+            item.academic_title or u'',
+            item.firstname or u'',
+            item.lastname or u'',
+            item.function or u'',
+            item.department or u'',
+            item.company or u'',
+            item.phone_office or u'',
+            item.email or u'',
+            item.phone_mobile or u'',
+            item.email2 or u'',
+            item.phone_home or u'',
+            item.url or u'',
+            item.phone_fax or u'',
+            item.address1 or u'',
+            item.address2 or u'',
+            item.zip_code or u'',
+            item.city or u'',
+            item.country or u'',
+            item.description or u'',
+        ]
