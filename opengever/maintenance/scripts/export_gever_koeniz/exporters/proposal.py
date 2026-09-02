@@ -3,10 +3,10 @@ from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import Bas
 
 
 class ProposalExporter(BaseExporter):
-    """Exports agenda items / proposals (Traktanden) as proposals.csv."""
+    """Exports agenda items / proposals (Anträge) as proposals.csv."""
 
     key = 'proposals'
-    label = u'Traktanden'
+    label = u'Anträge'
     filename = 'proposals.csv'
     id_column = u'Traktandum UID'
     headers = [
