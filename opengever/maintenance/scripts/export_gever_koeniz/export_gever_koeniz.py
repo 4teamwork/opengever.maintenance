@@ -18,6 +18,7 @@ from opengever.maintenance.scripts.export_gever_koeniz.exporters.document import
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.dossier import DossierExporter
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.keyword import KeywordExporter
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.meeting import MeetingExporter
+from opengever.maintenance.scripts.export_gever_koeniz.exporters.member import MemberExporter
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.participation import ParticipationExporter
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.proposal import ProposalExporter
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.repository import RepositoryExporter
@@ -44,6 +45,7 @@ EXPORTER_REGISTRY = OrderedDict([
     ('keywords', KeywordExporter),
     ('comments', CommentExporter),
     ('participations', ParticipationExporter),
+    ('members', MemberExporter),
     ('meetings', MeetingExporter),
     ('proposals', ProposalExporter),
     ('users', UserExporter),
