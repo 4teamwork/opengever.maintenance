@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from Acquisition import aq_inner
 from Acquisition import aq_parent
+from collections import OrderedDict
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberSettings
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
@@ -20,7 +21,7 @@ class RepositoryExporter(BaseExporter):
     headers = [
         u'Ordnungspositionsnummer',
         u'UID',
-        u'Pfad',
+        u'Übergeordnete Ordnungsposition - UID',
         u'Titel der Ordnungsposition',
         u'Titel der Ordnungsposition (französisch)',
         u'Titel der Ordnungsposition (englisch)',
@@ -36,6 +37,9 @@ class RepositoryExporter(BaseExporter):
         u'Gültig ab',
         u'Gültig bis',
     ]
+    reference_columns = OrderedDict([
+        (u'Übergeordnete Ordnungsposition - UID', 'repository'),
+    ])
 
     def get_items(self):
         active_formatter = api.portal.get_registry_record(
@@ -53,7 +57,7 @@ class RepositoryExporter(BaseExporter):
         return [
             item.get_repository_number(),
             unicode(item.UID()),
-            self._build_path(item),
+            self._parent_uid(item),
             item.title_de or u'',
             item.title_fr or u'',
             item.title_en or u'',
@@ -70,18 +74,11 @@ class RepositoryExporter(BaseExporter):
             self._format_date(item.valid_until),
         ]
 
-    def _build_path(self, folder):
-        """Breadcrumb of `<repository_number> <title_de>` per ancestor,
-        root-most first, including the folder itself.
-        """
-        segments = []
-        current = folder
-        while current is not None and IRepositoryFolder.providedBy(current):
-            segments.append(u'{} {}'.format(
-                current.get_repository_number(), current.title_de or u''))
-            current = aq_parent(aq_inner(current))
-        segments.reverse()
-        return u' / '.join(segments)
+    def _parent_uid(self, folder):
+        parent = aq_parent(aq_inner(folder))
+        if not IRepositoryFolder.providedBy(parent):
+            return u''
+        return unicode(parent.UID())
 
     def _translate(self, value):
         if not value:
