@@ -19,8 +19,7 @@ class MeetingExporter(BaseExporter):
         u'Vorsitz',
         u'Protokollführung',
         u'Ort',
-        u'Sitzungsdossier UID',
-        u'Sitzungsdokumente UID',
-        u'Teilnehmende',
-        u'Teilnehmende UID',
+        u'Sitzungsdossier - UID',
+        u'Sitzungsdokumente - UID',
+        u'Teilnehmende - UID',
     ]

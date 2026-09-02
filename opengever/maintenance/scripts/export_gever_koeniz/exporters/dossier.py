@@ -18,25 +18,25 @@ class DossierExporter(BaseExporter):
     id_column = u'Dossier UID'
     headers = [
         u'Dossier UID',
-        u'Dossier ID',
+        u'Dossier-ID',
         u'Status',
         u'Titel',
         u'Aktenzeichen Nr.',
-        u'Ordnungssystem - Ordnungsposition UID',
-        u'Übergeordnete Dossier UID',
+        u'Ordnungssystem - Ordnungsposition - UID',
+        u'Übergeordnetes Dossier - UID',
         u'Beschreibung',
-        u'Federführend - Benutzer UID',
+        u'Federführend - Benutzer - UID',
         u'Beginn',
         u'Ende',
-        u'Schlagwörter UID',
-        u'Verwandte Dossiers - Dossier UID',
+        u'Schlagwörter - UID',
+        u'Verwandte Dossiers - Dossier - UID',
     ]
     reference_columns = OrderedDict([
-        (u'Ordnungssystem - Ordnungsposition UID', 'repository'),
-        (u'Übergeordnete Dossier UID', 'dossiers'),
-        (u'Federführend - Benutzer UID', 'users'),
-        (u'Schlagwörter UID', 'keywords'),
-        (u'Verwandte Dossiers - Dossier UID', 'dossiers'),
+        (u'Ordnungssystem - Ordnungsposition - UID', 'repository'),
+        (u'Übergeordnetes Dossier - UID', 'dossiers'),
+        (u'Federführend - Benutzer - UID', 'users'),
+        (u'Schlagwörter - UID', 'keywords'),
+        (u'Verwandte Dossiers - Dossier - UID', 'dossiers'),
     ])
 
     def get_items(self):

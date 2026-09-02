@@ -9,8 +9,8 @@ class ParticipationExporter(BaseExporter):
     label = u'Beteiligungen'
     filename = 'participations.csv'
     headers = [
-        u'Dossier UID',
-        u'Benutzer UID',
-        u'Kontakt UID',
+        u'Dossier - UID',
+        u'Benutzer - UID',
+        u'Kontakt - UID',
         u'Rollen',
     ]

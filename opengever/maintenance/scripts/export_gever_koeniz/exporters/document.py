@@ -15,8 +15,8 @@ class DocumentExporter(BaseExporter):
     headers = [
         u'Dokument UID',
         u'Dokument-ID',
-        u'Übergeordnetes Dossier',
-        u'Übergeordnete Aufgabe',
+        u'Übergeordnetes Dossier - UID',
+        u'Übergeordnete Aufgabe - UID',
         u'Titel',
         u'Dokumentennummer',
         u'Datei',

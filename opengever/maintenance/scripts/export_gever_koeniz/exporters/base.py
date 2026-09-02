@@ -14,7 +14,7 @@ class BaseExporter(object):
     Subclasses may also set `id_column`, the header name of the column that
     holds that item's own id (e.g. `u'Dossier UID'`), and `reference_columns`,
     a mapping of header name to the `EXPORTER_REGISTRY` key of the exporter
-    it references (e.g. a dossier's `Übergeordnete Dossier UID` column
+    it references (e.g. a dossier's `Übergeordnetes Dossier - UID` column
     references `'dossiers'`). `export()` collects the `id_column` value of
     every row into `exported_ids`, and the values of any `reference_columns`
     into `referenced_ids`, so that the two can be cross-checked once all
