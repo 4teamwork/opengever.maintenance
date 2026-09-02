@@ -11,6 +11,7 @@ class DocumentExporter(BaseExporter):
     key = 'documents'
     label = u'Dokumente'
     filename = 'documents.csv'
+    id_column = u'Dokument UID'
     headers = [
         u'Dokument UID',
         u'Dokument-ID',

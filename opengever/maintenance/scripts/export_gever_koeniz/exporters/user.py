@@ -9,6 +9,7 @@ class UserExporter(BaseExporter):
     key = 'users'
     label = u'Benutzer'
     filename = 'users.csv'
+    id_column = u'Benutzer UID'
     headers = [
         u'Benutzer UID',
         u'Status',

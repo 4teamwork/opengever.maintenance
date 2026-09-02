@@ -68,14 +68,49 @@ class GeverKoenizExporter(object):
 
     def run(self):
         stats = OrderedDict()
+        exporters = OrderedDict()
         for key in self.export_types:
             exporter = EXPORTER_REGISTRY[key](self.portal)
             stats[exporter.label] = exporter.export(self.export_dir)
+            exporters[key] = exporter
 
         if self.export_blobs:
             EXPORTER_REGISTRY['documents'](self.portal).export_blobs(self.export_dir)
 
+        self._validate_references(exporters)
         self._log_stats(stats)
+
+    def _validate_references(self, exporters):
+        logger.info(u'Validating references...')
+        ok = missing = skipped = 0
+        for key, exporter in exporters.items():
+            for target_key, refs in exporter.referenced_ids.items():
+                target_label = EXPORTER_REGISTRY[target_key].label
+                if target_key not in exporters:
+                    logger.warning(
+                        u'  %s -> %s: SKIPPED (%s not exported in this run)',
+                        exporter.label, target_label, target_label)
+                    skipped += 1
+                    continue
+
+                known_ids = exporters[target_key].exported_ids
+                missing_ids = sorted(refs - known_ids)
+                if missing_ids:
+                    sample = u', '.join(missing_ids[:20])
+                    if len(missing_ids) > 20:
+                        sample += u', ... and {} more'.format(len(missing_ids) - 20)
+                    logger.warning(
+                        u'  %s -> %s: %d/%d references missing: %s',
+                        exporter.label, target_label, len(missing_ids), len(refs), sample)
+                    missing += 1
+                else:
+                    logger.info(
+                        u'  %s -> %s: OK (%d references)',
+                        exporter.label, target_label, len(refs))
+                    ok += 1
+
+        logger.info(
+            u'Reference validation: %d OK, %d missing, %d skipped', ok, missing, skipped)
 
     def _log_stats(self, stats):
         logger.info(

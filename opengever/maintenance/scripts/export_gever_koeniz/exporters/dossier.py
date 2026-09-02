@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import OrderedDict
 from opengever.dossier.behaviors.dossier import IDossier
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.dossier.utils import get_containing_repository_folder
@@ -14,6 +15,7 @@ class DossierExporter(BaseExporter):
     key = 'dossiers'
     label = u'Dossiers'
     filename = 'dossiers.csv'
+    id_column = u'Dossier UID'
     headers = [
         u'Dossier UID',
         u'Dossier ID',
@@ -29,6 +31,13 @@ class DossierExporter(BaseExporter):
         u'Schlagwörter UID',
         u'Verwandte Dossiers - Dossier UID',
     ]
+    reference_columns = OrderedDict([
+        (u'Ordnungssystem - Ordnungsposition UID', 'repository'),
+        (u'Übergeordnete Dossier UID', 'dossiers'),
+        (u'Federführend - Benutzer UID', 'users'),
+        (u'Schlagwörter UID', 'keywords'),
+        (u'Verwandte Dossiers - Dossier UID', 'dossiers'),
+    ])
 
     def get_items(self):
         brains = api.content.find(

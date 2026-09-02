@@ -16,6 +16,7 @@ class RepositoryExporter(BaseExporter):
     key = 'repository'
     label = u'Ordnungssystem'
     filename = 'repository.csv'
+    id_column = u'UID'
     headers = [
         u'Ordnungspositionsnummer',
         u'UID',

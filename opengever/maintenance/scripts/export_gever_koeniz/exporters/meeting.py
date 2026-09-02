@@ -8,6 +8,7 @@ class MeetingExporter(BaseExporter):
     key = 'meetings'
     label = u'Sitzungen'
     filename = 'meetings.csv'
+    id_column = u'Sitzung UID'
     headers = [
         u'Sitzung UID',
         u'Gremium',

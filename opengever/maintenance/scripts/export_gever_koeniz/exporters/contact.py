@@ -9,6 +9,7 @@ class ContactExporter(BaseExporter):
     key = 'contacts'
     label = u'Kontakte'
     filename = 'contacts.csv'
+    id_column = u'Kontakt UID'
     headers = [
         u'Kontakt UID',
         u'Anrede',

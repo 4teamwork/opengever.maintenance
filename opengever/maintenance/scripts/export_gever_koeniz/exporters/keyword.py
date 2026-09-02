@@ -15,6 +15,7 @@ class KeywordExporter(BaseExporter):
     key = 'keywords'
     label = u'Schlagwörter'
     filename = 'keywords.csv'
+    id_column = u'Schlagwort UID'
     headers = [
         u'Schlagwort UID',
         u'Schlagwort Bezeichnung',

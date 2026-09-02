@@ -8,6 +8,7 @@ class TaskExporter(BaseExporter):
     key = 'tasks'
     label = u'Aufgaben'
     filename = 'tasks.csv'
+    id_column = u'Aufgabe UID'
     headers = [
         u'Aufgabe UID',
         u'Aufgabe-ID',

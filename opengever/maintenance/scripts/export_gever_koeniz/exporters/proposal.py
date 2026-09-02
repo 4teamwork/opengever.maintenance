@@ -8,6 +8,7 @@ class ProposalExporter(BaseExporter):
     key = 'proposals'
     label = u'Traktanden'
     filename = 'proposals.csv'
+    id_column = u'Traktandum UID'
     headers = [
         u'Traktandum UID',
         u'Traktandum Nr.',
