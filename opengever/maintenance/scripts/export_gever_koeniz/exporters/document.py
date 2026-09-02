@@ -9,6 +9,7 @@ from opengever.base.solr.fields import translate_document_type
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.meeting.committeecontainer import ICommitteeContainer
 from opengever.meeting.proposal import IBaseProposal
 from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task.task import ITask
@@ -51,11 +52,24 @@ class DocumentExporter(BaseExporter):
     ])
 
     def get_items(self):
-        brains = api.content.find(
-            self._get_repository_root(),
-            object_provides=IBaseDocument.__identifier__)
-        documents = [brain.getObject() for brain in brains]
+        documents = []
+        for root in self._get_search_roots():
+            brains = api.content.find(
+                root, object_provides=IBaseDocument.__identifier__)
+            documents.extend(brain.getObject() for brain in brains)
         return sorted(documents, key=self._sequence_number)
+
+    def _get_search_roots(self):
+        """Documents live either under the repository root (Ordnungssystem)
+        or, once submitted as a proposal attachment, physically parented
+        under a SubmittedProposal in a committee container (Sitzungen) -
+        a separate top-level tree, not a descendant of the repository root.
+        """
+        roots = [self._get_repository_root()]
+        committee_container_brains = api.content.find(
+            self.portal, object_provides=ICommitteeContainer.__identifier__)
+        roots.extend(brain.getObject() for brain in committee_container_brains)
+        return roots
 
     def _get_repository_root(self):
         brains = api.content.find(
