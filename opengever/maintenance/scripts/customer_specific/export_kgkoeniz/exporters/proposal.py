@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
+from opengever.base.exceptions import InvalidOguidIntIdPart
 from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.meeting.model import SubmittedDocument
 from opengever.meeting.proposal import IProposal
@@ -24,6 +25,17 @@ def _get_proposal_document(proposal):
     if uuid is None:
         return None
     return uuidToObject(uuid)
+
+
+def _resolve_submitted(submitted_document):
+    """Like SubmittedDocument.resolve_submitted(), but tolerant of a stale
+    int_id (dangling reference to an object that no longer exists) - for
+    export purposes this is treated the same as no submitted document.
+    """
+    try:
+        return submitted_document.resolve_submitted()
+    except InvalidOguidIntIdPart:
+        return None
 
 
 class _AntragFields(object):
@@ -63,8 +75,8 @@ class _AntragFields(object):
                 continue
             submitted_document = SubmittedDocument.query.get_by_source(
                 self.proposal, document)
-            if not submitted_document or ILockable(
-                    submitted_document.resolve_submitted()).locked():
+            resolved = submitted_document and _resolve_submitted(submitted_document)
+            if resolved is None or ILockable(resolved).locked():
                 beilagen.append(_uid(document))
             else:
                 entkoppelt.append(_uid(document))
