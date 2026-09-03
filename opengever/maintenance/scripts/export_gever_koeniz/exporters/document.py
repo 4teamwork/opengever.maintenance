@@ -12,6 +12,7 @@ from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import Bas
 from opengever.meeting.committeecontainer import ICommitteeContainer
 from opengever.meeting.proposal import IBaseProposal
 from opengever.repository.repositoryroot import IRepositoryRoot
+from opengever.task import CLOSED_TASK_STATES
 from opengever.task.task import ITask
 from plone import api
 from zope.component import getUtility
@@ -82,7 +83,10 @@ class DocumentExporter(BaseExporter):
 
     def row_for_item(self, brain):
         item = brain.getObject()
-        dossier_uid, task_uid, proposal_uid = self._parent_uids(item)
+        parent = aq_parent(aq_inner(item))
+        if self._parent_task_is_closed(parent):
+            return None
+        dossier_uid, task_uid, proposal_uid = self._parent_uids(item, parent)
         return [
             unicode(item.UID()),
             self._physical_path(item),
@@ -117,12 +121,20 @@ class DocumentExporter(BaseExporter):
             return u''
         return u'/'.join((u'documents', item.UID(), item.get_filename()))
 
-    def _parent_uids(self, item):
+    def _parent_task_is_closed(self, parent):
+        """Documents whose immediate parent is a task in a closed state
+        (e.g. cancelled or tested-and-closed) are excluded from the export,
+        analogous to TaskExporter only exporting open tasks.
+        """
+        if not ITask.providedBy(parent):
+            return False
+        return api.content.get_state(parent) in CLOSED_TASK_STATES
+
+    def _parent_uids(self, item, parent):
         """Return (dossier_uid, task_uid, proposal_uid), with exactly one of
         them populated depending on the type of the document's immediate
         parent. Raises if the parent is of an unexpected type.
         """
-        parent = aq_parent(aq_inner(item))
         if IDossierMarker.providedBy(parent):
             return unicode(parent.UID()), u'', u''
         if ITask.providedBy(parent):
@@ -147,6 +159,8 @@ class DocumentExporter(BaseExporter):
         os.makedirs(blobs_dir)
         for brain in ProgressLogger(u'Dokumente (Dateien)', self.get_items()):
             item = brain.getObject()
+            if self._parent_task_is_closed(aq_parent(aq_inner(item))):
+                continue
             blob_path = self._blob_path(item)
             if not blob_path:
                 continue

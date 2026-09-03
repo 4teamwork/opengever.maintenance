@@ -32,7 +32,10 @@ class BaseExporter(object):
         return []
 
     def row_for_item(self, item):
-        """Return the CSV row (a list of column values) for a single item."""
+        """Return the CSV row (a list of column values) for a single item,
+        or None to skip the item entirely (no row written, not counted in
+        `exported_ids`/`referenced_ids`).
+        """
         return []
 
     def _physical_path(self, item):
@@ -72,6 +75,8 @@ class BaseExporter(object):
             writer.writerow([column.encode('utf-8') for column in self._csv_headers()])
             for item in ProgressLogger(self.label, self.get_items()):
                 row = self.row_for_item(item)
+                if row is None:
+                    continue
                 if id_index is not None:
                     self.exported_ids.add(row[id_index])
                 for idx, target_key in ref_indices:
