@@ -103,12 +103,9 @@ class _EingereichterAntragFields(object):
 class ProposalExporter(BaseExporter):
     """Exports Anträge and Eingereichte Anträge as proposals.csv.
 
-    Covers proposals in every workflow state. Each row corresponds to
-    exactly one `Proposal` SQL model row - the single source-of-truth
-    record for a business entity that may exist as an Antrag, an
-    Eingereichter Antrag, or (once submitted) both at once as two
-    separate physical Zope objects (the draft Proposal and the
-    SubmittedProposal); see `export()`.
+    Each row is one `Proposal` SQL model row, which may back an Antrag,
+    an Eingereichter Antrag, or - once submitted - both at once as two
+    separate physical Zope objects; see `_register_known_ids()`.
     """
 
     key = 'proposals'
@@ -141,23 +138,17 @@ class ProposalExporter(BaseExporter):
     ])
 
     def get_items(self):
-        # Every Eingereichter Antrag (SubmittedProposal) originates from an
-        # Antrag (Proposal), which is never deleted - so enumerating the
-        # SQL models of every Antrag found in this site's catalog also
-        # covers every Eingereichter Antrag, without querying the meeting
-        # database directly (which is not scoped to this Plone site).
+        # Every Eingereichter Antrag originates from an Antrag, which is
+        # never deleted - so enumerating Anträge also covers every
+        # Eingereichter Antrag, without querying the meeting database
+        # directly (which is not scoped to this Plone site).
         brains = api.content.find(
             self.portal, object_provides=IProposal.__identifier__)
-        models = []
-        for brain in brains:
-            proposal = brain.getObject()
-            model = proposal.load_model()
-            assert model is not None, (
-                u'missing db-model for {}'.format(proposal))
-            models.append(model)
-        return sorted(models, key=lambda model: model.proposal_id)
+        return sorted(brains, key=lambda brain: brain.getPath())
 
-    def row_for_item(self, item):
+    def row_for_item(self, brain):
+        item = self._load_model(brain)
+        self._register_known_ids(item)
         fields = self._fields_for(item)
         beilagen, entkoppelt = fields.attachment_uids()
         return [
@@ -176,22 +167,20 @@ class ProposalExporter(BaseExporter):
             self._excerpt_uids(item),
         ]
 
-    def export(self, export_dir):
-        count = super(ProposalExporter, self).export(export_dir)
+    def _load_model(self, brain):
+        proposal = brain.getObject()
+        model = proposal.load_model()
+        assert model is not None, u'missing db-model for {}'.format(proposal)
+        return model
 
-        # A Proposal spans up to two physical Zope objects: the Antrag
-        # (draft), and - once submitted - the Eingereichter Antrag
-        # (SubmittedProposal). DocumentExporter attributes a document to
-        # 'proposals' based on whichever of these two objects is its
-        # immediate physical parent, so both UIDs must be registered as
-        # known ids, even though only the Antrag's UID is shown as
-        # "Traktandum UID" per row.
-        for item in self.get_items():
-            for obj in (item.resolve_proposal(), item.resolve_submitted_proposal()):
-                uid = _uid(obj)
-                if uid:
-                    self.exported_ids.add(uid)
-        return count
+    def _register_known_ids(self, item):
+        # DocumentExporter can attribute a document to either the Antrag
+        # or the Eingereichter Antrag, so both UIDs must be known even
+        # though only the Antrag's UID is shown as "Traktandum UID".
+        for obj in (item.resolve_proposal(), item.resolve_submitted_proposal()):
+            uid = _uid(obj)
+            if uid:
+                self.exported_ids.add(uid)
 
     def _is_submitted(self, item):
         # submitted_int_id is cleared by reject(), which also deletes the

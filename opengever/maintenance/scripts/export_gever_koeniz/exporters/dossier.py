@@ -42,10 +42,10 @@ class DossierExporter(BaseExporter):
     def get_items(self):
         brains = api.content.find(
             self.portal, object_provides=IDossierMarker.__identifier__)
-        dossiers = [brain.getObject() for brain in brains]
-        return sorted(dossiers, key=lambda d: d.get_sequence_number())
+        return sorted(brains, key=lambda brain: brain.sequence_number)
 
-    def row_for_item(self, item):
+    def row_for_item(self, brain):
+        item = brain.getObject()
         return [
             unicode(item.UID()),
             unicode(item.get_sequence_number()),

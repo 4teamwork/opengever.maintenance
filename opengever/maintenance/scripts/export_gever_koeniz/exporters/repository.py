@@ -46,14 +46,14 @@ class RepositoryExporter(BaseExporter):
             name='formatter', interface=IReferenceNumberSettings)
         formatter = queryAdapter(
             self.portal, IReferenceNumberFormatter, name=active_formatter)
-        brains = sorted(
+        return sorted(
             api.content.find(
                 self.portal, object_provides=IRepositoryFolder.__identifier__),
             key=formatter.sorter,
         )
-        return [brain.getObject() for brain in brains]
 
-    def row_for_item(self, item):
+    def row_for_item(self, brain):
+        item = brain.getObject()
         return [
             item.get_repository_number(),
             unicode(item.UID()),

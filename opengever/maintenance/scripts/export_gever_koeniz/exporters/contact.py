@@ -36,10 +36,12 @@ class ContactExporter(BaseExporter):
 
     def get_items(self):
         brains = ContactService().all_contact_brains()
-        contacts = [brain.getObject() for brain in brains]
-        return sorted(contacts, key=lambda c: (c.lastname or u'', c.firstname or u''))
+        return sorted(
+            brains,
+            key=lambda brain: (brain.lastname or u'', brain.firstname or u''))
 
-    def row_for_item(self, item):
+    def row_for_item(self, brain):
+        item = brain.getObject()
         return [
             unicode(item.UID()),
             item.salutation or u'',

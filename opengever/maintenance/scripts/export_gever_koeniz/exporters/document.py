@@ -52,12 +52,11 @@ class DocumentExporter(BaseExporter):
     ])
 
     def get_items(self):
-        documents = []
+        brains = []
         for root in self._get_search_roots():
-            brains = api.content.find(
-                root, object_provides=IBaseDocument.__identifier__)
-            documents.extend(brain.getObject() for brain in brains)
-        return sorted(documents, key=self._sequence_number)
+            brains.extend(api.content.find(
+                root, object_provides=IBaseDocument.__identifier__))
+        return sorted(brains, key=lambda brain: brain.getPath())
 
     def _get_search_roots(self):
         """Documents live either under the repository root (Ordnungssystem)
@@ -80,7 +79,8 @@ class DocumentExporter(BaseExporter):
                     len(brains)))
         return brains[0].getObject()
 
-    def row_for_item(self, item):
+    def row_for_item(self, brain):
+        item = brain.getObject()
         dossier_uid, task_uid, proposal_uid = self._parent_uids(item)
         return [
             unicode(item.UID()),
@@ -143,7 +143,8 @@ class DocumentExporter(BaseExporter):
         """
         blobs_dir = os.path.join(export_dir, 'documents')
         os.makedirs(blobs_dir)
-        for item in ProgressLogger(u'Dokumente (Dateien)', self.get_items()):
+        for brain in ProgressLogger(u'Dokumente (Dateien)', self.get_items()):
+            item = brain.getObject()
             blob_path = self._blob_path(item)
             if not blob_path:
                 continue
