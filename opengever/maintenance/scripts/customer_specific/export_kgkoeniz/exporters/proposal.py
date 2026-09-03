@@ -4,6 +4,7 @@ from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.b
 from opengever.meeting.model import SubmittedDocument
 from opengever.meeting.proposal import IProposal
 from plone import api
+from plone.app.uuid.utils import uuidToObject
 from plone.locking.interfaces import ILockable
 from zope.i18n import translate
 
@@ -12,6 +13,17 @@ def _uid(obj):
     if obj is None:
         return u''
     return unicode(obj.UID())
+
+
+def _get_proposal_document(proposal):
+    """Like Proposal.get_proposal_document(), but without the physical
+    location check - for export purposes we only need the UID, even if
+    the document has since been moved elsewhere.
+    """
+    uuid = getattr(proposal, '_proposal_document_uuid', None)
+    if uuid is None:
+        return None
+    return uuidToObject(uuid)
 
 
 class _AntragFields(object):
@@ -39,7 +51,7 @@ class _AntragFields(object):
     def proposal_document_uid(self):
         if self.proposal is None:
             return u''
-        return _uid(self.proposal.get_proposal_document())
+        return _uid(_get_proposal_document(self.proposal))
 
     def attachment_uids(self):
         """Returns (beilagen_uids, entkoppelte_beilagen_uids)."""
@@ -86,7 +98,7 @@ class _EingereichterAntragFields(object):
     def proposal_document_uid(self):
         if self.submitted_proposal is None:
             return u''
-        return _uid(self.submitted_proposal.get_proposal_document())
+        return _uid(_get_proposal_document(self.submitted_proposal))
 
     def attachment_uids(self):
         if self.submitted_proposal is None:
