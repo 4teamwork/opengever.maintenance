@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.meeting.model.meeting import Meeting
 from pytz import timezone
 from zope.i18n import translate

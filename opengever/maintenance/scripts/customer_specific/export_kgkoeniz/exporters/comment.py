@@ -3,7 +3,7 @@ from collections import OrderedDict
 from opengever.base.response import COMMENT_RESPONSE_TYPE
 from opengever.base.response import IResponseContainer
 from opengever.dossier.behaviors.dossier import IDossierMarker
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.meeting.proposal import IProposal
 from opengever.task import OPEN_TASK_STATES
 from opengever.task.task import ITask

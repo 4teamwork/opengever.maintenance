@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.meeting.model.member import Member
 
 

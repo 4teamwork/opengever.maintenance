@@ -8,7 +8,7 @@ from opengever.base.interfaces import ISequenceNumber
 from opengever.base.solr.fields import translate_document_type
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.meeting.committeecontainer import ICommitteeContainer
 from opengever.meeting.proposal import IBaseProposal
 from opengever.repository.repositoryroot import IRepositoryRoot

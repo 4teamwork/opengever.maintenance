@@ -4,7 +4,7 @@ from Acquisition import aq_parent
 from collections import OrderedDict
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.dossier.utils import get_containing_dossier
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.task import OPEN_TASK_STATES
 from opengever.task.task import ITask
 from plone import api

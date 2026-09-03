@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from opengever.contact.service import ContactService
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 
 
 class ContactExporter(BaseExporter):

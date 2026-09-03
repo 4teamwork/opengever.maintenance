@@ -3,8 +3,8 @@ from collections import OrderedDict
 from opengever.dossier.behaviors.dossier import IDossier
 from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.dossier.utils import get_containing_repository_folder
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.keyword import generate_keyword_uid
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.keyword import generate_keyword_uid
 from plone import api
 from zope.i18n import translate
 

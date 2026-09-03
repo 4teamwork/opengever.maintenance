@@ -12,18 +12,18 @@ Help: bin/instance run export_gever_koeniz.py -h
 """
 from collections import OrderedDict
 from opengever.maintenance import dm
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.comment import CommentExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.contact import ContactExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.document import DocumentExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.dossier import DossierExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.keyword import KeywordExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.meeting import MeetingExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.member import MemberExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.participation import ParticipationExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.proposal import ProposalExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.repository import RepositoryExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.task import TaskExporter
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.user import UserExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.comment import CommentExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.contact import ContactExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.document import DocumentExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.dossier import DossierExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.keyword import KeywordExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.meeting import MeetingExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.member import MemberExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.participation import ParticipationExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.proposal import ProposalExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.repository import RepositoryExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.task import TaskExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.user import UserExporter
 import argparse
 import logging
 import os

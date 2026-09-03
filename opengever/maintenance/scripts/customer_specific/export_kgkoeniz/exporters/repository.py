@@ -4,7 +4,7 @@ from Acquisition import aq_parent
 from collections import OrderedDict
 from opengever.base.interfaces import IReferenceNumberFormatter
 from opengever.base.interfaces import IReferenceNumberSettings
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.repository.interfaces import IRepositoryFolder
 from plone import api
 from zope.component import queryAdapter

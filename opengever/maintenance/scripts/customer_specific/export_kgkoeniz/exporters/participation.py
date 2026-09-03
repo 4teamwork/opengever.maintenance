@@ -3,7 +3,7 @@ from collections import OrderedDict
 from opengever.contact.service import CONTACT_TYPE
 from opengever.dossier.behaviors.participation import IParticipationAware
 from opengever.dossier.behaviors.participation import IParticipationAwareMarker
-from opengever.maintenance.scripts.export_gever_koeniz.exporters.base import BaseExporter
+from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.ogds.base.actor import ActorLookup
 from plone import api
 
