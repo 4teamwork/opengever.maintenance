@@ -40,6 +40,20 @@ class BaseExporter(object):
         portal_path = self.portal.getPhysicalPath()
         return u'/'.join(item.getPhysicalPath()[len(portal_path):])
 
+    def _csv_headers(self):
+        """CSV header row: for a reference column, the target exporter's
+        key is appended (e.g. 'Übergeordnetes Dossier - UID -- dossiers'),
+        so the CSV documents which file a UID/ID column refers to.
+        """
+        headers = []
+        for header in self.headers:
+            target_key = self.reference_columns.get(header)
+            if target_key:
+                headers.append(u'{} -- {}'.format(header, target_key))
+            else:
+                headers.append(header)
+        return headers
+
     def export(self, export_dir):
         """Write the CSV file for this exporter into `export_dir`.
 
@@ -55,7 +69,7 @@ class BaseExporter(object):
             writer = csv.writer(
                 csv_file, delimiter=';', quotechar='"',
                 quoting=csv.QUOTE_MINIMAL)
-            writer.writerow([column.encode('utf-8') for column in self.headers])
+            writer.writerow([column.encode('utf-8') for column in self._csv_headers()])
             for item in ProgressLogger(self.label, self.get_items()):
                 row = self.row_for_item(item)
                 if id_index is not None:
