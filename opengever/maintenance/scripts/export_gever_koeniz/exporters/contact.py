@@ -12,6 +12,7 @@ class ContactExporter(BaseExporter):
     id_column = u'Kontakt UID'
     headers = [
         u'Kontakt UID',
+        u'Pfad zum Objekt',
         u'Anrede',
         u'Titel',
         u'Vorname',
@@ -44,6 +45,7 @@ class ContactExporter(BaseExporter):
         item = brain.getObject()
         return [
             unicode(item.UID()),
+            self._physical_path(item),
             item.salutation or u'',
             item.academic_title or u'',
             item.firstname or u'',

@@ -35,6 +35,11 @@ class BaseExporter(object):
         """Return the CSV row (a list of column values) for a single item."""
         return []
 
+    def _physical_path(self, item):
+        """Physical path of a Plone object, relative to the site root."""
+        portal_path = self.portal.getPhysicalPath()
+        return u'/'.join(item.getPhysicalPath()[len(portal_path):])
+
     def export(self, export_dir):
         """Write the CSV file for this exporter into `export_dir`.
 

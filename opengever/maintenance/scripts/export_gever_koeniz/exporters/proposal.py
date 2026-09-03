@@ -114,6 +114,7 @@ class ProposalExporter(BaseExporter):
     id_column = u'Traktandum UID'
     headers = [
         u'Traktandum UID',
+        u'Pfad zum Objekt',
         u'Traktandum Nr.',
         u'Beschlussnummer',
         u'Titel',
@@ -153,6 +154,7 @@ class ProposalExporter(BaseExporter):
         beilagen, entkoppelt = fields.attachment_uids()
         return [
             self._proposal_uid(item),
+            self._proposal_path(item),
             self._item_number(item),
             self._decision_number(item),
             fields.title,
@@ -193,11 +195,21 @@ class ProposalExporter(BaseExporter):
             return _EingereichterAntragFields(item)
         return _AntragFields(item)
 
+    def _proposal_object(self, item):
+        """The physical object backing the "Traktandum UID": the Antrag,
+        or - once the Antrag itself is no longer resolvable - the
+        Eingereichter Antrag. Mirrors `_proposal_uid`.
+        """
+        return item.resolve_proposal() or item.resolve_submitted_proposal()
+
     def _proposal_uid(self, item):
-        uid = _uid(item.resolve_proposal())
-        if uid:
-            return uid
-        return _uid(item.resolve_submitted_proposal())
+        return _uid(self._proposal_object(item))
+
+    def _proposal_path(self, item):
+        obj = self._proposal_object(item)
+        if obj is None:
+            return u''
+        return self._physical_path(obj)
 
     def _item_number(self, item):
         if item.agenda_item and item.agenda_item.item_number:

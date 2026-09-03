@@ -18,6 +18,7 @@ class DossierExporter(BaseExporter):
     id_column = u'Dossier UID'
     headers = [
         u'Dossier UID',
+        u'Pfad zum Objekt',
         u'Dossier-ID',
         u'Status',
         u'Titel',
@@ -48,6 +49,7 @@ class DossierExporter(BaseExporter):
         item = brain.getObject()
         return [
             unicode(item.UID()),
+            self._physical_path(item),
             unicode(item.get_sequence_number()),
             self._translate_state(item),
             item.title or u'',

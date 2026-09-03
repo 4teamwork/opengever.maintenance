@@ -21,6 +21,7 @@ class TaskExporter(BaseExporter):
     id_column = u'Aufgabe UID'
     headers = [
         u'Aufgabe UID',
+        u'Pfad zum Objekt',
         u'Aufgabe-ID',
         u'Dossier - UID',
         u'Übergeordnete Aufgabe - UID',
@@ -55,6 +56,7 @@ class TaskExporter(BaseExporter):
         item = brain.getObject()
         return [
             unicode(item.UID()),
+            self._physical_path(item),
             unicode(item.get_sequence_number()),
             self._dossier_uid(item),
             self._parent_task_uid(item),

@@ -29,6 +29,7 @@ class DocumentExporter(BaseExporter):
     id_column = u'Dokument UID'
     headers = [
         u'Dokument UID',
+        u'Pfad zum Objekt',
         u'Dokument-ID',
         u'Übergeordnetes Dossier - UID',
         u'Übergeordnete Aufgabe - UID',
@@ -84,6 +85,7 @@ class DocumentExporter(BaseExporter):
         dossier_uid, task_uid, proposal_uid = self._parent_uids(item)
         return [
             unicode(item.UID()),
+            self._physical_path(item),
             unicode(self._sequence_number(item)),
             dossier_uid,
             task_uid,

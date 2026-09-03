@@ -21,6 +21,7 @@ class RepositoryExporter(BaseExporter):
     headers = [
         u'Ordnungspositionsnummer',
         u'Ordnungsposition UID',
+        u'Pfad zum Objekt',
         u'Übergeordnete Ordnungsposition - UID',
         u'Titel der Ordnungsposition',
         u'Titel der Ordnungsposition (französisch)',
@@ -57,6 +58,7 @@ class RepositoryExporter(BaseExporter):
         return [
             item.get_repository_number(),
             unicode(item.UID()),
+            self._physical_path(item),
             self._parent_uid(item),
             item.title_de or u'',
             item.title_fr or u'',
