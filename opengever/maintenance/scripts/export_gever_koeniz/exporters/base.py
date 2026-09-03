@@ -9,18 +9,10 @@ class BaseExporter(object):
     """Base class for all CMI export types.
 
     Subclasses set `key`, `label`, `filename` and `headers`, and override
-    `get_items`/`row_for_item` to provide the actual data.
-
-    Subclasses may also set `id_column`, the header name of the column that
-    holds that item's own id (e.g. `u'Dossier UID'`), and `reference_columns`,
-    a mapping of header name to the `EXPORTER_REGISTRY` key of the exporter
-    it references (e.g. a dossier's `Übergeordnetes Dossier - UID` column
-    references `'dossiers'`). `export()` collects the `id_column` value of
-    every row into `exported_ids`, and the values of any `reference_columns`
-    into `referenced_ids`, so that the two can be cross-checked once all
-    exporters have run. Leave `id_column` unset for exporters whose rows
-    have no native id (e.g. comments, participations) — they simply won't
-    be a validation target.
+    `get_items`/`row_for_item`. `id_column` and `reference_columns` are
+    optional: if set, `export()` collects both into `exported_ids` /
+    `referenced_ids` so the runner can cross-check them across exporters
+    once every export has finished.
     """
 
     key = None
