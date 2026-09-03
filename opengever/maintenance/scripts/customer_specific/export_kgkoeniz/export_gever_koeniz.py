@@ -11,6 +11,7 @@ Usage:
 Help: bin/instance run export_gever_koeniz.py -h
 """
 from collections import OrderedDict
+from zope.globalrequest import setRequest
 from opengever.maintenance import dm
 from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.comment import CommentExporter
 from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.contact import ContactExporter
@@ -124,6 +125,7 @@ class GeverKoenizExporter(object):
 
 if __name__ == '__main__':
     dm()  # Sets up the `plone` global, using the sole Plone site.
+    setRequest(plone.REQUEST)
     transaction.doom()  # This export is read-only.
 
     parser = argparse.ArgumentParser(
