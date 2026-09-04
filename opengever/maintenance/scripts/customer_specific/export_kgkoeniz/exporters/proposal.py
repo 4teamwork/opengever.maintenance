@@ -167,8 +167,9 @@ class ProposalExporter(BaseExporter):
         # never deleted - so enumerating Anträge also covers every
         # Eingereichter Antrag, without querying the meeting database
         # directly (which is not scoped to this Plone site).
-        brains = api.content.find(
-            self.portal, object_provides=IProposal.__identifier__)
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IProposal.__identifier__)
         return sorted(brains, key=lambda brain: brain.getPath())
 
     def row_for_item(self, brain):

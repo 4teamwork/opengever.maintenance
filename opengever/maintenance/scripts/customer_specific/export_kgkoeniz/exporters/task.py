@@ -47,8 +47,9 @@ class TaskExporter(BaseExporter):
     ])
 
     def get_items(self):
-        brains = api.content.find(
-            self.portal, object_provides=ITask.__identifier__,
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=ITask.__identifier__,
             review_state=OPEN_TASK_STATES)
         return sorted(brains, key=lambda brain: brain.getPath())
 

@@ -41,8 +41,9 @@ class DossierExporter(BaseExporter):
     ])
 
     def get_items(self):
-        brains = api.content.find(
-            self.portal, object_provides=IDossierMarker.__identifier__)
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IDossierMarker.__identifier__)
         return sorted(brains, key=lambda brain: brain.sequence_number)
 
     def row_for_item(self, brain):

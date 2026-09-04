@@ -54,10 +54,12 @@ class DocumentExporter(BaseExporter):
     ])
 
     def get_items(self):
+        catalog = api.portal.get_tool('portal_catalog')
         brains = []
         for root in self._get_search_roots():
-            brains.extend(api.content.find(
-                root, object_provides=IBaseDocument.__identifier__))
+            brains.extend(catalog.unrestrictedSearchResults(
+                object_provides=IBaseDocument.__identifier__,
+                path=u'/'.join(root.getPhysicalPath())))
         return sorted(brains, key=lambda brain: brain.getPath())
 
     def _get_search_roots(self):
@@ -66,15 +68,17 @@ class DocumentExporter(BaseExporter):
         under a SubmittedProposal in a committee container (Sitzungen) -
         a separate top-level tree, not a descendant of the repository root.
         """
+        catalog = api.portal.get_tool('portal_catalog')
         roots = [self._get_repository_root()]
-        committee_container_brains = api.content.find(
-            self.portal, object_provides=ICommitteeContainer.__identifier__)
+        committee_container_brains = catalog.unrestrictedSearchResults(
+            object_provides=ICommitteeContainer.__identifier__)
         roots.extend(brain.getObject() for brain in committee_container_brains)
         return roots
 
     def _get_repository_root(self):
-        brains = api.content.find(
-            self.portal, object_provides=IRepositoryRoot.__identifier__)
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IRepositoryRoot.__identifier__)
         if len(brains) != 1:
             raise ValueError(
                 u'Expected exactly one repository root, found {}'.format(

@@ -47,9 +47,10 @@ class RepositoryExporter(BaseExporter):
             name='formatter', interface=IReferenceNumberSettings)
         formatter = queryAdapter(
             self.portal, IReferenceNumberFormatter, name=active_formatter)
+        catalog = api.portal.get_tool('portal_catalog')
         return sorted(
-            api.content.find(
-                self.portal, object_provides=IRepositoryFolder.__identifier__),
+            catalog.unrestrictedSearchResults(
+                object_provides=IRepositoryFolder.__identifier__),
             key=formatter.sorter,
         )
 

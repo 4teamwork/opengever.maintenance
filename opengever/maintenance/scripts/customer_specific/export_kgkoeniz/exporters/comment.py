@@ -63,8 +63,9 @@ class CommentExporter(BaseExporter):
         ]
 
     def _dossier_comments(self):
-        brains = api.content.find(
-            self.portal, object_provides=IDossierMarker.__identifier__)
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IDossierMarker.__identifier__)
         items = []
         for brain in sorted(brains, key=lambda brain: brain.UID):
             dossier = brain.getObject()
@@ -75,8 +76,9 @@ class CommentExporter(BaseExporter):
     def _task_comments(self):
         # Restricted to open tasks, like TaskExporter - so every Aufgabe -
         # UID referenced here is also present in tasks.csv.
-        brains = api.content.find(
-            self.portal, object_provides=ITask.__identifier__,
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=ITask.__identifier__,
             review_state=OPEN_TASK_STATES)
         items = []
         for brain in sorted(brains, key=lambda brain: brain.getPath()):
@@ -90,7 +92,9 @@ class CommentExporter(BaseExporter):
         # Antrag) are separate physical objects, each with their own
         # comments - see ProposalExporter. Both are attributed to the
         # canonical "Traktandum UID" used there.
-        brains = api.content.find(self.portal, object_provides=IProposal.__identifier__)
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IProposal.__identifier__)
         items = []
         for brain in sorted(brains, key=lambda brain: brain.getPath()):
             proposal = brain.getObject()

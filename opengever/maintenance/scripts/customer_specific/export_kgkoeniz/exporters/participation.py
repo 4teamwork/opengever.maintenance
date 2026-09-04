@@ -38,8 +38,9 @@ class ParticipationExporter(BaseExporter):
     ])
 
     def get_items(self):
-        brains = api.content.find(
-            self.portal, object_provides=IParticipationAwareMarker.__identifier__)
+        catalog = api.portal.get_tool('portal_catalog')
+        brains = catalog.unrestrictedSearchResults(
+            object_provides=IParticipationAwareMarker.__identifier__)
         items = []
         for brain in sorted(brains, key=lambda brain: brain.UID):
             dossier = brain.getObject()
