@@ -10,7 +10,6 @@ from opengever.dossier.behaviors.dossier import IDossierMarker
 from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.base import BaseExporter
 from opengever.meeting.committeecontainer import ICommitteeContainer
 from opengever.meeting.proposal import IBaseProposal
-from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task import CLOSED_TASK_STATES
 from opengever.task.task import ITask
 from plone import api
@@ -74,14 +73,7 @@ class DocumentExporter(BaseExporter):
         return roots
 
     def _get_repository_root(self):
-        catalog = api.portal.get_tool('portal_catalog')
-        brains = catalog.unrestrictedSearchResults(
-            object_provides=IRepositoryRoot.__identifier__)
-        if len(brains) != 1:
-            raise ValueError(
-                u'Expected exactly one repository root, found {}'.format(
-                    len(brains)))
-        return brains[0].getObject()
+        return self.portal.unrestrictedTraverse('ordnungssystem')
 
     def row_for_item(self, brain):
         item = brain.getObject()
