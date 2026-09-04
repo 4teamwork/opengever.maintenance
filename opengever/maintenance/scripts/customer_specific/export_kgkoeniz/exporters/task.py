@@ -57,7 +57,7 @@ class TaskExporter(BaseExporter):
         return [
             unicode(item.UID()),
             self._physical_path(item),
-            unicode(item.get_sequence_number()),
+            unicode(brain.id),
             self._dossier_uid(item),
             self._parent_task_uid(item),
             self._translate_state(item),

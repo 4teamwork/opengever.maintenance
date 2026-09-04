@@ -4,7 +4,6 @@ from Acquisition import aq_parent
 from collections import OrderedDict
 from ftw.upgrade import ProgressLogger
 from opengever.base.interfaces import IReferenceNumber
-from opengever.base.interfaces import ISequenceNumber
 from opengever.base.solr.fields import translate_document_type
 from opengever.document.behaviors import IBaseDocument
 from opengever.dossier.behaviors.dossier import IDossierMarker
@@ -15,7 +14,6 @@ from opengever.repository.repositoryroot import IRepositoryRoot
 from opengever.task import CLOSED_TASK_STATES
 from opengever.task.task import ITask
 from plone import api
-from zope.component import getUtility
 import os
 
 
@@ -94,7 +92,7 @@ class DocumentExporter(BaseExporter):
         return [
             unicode(item.UID()),
             self._physical_path(item),
-            unicode(self._sequence_number(item)),
+            unicode(brain.id),
             dossier_uid,
             task_uid,
             proposal_uid,
@@ -110,9 +108,6 @@ class DocumentExporter(BaseExporter):
             item.document_author or u'',
             u'Ja' if item.preserved_as_paper else u'Nein',
         ]
-
-    def _sequence_number(self, item):
-        return getUtility(ISequenceNumber).get_number(item)
 
     def _reference_number(self, item):
         return IReferenceNumber(item).get_number() or u''

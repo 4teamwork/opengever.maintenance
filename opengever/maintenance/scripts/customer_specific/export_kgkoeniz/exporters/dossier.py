@@ -50,7 +50,7 @@ class DossierExporter(BaseExporter):
         return [
             unicode(item.UID()),
             self._physical_path(item),
-            unicode(item.get_sequence_number()),
+            unicode(brain.id),
             self._translate_state(item),
             item.title or u'',
             item.get_reference_number() or u'',
