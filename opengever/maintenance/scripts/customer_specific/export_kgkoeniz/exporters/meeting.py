@@ -15,6 +15,7 @@ class MeetingExporter(BaseExporter):
     id_column = u'Sitzung-ID'
     headers = [
         u'Sitzung-ID',
+        u'Pfad zum Objekt',
         u'Gremium',
         u'Sitzungstitel',
         u'Status',
@@ -43,6 +44,7 @@ class MeetingExporter(BaseExporter):
     def row_for_item(self, item):
         return [
             unicode(item.meeting_id),
+            item.physical_path,
             item.committee.title or u'',
             item.title or u'',
             self._translate_state(item),
