@@ -8,7 +8,6 @@ from opengever.maintenance.scripts.customer_specific.export_kgkoeniz.exporters.b
 from opengever.repository.interfaces import IRepositoryFolder
 from plone import api
 from zope.component import queryAdapter
-from zope.i18n import translate
 
 
 class RepositoryExporter(BaseExporter):
@@ -24,17 +23,7 @@ class RepositoryExporter(BaseExporter):
         u'Pfad zum Objekt',
         u'Übergeordnete Ordnungsposition - UID',
         u'Titel der Ordnungsposition',
-        u'Titel der Ordnungsposition (französisch)',
-        u'Titel der Ordnungsposition (englisch)',
         u'Beschreibung (optional)',
-        u'Klassifikation',
-        u'Datenschutz',
-        u'Öffentlichkeitsstatus',
-        u'Aufbewahrungsdauer (Jahre)',
-        u'Kommentar zur Aufbewahrungsdauer',
-        u'Archivwürdigkeit',
-        u'Kommentar zur Archivwürdigkeit',
-        u'Archivische Schutzfrist (Jahre)',
         u'Gültig ab',
         u'Gültig bis',
     ]
@@ -62,17 +51,7 @@ class RepositoryExporter(BaseExporter):
             self._physical_path(item),
             self._parent_uid(item),
             item.title_de or u'',
-            item.title_fr or u'',
-            item.title_en or u'',
             item.description or u'',
-            self._translate(item.classification),
-            self._translate(item.privacy_layer),
-            self._translate(item.public_trial),
-            unicode(item.get_retention_period()),
-            item.get_retention_period_annotation() or u'',
-            self._translate(item.get_archival_value()),
-            item.get_archival_value_annotation() or u'',
-            unicode(item.get_custody_period()),
             self._format_date(item.valid_from),
             self._format_date(item.valid_until),
         ]
@@ -82,11 +61,6 @@ class RepositoryExporter(BaseExporter):
         if not IRepositoryFolder.providedBy(parent):
             return u''
         return unicode(parent.UID())
-
-    def _translate(self, value):
-        if not value:
-            return u''
-        return translate(value, domain='opengever.base', target_language='de')
 
     def _format_date(self, value):
         if not value:

@@ -31,7 +31,7 @@ Echte Mehrfachbeziehungen (m:n), bei denen ein Datensatz tatsächlich zu mehrere
 
 ## 3. Neu ergänzte Tabellen
 
-**Ordnungssystem (`repository.csv`):** Im Original existiert keine eigene Exporttabelle für das Ordnungssystem – Dossiers referenzieren lediglich eine `Ordnungsposition UID`, ohne dass die Ordnungspositionen selbst (Titel, Hierarchie, Klassifikation, Aufbewahrungsfristen, Archivwürdigkeit etc.) exportiert würden. Diese Tabelle wurde ergänzt, da die Ordnungsstruktur sowie die Aufbewahrungs- und Archivierungsattribute (im Original bei Dossier mit „-" als noch nicht definiert markiert) inhaltlich zur Ordnungsposition gehören und ohne sie nicht rekonstruierbar sind.
+**Ordnungssystem (`repository.csv`):** Im Original existiert keine eigene Exporttabelle für das Ordnungssystem – Dossiers referenzieren lediglich eine `Ordnungsposition UID`, ohne dass die Ordnungspositionen selbst (Titel, Hierarchie etc.) exportiert würden. Diese Tabelle wurde ergänzt, da die Ordnungsstruktur inhaltlich zur Ordnungsposition gehört und ohne sie nicht rekonstruierbar ist.
 
 **Sitzungsmitglieder (`members.csv`):** Im Original werden Vorsitz und Teilnehmende einer Sitzung nur als Klartext-Namen geführt, ohne eigene, referenzierbare Datensätze. Diese Tabelle wurde ergänzt, damit Vorsitz und Teilnehmende wie alle anderen Beziehungen über eine stabile ID referenziert werden können, statt über einen Namen, der z.B. bei Schreibvarianten oder Namensänderungen nicht eindeutig ist.
 
@@ -63,7 +63,7 @@ Mehrere Felder waren im Original mit „-" (Lieferung/Feldtyp noch nicht definie
 
 | Feld (Original) | Umgang in der Umsetzung | Begründung |
 |---|---|---|
-| Aufbewahrungsdauer, Kommentar zur Aufbewahrungsdauer, Archivwürdigkeit, Kommentar zur Archivwürdigkeit, Archivische Schutzfrist (bei Dossier mit „-" markiert) | In `repository.csv` als vollständig definierte Felder der Ordnungsposition geführt | Diese Attribute gehören inhaltlich zur Ordnungsposition, nicht zum einzelnen Dossier, und werden dort korrekt und einheitlich geliefert (siehe Abschnitt 3). |
+| Klassifikation, Datenschutz, Öffentlichkeitsstatus, Aufbewahrungsdauer, Kommentar zur Aufbewahrungsdauer, Archivwürdigkeit, Kommentar zur Archivwürdigkeit, Archivische Schutzfrist, Titel der Ordnungsposition (französisch/englisch) (bei Dossier mit „-" markiert) | Nicht übernommen | Diese Attribute gehören inhaltlich zur Ordnungsposition, sind aber für die Migration nicht relevant und werden bewusst nicht exportiert. |
 | Verknüpfte Teamräume (Titel + UID) | Nicht übernommen | Teamräume/Workspaces sind kein Bestandteil dieses Exports; es existiert kein entsprechendes CMI-Zielkonzept im Rahmen dieser Datenlieferung. |
 | Ablage-Präfix, Behältnis-Art, Anzahl Behältnisse, Behältnis Standort, Externe Referenz, Dossiertyp | Nicht übernommen (im Original grösstenteils undefiniert oder ohne Beispielwert) | Physische Ablageattribute ohne digitales Äquivalent bzw. im Original nicht spezifiziert. |
 | Dateigrösse, Version, Genehmigung, Eingereicht bei, Antrag/Eingereichter Antrag/Sitzung als eigene Felder (bei Dokumente, alle im Original mit „-" markiert) | Nicht übernommen; Zuordnung zu Antrag/Aufgabe erfolgt stattdessen über die neu ergänzte Parent-Referenz (Abschnitt 5) | Im Original nicht spezifiziert; die relevante Information (Zugehörigkeit zu Antrag/Aufgabe) wird bereits durch die neue Parent-Referenz abgedeckt. |

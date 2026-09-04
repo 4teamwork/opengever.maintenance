@@ -82,17 +82,7 @@ Der CMI-Export bildet die gleichen Daten (Ordnungspositionen sortiert nach Ordnu
 | Pfad zum Objekt | Text | Physischer Pfad der Ordnungsposition als Text | ordnungssystem/politik-und-verwaltung |
 | Übergeordnete Ordnungsposition - UID | Assoc | UID der übergeordneten Ordnungsposition als Text | 2eb9f56139f740a0a312cd27a6382f6a |
 | Titel der Ordnungsposition | Text | Titel der Ordnungsposition als Text | Politik und Verwaltung |
-| Titel der Ordnungsposition (französisch) | Text | Titel der Ordnungsposition (FR) als Text | Politique et administration |
-| Titel der Ordnungsposition (englisch) | Text | Titel der Ordnungsposition (EN) als Text | Politics and administration |
 | Beschreibung (optional) | Text | Beschreibung der Ordnungsposition als Text | Lorem Ipsum |
-| Klassifikation | Assoc | Klassifikation der Ordnungsposition als Text | Nicht klassifiziert |
-| Datenschutz | Assoc | Datenschutz der Ordnungsposition als Text | Nein |
-| Öffentlichkeitsstatus | Assoc | Öffentlichkeitsstatus der Ordnungsposition als Text | Nicht geprüft |
-| Aufbewahrungsdauer (Jahre) | Text | Aufbewahrungsdauer der Ordnungsposition als Text | 10 |
-| Kommentar zur Aufbewahrungsdauer | Text | Kommentar zur Aufbewahrungsdauer als Text | Lorem Ipsum |
-| Archivwürdigkeit | Assoc | Archivwürdigkeit der Ordnungsposition als Text | Ja |
-| Kommentar zur Archivwürdigkeit | Text | Kommentar zur Archivwürdigkeit als Text | Lorem Ipsum |
-| Archivische Schutzfrist (Jahre) | Text | Archivische Schutzfrist der Ordnungsposition als Text | 5 |
 | Gültig ab | Datum | Gültig ab Datum der Ordnungsposition als Text | 01.01.2020 |
 | Gültig bis | Datum | Gültig bis Datum der Ordnungsposition als Text | 31.12.2030 |
 
