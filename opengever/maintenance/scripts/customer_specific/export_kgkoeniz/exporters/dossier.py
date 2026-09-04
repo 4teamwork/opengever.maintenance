@@ -84,7 +84,7 @@ class DossierExporter(BaseExporter):
 
     def _keyword_uids(self, item):
         keywords = IDossier(item).keywords
-        return u'|'.join(generate_keyword_uid(keyword) for keyword in keywords)
+        return u'|'.join(generate_keyword_uid(keyword) for keyword in keywords if keyword)
 
     def _related_dossier_uids(self, item):
         related = [rel.to_object for rel in IDossier(item).relatedDossier
