@@ -168,9 +168,8 @@ class ProposalExporter(BaseExporter):
         # Eingereichter Antrag, without querying the meeting database
         # directly (which is not scoped to this Plone site).
         catalog = api.portal.get_tool('portal_catalog')
-        brains = catalog.unrestrictedSearchResults(
+        return catalog.unrestrictedSearchResults(
             object_provides=IProposal.__identifier__)
-        return sorted(brains, key=lambda brain: brain.getPath())
 
     def row_for_item(self, brain):
         item = self._load_model(brain)

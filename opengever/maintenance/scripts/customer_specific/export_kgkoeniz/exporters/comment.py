@@ -65,9 +65,9 @@ class CommentExporter(BaseExporter):
     def _dossier_comments(self):
         catalog = api.portal.get_tool('portal_catalog')
         brains = catalog.unrestrictedSearchResults(
-            object_provides=IDossierMarker.__identifier__)
+            object_provides=IDossierMarker.__identifier__, sort_on='UID')
         items = []
-        for brain in sorted(brains, key=lambda brain: brain.UID):
+        for brain in brains:
             dossier = brain.getObject()
             for response in self._comment_responses(dossier):
                 items.append((response, _uid(dossier), u'', u''))
@@ -81,7 +81,7 @@ class CommentExporter(BaseExporter):
             object_provides=ITask.__identifier__,
             review_state=OPEN_TASK_STATES)
         items = []
-        for brain in sorted(brains, key=lambda brain: brain.getPath()):
+        for brain in brains:
             task = brain.getObject()
             for response in self._comment_responses(task):
                 items.append((response, u'', u'', _uid(task)))
@@ -96,7 +96,7 @@ class CommentExporter(BaseExporter):
         brains = catalog.unrestrictedSearchResults(
             object_provides=IProposal.__identifier__)
         items = []
-        for brain in sorted(brains, key=lambda brain: brain.getPath()):
+        for brain in brains:
             proposal = brain.getObject()
             model = proposal.load_model()
             assert model is not None, u'missing db-model for {}'.format(proposal)
@@ -115,9 +115,11 @@ class CommentExporter(BaseExporter):
         return _uid(model.resolve_submitted_proposal())
 
     def _comment_responses(self, obj):
-        responses = [response for response in IResponseContainer(obj).list()
-                     if response.response_type == COMMENT_RESPONSE_TYPE]
-        return sorted(responses, key=lambda response: response.response_id)
+        # ResponseContainer.list() returns storage.values() off an LOBTree
+        # keyed by response_id, so responses already come back in
+        # chronological (response_id-ascending) order.
+        return [response for response in IResponseContainer(obj).list()
+                if response.response_type == COMMENT_RESPONSE_TYPE]
 
     def _format_date(self, value):
         if not value:

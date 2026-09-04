@@ -36,10 +36,7 @@ class ContactExporter(BaseExporter):
     ]
 
     def get_items(self):
-        brains = ContactService().all_contact_brains()
-        return sorted(
-            brains,
-            key=lambda brain: (brain.lastname or u'', brain.firstname or u''))
+        return ContactService().all_contact_brains()
 
     def row_for_item(self, brain):
         item = brain.getObject()

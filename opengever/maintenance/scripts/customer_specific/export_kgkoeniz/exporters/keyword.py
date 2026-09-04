@@ -22,9 +22,10 @@ class KeywordExporter(BaseExporter):
     ]
 
     def get_items(self):
+        # uniqueValuesFor iterates the index's BTree keys, which already
+        # come back in sorted order.
         catalog = api.portal.get_tool('portal_catalog')
-        keywords = [kw for kw in catalog.uniqueValuesFor('Subject') if kw]
-        return sorted(keywords)
+        return [kw for kw in catalog.uniqueValuesFor('Subject') if kw]
 
     def row_for_item(self, item):
         return [

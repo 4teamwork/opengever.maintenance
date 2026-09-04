@@ -60,7 +60,7 @@ class DocumentExporter(BaseExporter):
             brains.extend(catalog.unrestrictedSearchResults(
                 object_provides=IBaseDocument.__identifier__,
                 path=u'/'.join(root.getPhysicalPath())))
-        return sorted(brains, key=lambda brain: brain.getPath())
+        return brains
 
     def _get_search_roots(self):
         """Documents live either under the repository root (Ordnungssystem)

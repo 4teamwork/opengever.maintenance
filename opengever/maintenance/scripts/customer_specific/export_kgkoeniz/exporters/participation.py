@@ -40,12 +40,12 @@ class ParticipationExporter(BaseExporter):
     def get_items(self):
         catalog = api.portal.get_tool('portal_catalog')
         brains = catalog.unrestrictedSearchResults(
-            object_provides=IParticipationAwareMarker.__identifier__)
+            object_provides=IParticipationAwareMarker.__identifier__, sort_on='UID')
         items = []
-        for brain in sorted(brains, key=lambda brain: brain.UID):
+        for brain in brains:
             dossier = brain.getObject()
             participations = IParticipationAware(dossier).get_participations()
-            for participation in sorted(participations, key=lambda p: p.contact):
+            for participation in participations:
                 items.append((dossier, participation))
         return items
 

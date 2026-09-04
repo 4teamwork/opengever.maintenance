@@ -48,10 +48,9 @@ class TaskExporter(BaseExporter):
 
     def get_items(self):
         catalog = api.portal.get_tool('portal_catalog')
-        brains = catalog.unrestrictedSearchResults(
+        return catalog.unrestrictedSearchResults(
             object_provides=ITask.__identifier__,
             review_state=OPEN_TASK_STATES)
-        return sorted(brains, key=lambda brain: brain.getPath())
 
     def row_for_item(self, brain):
         item = brain.getObject()
